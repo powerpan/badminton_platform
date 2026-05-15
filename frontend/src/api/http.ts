@@ -16,13 +16,16 @@ http.interceptors.request.use((config) => {
 http.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    const status = error.response?.status;
     const message = error.response?.data?.message || "请求失败";
-    if (error.response?.status === 401) {
+    if (status === 401) {
       localStorage.removeItem("bf_token");
       localStorage.removeItem("bf_user");
       if (window.location.pathname !== "/login") {
         window.location.assign("/login");
       }
+    } else if (status === 403 && window.location.pathname.startsWith("/admin")) {
+      window.location.assign("/");
     }
     return Promise.reject(new Error(message));
   },

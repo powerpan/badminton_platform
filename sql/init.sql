@@ -97,6 +97,9 @@ CREATE TABLE IF NOT EXISTS operation_log (
 
 INSERT INTO config (config_key, config_value, description)
 VALUES
+  ('business_start_time', '09:00', '每日营业开始时间'),
+  ('business_end_time', '21:00', '每日营业结束时间'),
+  ('slot_interval_minutes', '60', '预约时间段间隔，单位分钟'),
   ('max_reservation_hours', '2', '单次最大预约小时数'),
   ('reservation_lock_ttl_seconds', '300', '预约锁超时时间，单位秒'),
   ('advance_reservation_days', '7', '可提前预约天数'),

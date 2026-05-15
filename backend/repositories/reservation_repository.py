@@ -1,0 +1,204 @@
+from datetime import date, time
+from typing import Any
+
+from config.settings import Settings
+from repositories.database import execute, fetch_all, fetch_one
+
+
+ACTIVE_STATUSES = ("pending", "confirmed")
+
+
+async def list_reservations_for_court_date(
+    settings: Settings,
+    *,
+    court_id: int,
+    reserve_date: date,
+) -> list[dict[str, Any]]:
+    return await fetch_all(
+        settings,
+        """
+        SELECT id, reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, status
+        FROM reservation
+        WHERE court_id = %s AND reserve_date = %s AND status IN ('pending', 'confirmed')
+        ORDER BY start_time ASC
+        """,
+        (court_id, reserve_date),
+    )
+
+
+async def find_conflict(
+    settings: Settings,
+    *,
+    court_id: int,
+    reserve_date: date,
+    start_time: time,
+    end_time: time,
+) -> dict[str, Any] | None:
+    return await fetch_one(
+        settings,
+        """
+        SELECT id, reservation_no, status
+        FROM reservation
+        WHERE court_id = %s
+          AND reserve_date = %s
+          AND status IN ('pending', 'confirmed')
+          AND %s < end_time
+          AND %s > start_time
+        LIMIT 1
+        """,
+        (court_id, reserve_date, start_time, end_time),
+    )
+
+
+async def count_user_daily_reservations(
+    settings: Settings,
+    *,
+    user_id: int,
+    reserve_date: date,
+) -> int:
+    row = await fetch_one(
+        settings,
+        """
+        SELECT COUNT(*) AS total
+        FROM reservation
+        WHERE user_id = %s AND reserve_date = %s AND status IN ('pending', 'confirmed')
+        """,
+        (user_id, reserve_date),
+    )
+    return int(row["total"]) if row else 0
+
+
+async def create_reservation(
+    settings: Settings,
+    *,
+    reservation_no: str,
+    user_id: int,
+    court_id: int,
+    reserve_date: date,
+    start_time: time,
+    end_time: time,
+    time_slot: str,
+    status: str,
+    remark: str,
+) -> int:
+    return await execute(
+        settings,
+        """
+        INSERT INTO reservation
+          (reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, status, remark)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, status, remark),
+    )
+
+
+async def get_reservation_detail(settings: Settings, reservation_id: int) -> dict[str, Any] | None:
+    return await fetch_one(
+        settings,
+        """
+        SELECT r.id, r.reservation_no, r.user_id, u.username, u.nickname,
+               r.court_id, c.court_no, c.court_name,
+               r.reserve_date, r.start_time, r.end_time, r.time_slot,
+               r.status, r.remark, r.created_at, r.updated_at, r.canceled_at
+        FROM reservation r
+        JOIN user u ON u.id = r.user_id
+        JOIN court c ON c.id = r.court_id
+        WHERE r.id = %s
+        """,
+        (reservation_id,),
+    )
+
+
+async def list_user_reservations(
+    settings: Settings,
+    *,
+    user_id: int,
+    status: str | None,
+    offset: int,
+    limit: int,
+) -> list[dict[str, Any]]:
+    where = ["r.user_id = %s"]
+    args: list[Any] = [user_id]
+    if status:
+        where.append("r.status = %s")
+        args.append(status)
+    args.extend([offset, limit])
+    return await fetch_all(
+        settings,
+        f"""
+        SELECT r.id, r.reservation_no, r.court_id, c.court_no, c.court_name,
+               r.reserve_date, r.start_time, r.end_time, r.time_slot,
+               r.status, r.remark, r.created_at, r.canceled_at
+        FROM reservation r
+        JOIN court c ON c.id = r.court_id
+        WHERE {" AND ".join(where)}
+        ORDER BY r.reserve_date DESC, r.start_time DESC, r.id DESC
+        LIMIT %s, %s
+        """,
+        args,
+    )
+
+
+async def count_user_reservations(settings: Settings, *, user_id: int, status: str | None) -> int:
+    where = ["user_id = %s"]
+    args: list[Any] = [user_id]
+    if status:
+        where.append("status = %s")
+        args.append(status)
+    row = await fetch_one(
+        settings,
+        f"SELECT COUNT(*) AS total FROM reservation WHERE {' AND '.join(where)}",
+        args,
+    )
+    return int(row["total"]) if row else 0
+
+
+async def list_admin_reservations(
+    settings: Settings,
+    *,
+    status: str | None,
+    offset: int,
+    limit: int,
+) -> list[dict[str, Any]]:
+    where = []
+    args: list[Any] = []
+    if status:
+        where.append("r.status = %s")
+        args.append(status)
+    where_sql = "WHERE " + " AND ".join(where) if where else ""
+    args.extend([offset, limit])
+    return await fetch_all(
+        settings,
+        f"""
+        SELECT r.id, r.reservation_no, r.user_id, u.username, u.nickname,
+               r.court_id, c.court_no, c.court_name,
+               r.reserve_date, r.start_time, r.end_time, r.time_slot,
+               r.status, r.remark, r.created_at, r.canceled_at
+        FROM reservation r
+        JOIN user u ON u.id = r.user_id
+        JOIN court c ON c.id = r.court_id
+        {where_sql}
+        ORDER BY r.reserve_date DESC, r.start_time DESC, r.id DESC
+        LIMIT %s, %s
+        """,
+        args,
+    )
+
+
+async def count_admin_reservations(settings: Settings, *, status: str | None) -> int:
+    where = []
+    args: list[Any] = []
+    if status:
+        where.append("status = %s")
+        args.append(status)
+    where_sql = "WHERE " + " AND ".join(where) if where else ""
+    row = await fetch_one(settings, f"SELECT COUNT(*) AS total FROM reservation {where_sql}", args)
+    return int(row["total"]) if row else 0
+
+
+async def cancel_reservation(settings: Settings, reservation_id: int) -> None:
+    await execute(
+        settings,
+        "UPDATE reservation SET status = 'canceled', canceled_at = NOW() WHERE id = %s",
+        (reservation_id,),
+    )

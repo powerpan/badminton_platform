@@ -8,7 +8,7 @@
 - 缓存：Redis
 - 认证：JWT
 
-当前阶段已完成开发框架骨架和用户认证闭环，包含后端健康检查、数据库初始化 SQL、JWT 登录认证、前端登录注册页面、个人中心、路由守卫和管理员权限拦截。
+当前阶段已完成开发框架骨架、用户认证闭环、场地预约闭环和后台基础管理。普通用户可以查看场地、选择时间段、创建预约、查看和取消自己的预约；管理员可以管理用户、场地、预约、公告和预约规则配置。
 
 ## 当前实现状态
 
@@ -18,19 +18,26 @@
 - MySQL 连接池和用户数据访问封装。
 - Redis / MySQL / API 健康检查。
 - 用户注册、登录、JWT 鉴权、个人资料、修改密码。
+- 场地列表、按规则生成时间段、时间段状态查询。
+- 预约创建、Redis 临时锁、MySQL 时间重叠冲突校验。
+- 我的预约列表和未开始预约取消。
+- 管理员用户新增、启用/禁用、角色修改。
+- 管理员场地新增、编辑、启停。
+- 管理员预约列表、详情和取消。
+- 管理员公告发布、编辑、隐藏。
+- 管理员规则配置查询和更新。
 - Vue3 前端骨架、Axios 请求封装、Pinia 登录态保存。
-- `/login`、`/register`、`/profile`、`/courts`、`/reservations`、`/admin` 基础页面。
+- `/login`、`/register`、`/profile`、`/courts`、`/reservations`、`/admin` 页面。
 - 路由守卫：未登录跳转登录页，普通用户不能访问管理后台。
 - 初始化 SQL：核心表、默认配置、测试场地、默认管理员账号。
 
 待开发：
 
-- 场地列表接口和页面数据接入。
-- 场地时间段状态查询。
-- 预约创建、Redis 锁和 MySQL 冲突校验。
-- 我的预约、取消预约。
-- 管理员用户、场地、预约和公告管理。
-- 统计分析、规则配置和操作日志页面。
+- 统计分析图表。
+- 操作日志查询页面。
+- 预约状态自动完成、过期处理。
+- 找回密码、刷新 token、验证码等安全增强。
+- Docker 部署和生产环境配置。
 
 ## 目录结构
 
@@ -104,8 +111,6 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 
 ## 认证接口
 
-当前已实现的认证接口：
-
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/api/auth/register` | 注册普通用户 |
@@ -113,6 +118,36 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 | GET | `/api/auth/profile` | 获取当前用户信息 |
 | PUT | `/api/auth/profile` | 修改昵称和联系方式 |
 | PUT | `/api/auth/password` | 修改密码 |
+
+## 业务接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/announcements` | 查询显示中的公告 |
+| GET | `/api/courts` | 查询启用场地列表 |
+| GET | `/api/courts/{court_id}/slots?date=YYYY-MM-DD` | 查询场地时间段状态 |
+| POST | `/api/reservations` | 创建预约 |
+| GET | `/api/reservations/my` | 查询我的预约 |
+| PUT | `/api/reservations/{id}/cancel` | 取消我的预约 |
+
+## 管理员接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET/POST | `/api/admin/users` | 用户列表和新增用户 |
+| PUT | `/api/admin/users/{id}/status` | 启用或禁用用户 |
+| PUT | `/api/admin/users/{id}/role` | 修改用户角色 |
+| GET/POST | `/api/admin/courts` | 场地列表和新增场地 |
+| PUT | `/api/admin/courts/{id}` | 编辑场地 |
+| PUT | `/api/admin/courts/{id}/status` | 启用或停用场地 |
+| GET | `/api/admin/reservations` | 查询全部预约 |
+| GET | `/api/admin/reservations/{id}` | 查询预约详情 |
+| PUT | `/api/admin/reservations/{id}/cancel` | 管理员取消预约 |
+| GET/POST | `/api/admin/announcements` | 公告列表和发布公告 |
+| PUT | `/api/admin/announcements/{id}` | 编辑公告 |
+| PUT | `/api/admin/announcements/{id}/status` | 显示或隐藏公告 |
+| GET | `/api/admin/configs` | 查询规则配置 |
+| PUT | `/api/admin/configs/{config_key}` | 更新规则配置 |
 
 统一响应格式：
 
@@ -175,15 +210,13 @@ http://localhost:8000
 
 ## 下一步开发顺序
 
-下一阶段建议优先推“场地与预约基础闭环”：
+下一阶段建议优先推“统计分析与运维增强”：
 
-1. 后端场地列表接口：`GET /api/courts`。
-2. 后端时间段状态接口：`GET /api/courts/{court_id}/slots?date=YYYY-MM-DD`。
-3. 前端场地预约页接入真实数据。
-4. 后端预约创建接口：`POST /api/reservations`。
-5. Redis 预约锁：同一场地、同一日期、同一时间段只允许一个请求成功。
-6. MySQL 最终冲突校验：防止 Redis key 丢失后产生重复预约。
-7. 我的预约接口和页面：`GET /api/reservations/my`。
-8. 取消预约接口：`PUT /api/reservations/{id}/cancel`。
+1. 增加后台统计接口：预约总量、今日预约、活跃用户、场地使用率。
+2. 增加统计图表页面：按场地、日期、时间段展示预约分布。
+3. 增加操作日志写入和查询页面，记录管理员关键操作。
+4. 增加预约自动过期和自动完成处理。
+5. 补一批后端自动化接口测试，覆盖当前核心业务。
+6. 准备 Docker Compose 或一键启动脚本，降低演示部署成本。
 
-完成这一阶段后，普通用户就能从登录到预约、查看、取消形成完整业务闭环。
+当前已完成场地与预约基础闭环、后台管理与规则配置。下一阶段应优先提升可展示性、可追踪性和验收稳定性。

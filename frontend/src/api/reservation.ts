@@ -1,0 +1,43 @@
+import { http } from "./http";
+import type { ApiResponse } from "./auth";
+import type { PageResult } from "./court";
+
+export type ReservationStatus = "pending" | "confirmed" | "canceled" | "expired" | "completed";
+
+export interface Reservation {
+  id: number;
+  reservation_no: string;
+  user_id?: number;
+  username?: string;
+  nickname?: string;
+  court_id: number;
+  court_no: string;
+  court_name: string;
+  reserve_date: string;
+  start_time: string;
+  end_time: string;
+  time_slot: string;
+  status: ReservationStatus;
+  remark: string;
+  created_at: string;
+  updated_at?: string;
+  canceled_at?: string | null;
+}
+
+export function createReservation(payload: {
+  court_id: number;
+  reserve_date: string;
+  start_time: string;
+  end_time: string;
+  remark?: string;
+}) {
+  return http.post<unknown, ApiResponse<Reservation>>("/reservations", payload);
+}
+
+export function getMyReservations(params: { status?: string; page?: number; page_size?: number } = {}) {
+  return http.get<unknown, ApiResponse<PageResult<Reservation>>>("/reservations/my", { params });
+}
+
+export function cancelReservation(reservationId: number) {
+  return http.put<unknown, ApiResponse<Reservation>>(`/reservations/${reservationId}/cancel`);
+}

@@ -1,7 +1,7 @@
 from typing import Any
 
 from config.settings import Settings
-from repositories.database import execute, fetch_one
+from repositories.database import execute, fetch_all, fetch_one
 
 
 USER_COLUMNS = """
@@ -68,3 +68,56 @@ async def update_password(settings: Settings, user_id: int, password_hash: str) 
         "UPDATE user SET password_hash = %s WHERE id = %s",
         (password_hash, user_id),
     )
+
+
+async def list_users(
+    settings: Settings,
+    *,
+    role: str | None,
+    status: int | None,
+    offset: int,
+    limit: int,
+) -> list[dict[str, Any]]:
+    where = []
+    args: list[Any] = []
+    if role:
+        where.append("role = %s")
+        args.append(role)
+    if status is not None:
+        where.append("status = %s")
+        args.append(status)
+    where_sql = "WHERE " + " AND ".join(where) if where else ""
+    args.extend([offset, limit])
+    return await fetch_all(
+        settings,
+        f"""
+        SELECT {USER_COLUMNS}
+        FROM user
+        {where_sql}
+        ORDER BY id DESC
+        LIMIT %s, %s
+        """,
+        args,
+    )
+
+
+async def count_users(settings: Settings, *, role: str | None, status: int | None) -> int:
+    where = []
+    args: list[Any] = []
+    if role:
+        where.append("role = %s")
+        args.append(role)
+    if status is not None:
+        where.append("status = %s")
+        args.append(status)
+    where_sql = "WHERE " + " AND ".join(where) if where else ""
+    row = await fetch_one(settings, f"SELECT COUNT(*) AS total FROM user {where_sql}", args)
+    return int(row["total"]) if row else 0
+
+
+async def update_user_status(settings: Settings, user_id: int, status: int) -> None:
+    await execute(settings, "UPDATE user SET status = %s WHERE id = %s", (status, user_id))
+
+
+async def update_user_role(settings: Settings, user_id: int, role: str) -> None:
+    await execute(settings, "UPDATE user SET role = %s WHERE id = %s", (role, user_id))

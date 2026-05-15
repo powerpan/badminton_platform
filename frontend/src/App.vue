@@ -27,10 +27,10 @@ async function logout() {
         <RouterLink to="/">首页</RouterLink>
         <RouterLink v-if="!authStore.isLoggedIn" to="/login">登录</RouterLink>
         <RouterLink v-if="!authStore.isLoggedIn" to="/register">注册</RouterLink>
-        <RouterLink to="/courts">场地预约</RouterLink>
-        <RouterLink to="/reservations">我的预约</RouterLink>
-        <RouterLink to="/profile">个人中心</RouterLink>
-        <RouterLink to="/admin">管理后台</RouterLink>
+        <RouterLink v-if="authStore.isLoggedIn" to="/courts">场地预约</RouterLink>
+        <RouterLink v-if="authStore.isLoggedIn" to="/reservations">我的预约</RouterLink>
+        <RouterLink v-if="authStore.isLoggedIn" to="/profile">个人中心</RouterLink>
+        <RouterLink v-if="authStore.isAdmin" to="/admin">管理后台</RouterLink>
       </nav>
 
       <div class="session-box">

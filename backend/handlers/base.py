@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 import tornado.web
@@ -6,6 +7,21 @@ import tornado.web
 from repositories import user_repository
 from utils.response import ApiError, error
 from utils.tokens import decode_access_token
+
+
+def _json_default(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, date):
+        return value.strftime("%Y-%m-%d")
+    if isinstance(value, time):
+        return value.strftime("%H:%M:%S")
+    if isinstance(value, timedelta):
+        total_seconds = int(value.total_seconds())
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    return str(value)
 
 
 class BaseHandler(tornado.web.RequestHandler):
@@ -23,7 +39,7 @@ class BaseHandler(tornado.web.RequestHandler):
 
     def write_json(self, payload: dict[str, Any], status_code: int = 200) -> None:
         self.set_status(status_code)
-        self.finish(json.dumps(payload, ensure_ascii=False))
+        self.finish(json.dumps(payload, ensure_ascii=False, default=_json_default))
 
     def get_json_body(self) -> dict[str, Any]:
         if not self.request.body:

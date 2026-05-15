@@ -208,7 +208,15 @@ h2 {
   font-weight: 700;
 }
 
-.form-stack input {
+.form-stack input,
+.form-stack select,
+.form-stack textarea,
+.form-inline input,
+.form-inline select,
+.toolbar-row input,
+.toolbar-row select,
+td input,
+td select {
   width: 100%;
   padding: 11px 12px;
   color: #1f2937;
@@ -217,7 +225,15 @@ h2 {
   border-radius: 6px;
 }
 
-.form-stack input:focus {
+.form-stack input:focus,
+.form-stack select:focus,
+.form-stack textarea:focus,
+.form-inline input:focus,
+.form-inline select:focus,
+.toolbar-row input:focus,
+.toolbar-row select:focus,
+td input:focus,
+td select:focus {
   outline: 2px solid #b8f060;
   border-color: #2f7f64;
 }
@@ -258,6 +274,232 @@ h2 {
   margin-top: 16px;
 }
 
+.workspace-grid {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.toolbar-row,
+.section-title,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.toolbar-row label {
+  display: grid;
+  gap: 7px;
+  min-width: 180px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.section-title h2,
+.section-title p {
+  margin: 0;
+}
+
+.court-list {
+  display: grid;
+  gap: 10px;
+}
+
+.court-tile {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 14px;
+  color: #1f2937;
+  text-align: left;
+  cursor: pointer;
+  background: #f8fafc;
+  border: 1px solid #dce4ea;
+  border-radius: 8px;
+}
+
+.court-tile.active {
+  border-color: #2f7f64;
+  box-shadow: 0 0 0 2px #dff4e8;
+}
+
+.court-tile span,
+.court-tile small {
+  color: #64748b;
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.slot-button {
+  display: grid;
+  gap: 5px;
+  min-height: 68px;
+  padding: 10px;
+  color: #1f2937;
+  cursor: pointer;
+  background: #f8fafc;
+  border: 1px solid #dce4ea;
+  border-radius: 8px;
+}
+
+.slot-button.available {
+  background: #f3faf6;
+  border-color: #9bd8b7;
+}
+
+.slot-button.active {
+  color: #ffffff;
+  background: #256f57;
+  border-color: #256f57;
+}
+
+.slot-button.reserved,
+.slot-button.locked,
+.slot-button.disabled,
+.slot-button:disabled {
+  color: #64748b;
+  cursor: not-allowed;
+  background: #eef2f6;
+  border-color: #d5dde5;
+}
+
+.reserve-form {
+  margin-top: 18px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tabs button,
+.text-button {
+  padding: 8px 11px;
+  color: #256f57;
+  cursor: pointer;
+  background: #ffffff;
+  border: 1px solid #b7c8bf;
+  border-radius: 6px;
+}
+
+.tabs button.active {
+  color: #ffffff;
+  background: #256f57;
+  border-color: #256f57;
+}
+
+.text-button:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 12px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+th {
+  color: #475569;
+  font-size: 13px;
+  background: #f8fafc;
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 9px;
+  color: #334155;
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.state-pill.confirmed {
+  color: #17613f;
+  background: #dff4e8;
+}
+
+.state-pill.canceled {
+  color: #a33a2c;
+  background: #fae3df;
+}
+
+.state-pill.pending {
+  color: #7a4b12;
+  background: #f7e6c4;
+}
+
+.empty-state {
+  padding: 28px;
+  color: #64748b;
+  text-align: center;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+
+.admin-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-section {
+  display: grid;
+  gap: 16px;
+}
+
+.form-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.compact-form {
+  max-width: 760px;
+}
+
+.announcement-list {
+  display: grid;
+  gap: 12px;
+}
+
+.announcement-list article {
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.announcement-list p {
+  margin: 6px 0 0;
+  color: #475569;
+}
+
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -269,5 +511,13 @@ h2 {
 
   .main-panel {
     padding: 20px;
+  }
+
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  table {
+    min-width: 620px;
   }
 }
