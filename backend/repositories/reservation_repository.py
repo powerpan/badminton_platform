@@ -202,3 +202,18 @@ async def cancel_reservation(settings: Settings, reservation_id: int) -> None:
         "UPDATE reservation SET status = 'canceled', canceled_at = NOW() WHERE id = %s",
         (reservation_id,),
     )
+
+
+async def complete_finished_reservations(settings: Settings) -> int:
+    return await execute(
+        settings,
+        """
+        UPDATE reservation
+        SET status = 'completed'
+        WHERE status = 'confirmed'
+          AND (
+            reserve_date < CURDATE()
+            OR (reserve_date = CURDATE() AND end_time <= CURTIME())
+          )
+        """,
+    )

@@ -453,6 +453,16 @@ th {
   background: #f7e6c4;
 }
 
+.state-pill.completed {
+  color: #1d4d7a;
+  background: #dcebf7;
+}
+
+.state-pill.expired {
+  color: #475569;
+  background: #e2e8f0;
+}
+
 .empty-state {
   padding: 28px;
   color: #64748b;
@@ -470,6 +480,77 @@ th {
 .admin-section {
   display: grid;
   gap: 16px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.metric-card,
+.stat-panel {
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.metric-card {
+  display: grid;
+  gap: 6px;
+}
+
+.metric-card span,
+.metric-card small,
+.bar-item span {
+  color: #64748b;
+}
+
+.metric-card strong {
+  color: #133428;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.stat-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.stat-panel {
+  min-width: 0;
+}
+
+.bar-list {
+  display: grid;
+  gap: 12px;
+}
+
+.bar-item {
+  display: grid;
+  gap: 7px;
+}
+
+.bar-item > div:first-child {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.bar-track {
+  height: 9px;
+  overflow: hidden;
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.bar-track i {
+  display: block;
+  height: 100%;
+  background: #2f7f64;
+  border-radius: inherit;
 }
 
 .form-inline {
@@ -514,6 +595,10 @@ th {
   }
 
   .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stat-layout {
     grid-template-columns: 1fr;
   }
 

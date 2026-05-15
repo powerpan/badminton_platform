@@ -61,12 +61,17 @@ def _validate_status_filter(status: str | None) -> str | None:
     return status
 
 
+async def refresh_reservation_statuses(settings: Settings) -> int:
+    return await reservation_repository.complete_finished_reservations(settings)
+
+
 async def create_reservation(
     settings: Settings,
     *,
     current_user: dict[str, Any],
     body: dict[str, Any],
 ) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
     try:
         court_id = int(body.get("court_id"))
     except (TypeError, ValueError) as exc:
@@ -161,6 +166,7 @@ async def list_my_reservations(
     page_size: int,
     offset: int,
 ) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
     status = _validate_status_filter(status_arg)
     rows = await reservation_repository.list_user_reservations(
         settings,
@@ -183,6 +189,7 @@ async def cancel_my_reservation(
     current_user: dict[str, Any],
     reservation_id: int,
 ) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
     reservation = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if reservation is None or reservation["user_id"] != current_user["id"]:
         raise ApiError(404, "预约记录不存在", 404)
@@ -208,6 +215,7 @@ async def list_admin_reservations(
     page_size: int,
     offset: int,
 ) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
     status = _validate_status_filter(status_arg)
     rows = await reservation_repository.list_admin_reservations(
         settings,
@@ -220,6 +228,7 @@ async def list_admin_reservations(
 
 
 async def get_admin_reservation(settings: Settings, reservation_id: int) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
     reservation = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if reservation is None:
         raise ApiError(404, "预约记录不存在", 404)
@@ -227,11 +236,14 @@ async def get_admin_reservation(settings: Settings, reservation_id: int) -> dict
 
 
 async def admin_cancel_reservation(settings: Settings, reservation_id: int) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
     reservation = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if reservation is None:
         raise ApiError(404, "预约记录不存在", 404)
     if reservation["status"] == "canceled":
         raise ApiError(400, "预约已取消", 400)
+    if reservation["status"] in {"completed", "expired"}:
+        raise ApiError(400, "当前预约状态不能取消", 400)
     await reservation_repository.cancel_reservation(settings, reservation_id)
     updated = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if updated is None:

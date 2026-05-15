@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 
 import type { Announcement } from "../api/announcement";
 import {
@@ -9,8 +9,13 @@ import {
   adminCreateUser,
   adminGetAnnouncements,
   adminGetConfigs,
+  adminGetCourtStatistics,
   adminGetCourts,
+  adminGetOperationLogs,
   adminGetReservations,
+  adminGetStatisticsOverview,
+  adminGetTimeSlotStatistics,
+  adminGetUserStatistics,
   adminGetUsers,
   adminUpdateAnnouncement,
   adminUpdateAnnouncementStatus,
@@ -19,26 +24,55 @@ import {
   adminUpdateCourtStatus,
   adminUpdateUserRole,
   adminUpdateUserStatus,
+  type CourtStatistic,
   type ConfigItem,
+  type OperationLog,
+  type StatisticsOverview,
+  type TimeSlotStatistic,
+  type UserStatistic,
 } from "../api/admin";
 import type { UserInfo } from "../api/auth";
 import type { Court } from "../api/court";
 import type { Reservation } from "../api/reservation";
 
-type AdminTab = "users" | "courts" | "reservations" | "announcements" | "configs";
+type AdminTab = "statistics" | "users" | "courts" | "reservations" | "announcements" | "configs" | "logs";
 
 const tabs: Array<{ key: AdminTab; label: string }> = [
+  { key: "statistics", label: "统计" },
   { key: "users", label: "用户" },
   { key: "courts", label: "场地" },
   { key: "reservations", label: "预约" },
   { key: "announcements", label: "公告" },
   { key: "configs", label: "规则" },
+  { key: "logs", label: "日志" },
 ];
 
-const activeTab = ref<AdminTab>("users");
+const activeTab = ref<AdminTab>("statistics");
 const loading = ref(false);
 const message = ref("");
 const errorMessage = ref("");
+
+function formatDate(value: Date) {
+  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function addDays(days: number) {
+  const value = new Date();
+  value.setDate(value.getDate() + days);
+  return formatDate(value);
+}
+
+const statsRange = ref({
+  date_from: addDays(0),
+  date_to: addDays(6),
+});
+const statisticsOverview = ref<StatisticsOverview | null>(null);
+const courtStatistics = ref<CourtStatistic[]>([]);
+const timeSlotStatistics = ref<TimeSlotStatistic[]>([]);
+const userStatistics = ref<UserStatistic[]>([]);
+const maxCourtActiveCount = computed(() => Math.max(0, ...courtStatistics.value.map((item) => item.active_count)));
+const maxTimeSlotCount = computed(() => Math.max(0, ...timeSlotStatistics.value.map((item) => item.reservation_count)));
 
 const users = ref<UserInfo[]>([]);
 const userForm = ref({
@@ -72,6 +106,15 @@ const announcementForm = ref({
 
 const configs = ref<ConfigItem[]>([]);
 
+const operationLogs = ref<OperationLog[]>([]);
+const logFilters = ref({
+  module: "",
+  action: "",
+  username: "",
+  date_from: "",
+  date_to: "",
+});
+
 function setMessage(text: string) {
   message.value = text;
   errorMessage.value = "";
@@ -80,6 +123,51 @@ function setMessage(text: string) {
 function setError(error: unknown, fallback: string) {
   errorMessage.value = error instanceof Error ? error.message : fallback;
   message.value = "";
+}
+
+function barWidth(value: number, max: number) {
+  if (!max) return "0%";
+  return `${Math.max(6, Math.round((value / max) * 100))}%`;
+}
+
+function operationDetail(detail: string) {
+  try {
+    const parsed = JSON.parse(detail);
+    return Object.entries(parsed)
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("，");
+  } catch {
+    return detail || "-";
+  }
+}
+
+async function loadStatistics() {
+  const params = {
+    date_from: statsRange.value.date_from,
+    date_to: statsRange.value.date_to,
+  };
+  const [overview, courts, timeSlots, users] = await Promise.all([
+    adminGetStatisticsOverview(params),
+    adminGetCourtStatistics(params),
+    adminGetTimeSlotStatistics({ ...params, limit: 12 }),
+    adminGetUserStatistics({ ...params, limit: 10 }),
+  ]);
+  statisticsOverview.value = overview.data;
+  courtStatistics.value = courts.data.items;
+  timeSlotStatistics.value = timeSlots.data.items;
+  userStatistics.value = users.data.items;
+}
+
+async function refreshStatistics() {
+  loading.value = true;
+  try {
+    await loadStatistics();
+    setMessage("统计已刷新");
+  } catch (error) {
+    setError(error, "统计数据加载失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function loadUsers() {
@@ -258,6 +346,30 @@ async function loadConfigs() {
   configs.value = response.data;
 }
 
+async function loadOperationLogs() {
+  const response = await adminGetOperationLogs({
+    module: logFilters.value.module || undefined,
+    action: logFilters.value.action || undefined,
+    username: logFilters.value.username || undefined,
+    date_from: logFilters.value.date_from || undefined,
+    date_to: logFilters.value.date_to || undefined,
+    page_size: 100,
+  });
+  operationLogs.value = response.data.items;
+}
+
+async function refreshOperationLogs() {
+  loading.value = true;
+  try {
+    await loadOperationLogs();
+    setMessage("日志已刷新");
+  } catch (error) {
+    setError(error, "日志加载失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
 async function saveConfig(config: ConfigItem) {
   loading.value = true;
   try {
@@ -276,11 +388,13 @@ async function loadActiveTab() {
   message.value = "";
   errorMessage.value = "";
   try {
+    if (activeTab.value === "statistics") await loadStatistics();
     if (activeTab.value === "users") await loadUsers();
     if (activeTab.value === "courts") await loadCourts();
     if (activeTab.value === "reservations") await loadReservations();
     if (activeTab.value === "announcements") await loadAnnouncements();
     if (activeTab.value === "configs") await loadConfigs();
+    if (activeTab.value === "logs") await loadOperationLogs();
   } catch (error) {
     setError(error, "后台数据加载失败");
   } finally {
@@ -300,7 +414,7 @@ onMounted(loadActiveTab);
   <section class="page-header">
     <p class="eyebrow">管理端</p>
     <h1>后台管理</h1>
-    <p>集中管理用户、场地、预约、公告和预约规则配置。</p>
+    <p>集中管理统计、用户、场地、预约、公告、规则配置和操作日志。</p>
   </section>
 
   <section class="panel admin-shell">
@@ -318,6 +432,116 @@ onMounted(loadActiveTab);
 
     <p v-if="message" class="success-text">{{ message }}</p>
     <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+
+    <div v-if="activeTab === 'statistics'" class="admin-section">
+      <div class="toolbar-row">
+        <label>
+          开始日期
+          <input v-model="statsRange.date_from" type="date" />
+        </label>
+        <label>
+          结束日期
+          <input v-model="statsRange.date_to" type="date" />
+        </label>
+        <button class="primary-button" type="button" :disabled="loading" @click="refreshStatistics">刷新统计</button>
+      </div>
+
+      <div v-if="statisticsOverview" class="metric-grid">
+        <article class="metric-card">
+          <span>预约总量</span>
+          <strong>{{ statisticsOverview.reservation_total }}</strong>
+          <small>{{ statisticsOverview.date_from }} 至 {{ statisticsOverview.date_to }}</small>
+        </article>
+        <article class="metric-card">
+          <span>今日预约</span>
+          <strong>{{ statisticsOverview.today_reservations }}</strong>
+          <small>当天预约记录</small>
+        </article>
+        <article class="metric-card">
+          <span>活跃用户</span>
+          <strong>{{ statisticsOverview.active_users }}</strong>
+          <small>区间内有预约的用户</small>
+        </article>
+        <article class="metric-card">
+          <span>场地使用率</span>
+          <strong>{{ statisticsOverview.utilization_rate }}%</strong>
+          <small>{{ statisticsOverview.occupied_slots }}/{{ statisticsOverview.capacity_slots }} 时间段</small>
+        </article>
+        <article class="metric-card">
+          <span>启用场地</span>
+          <strong>{{ statisticsOverview.enabled_courts }}/{{ statisticsOverview.total_courts }}</strong>
+          <small>可预约场地数量</small>
+        </article>
+        <article class="metric-card">
+          <span>预约状态</span>
+          <strong>{{ statisticsOverview.confirmed_reservations }}/{{ statisticsOverview.completed_reservations }}</strong>
+          <small>confirmed / completed</small>
+        </article>
+      </div>
+
+      <div class="stat-layout">
+        <section class="stat-panel">
+          <div class="section-title">
+            <h2>场地使用率</h2>
+          </div>
+          <div v-if="courtStatistics.length" class="bar-list">
+            <div v-for="court in courtStatistics" :key="court.court_id" class="bar-item">
+              <div>
+                <strong>{{ court.court_no }} {{ court.court_name }}</strong>
+                <span>{{ court.active_count }} 次 / {{ court.usage_rate }}%</span>
+              </div>
+              <div class="bar-track">
+                <i :style="{ width: barWidth(court.active_count, maxCourtActiveCount) }"></i>
+              </div>
+            </div>
+          </div>
+          <p v-else class="empty-state">暂无场地统计数据</p>
+        </section>
+
+        <section class="stat-panel">
+          <div class="section-title">
+            <h2>热门时间段</h2>
+          </div>
+          <div v-if="timeSlotStatistics.length" class="bar-list">
+            <div v-for="slot in timeSlotStatistics" :key="slot.time_slot" class="bar-item">
+              <div>
+                <strong>{{ slot.time_slot }}</strong>
+                <span>{{ slot.reservation_count }} 次</span>
+              </div>
+              <div class="bar-track">
+                <i :style="{ width: barWidth(slot.reservation_count, maxTimeSlotCount) }"></i>
+              </div>
+            </div>
+          </div>
+          <p v-else class="empty-state">暂无时间段统计数据</p>
+        </section>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>用户</th>
+              <th>预约总数</th>
+              <th>已确认</th>
+              <th>已完成</th>
+              <th>已取消</th>
+              <th>最近预约日期</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="user in userStatistics" :key="user.user_id">
+              <td>{{ user.nickname || user.username }}</td>
+              <td>{{ user.reservation_count }}</td>
+              <td>{{ user.confirmed_count }}</td>
+              <td>{{ user.completed_count }}</td>
+              <td>{{ user.canceled_count }}</td>
+              <td>{{ user.last_reserve_date || "-" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
 
     <div v-if="activeTab === 'users'" class="admin-section">
       <form class="form-inline" @submit.prevent="submitUser">
@@ -442,7 +666,16 @@ onMounted(loadActiveTab);
               <td>{{ reservation.reserve_date }}</td>
               <td>{{ reservation.start_time }}-{{ reservation.end_time }}</td>
               <td><span class="state-pill" :class="reservation.status">{{ reservation.status }}</span></td>
-              <td><button class="text-button" type="button" :disabled="reservation.status === 'canceled'" @click="cancelAdminReservation(reservation)">取消</button></td>
+              <td>
+                <button
+                  class="text-button"
+                  type="button"
+                  :disabled="['canceled', 'completed', 'expired'].includes(reservation.status)"
+                  @click="cancelAdminReservation(reservation)"
+                >
+                  取消
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -505,6 +738,74 @@ onMounted(loadActiveTab);
               <td><input v-model="config.config_value" /></td>
               <td>{{ config.description }}</td>
               <td><button class="text-button" type="button" @click="saveConfig(config)">保存</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div v-if="activeTab === 'logs'" class="admin-section">
+      <div class="toolbar-row">
+        <label>
+          模块
+          <select v-model="logFilters.module" @change="refreshOperationLogs">
+            <option value="">全部</option>
+            <option value="user">用户</option>
+            <option value="court">场地</option>
+            <option value="reservation">预约</option>
+            <option value="announcement">公告</option>
+            <option value="config">规则</option>
+          </select>
+        </label>
+        <label>
+          操作
+          <select v-model="logFilters.action" @change="refreshOperationLogs">
+            <option value="">全部</option>
+            <option value="create">create</option>
+            <option value="update">update</option>
+            <option value="status">status</option>
+            <option value="role">role</option>
+            <option value="cancel">cancel</option>
+            <option value="hide">hide</option>
+          </select>
+        </label>
+        <label>
+          操作人
+          <input v-model="logFilters.username" placeholder="用户名" @keyup.enter="refreshOperationLogs" />
+        </label>
+        <label>
+          开始日期
+          <input v-model="logFilters.date_from" type="date" />
+        </label>
+        <label>
+          结束日期
+          <input v-model="logFilters.date_to" type="date" />
+        </label>
+        <button class="primary-button" type="button" :disabled="loading" @click="refreshOperationLogs">查询日志</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>操作人</th>
+              <th>模块</th>
+              <th>操作</th>
+              <th>目标</th>
+              <th>详情</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="log in operationLogs" :key="log.id">
+              <td>{{ log.created_at }}</td>
+              <td>{{ log.username || "-" }}</td>
+              <td>{{ log.module }}</td>
+              <td>{{ log.action }}</td>
+              <td>{{ log.target_type || "-" }} #{{ log.target_id || "-" }}</td>
+              <td>{{ operationDetail(log.detail) }}</td>
+              <td>{{ log.ip || "-" }}</td>
             </tr>
           </tbody>
         </table>

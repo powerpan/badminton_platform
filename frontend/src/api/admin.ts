@@ -14,6 +14,77 @@ export interface ConfigItem {
   updated_at: string;
 }
 
+export interface StatisticsOverview {
+  date_from: string;
+  date_to: string;
+  total_users: number;
+  enabled_users: number;
+  admin_users: number;
+  total_courts: number;
+  enabled_courts: number;
+  reservation_total: number;
+  today_reservations: number;
+  active_users: number;
+  pending_reservations: number;
+  confirmed_reservations: number;
+  completed_reservations: number;
+  canceled_reservations: number;
+  expired_reservations: number;
+  capacity_slots: number;
+  occupied_slots: number;
+  utilization_rate: number;
+}
+
+export interface CourtStatistic {
+  court_id: number;
+  court_no: string;
+  court_name: string;
+  status: number;
+  reservation_count: number;
+  active_count: number;
+  booked_hours: number;
+  capacity_slots: number;
+  usage_rate: number;
+}
+
+export interface TimeSlotStatistic {
+  time_slot: string;
+  start_time: string;
+  end_time: string;
+  reservation_count: number;
+}
+
+export interface UserStatistic {
+  user_id: number;
+  username: string;
+  nickname: string;
+  reservation_count: number;
+  confirmed_count: number;
+  completed_count: number;
+  canceled_count: number;
+  last_reserve_date: string;
+}
+
+export interface StatisticsList<T> {
+  date_from: string;
+  date_to: string;
+  items: T[];
+}
+
+export interface OperationLog {
+  id: number;
+  user_id: number | null;
+  username: string | null;
+  role: string | null;
+  module: string;
+  action: string;
+  target_type: string | null;
+  target_id: number | null;
+  detail: string;
+  ip: string | null;
+  created_at: string;
+}
+
 export function adminGetUsers(params: { role?: string; status?: string; page?: number; page_size?: number } = {}) {
   return http.get<unknown, ApiResponse<PageResult<UserInfo>>>("/admin/users", { params });
 }
@@ -97,4 +168,32 @@ export function adminGetConfigs() {
 
 export function adminUpdateConfig(configKey: string, configValue: string) {
   return http.put<unknown, ApiResponse<ConfigItem>>(`/admin/configs/${configKey}`, { config_value: configValue });
+}
+
+export function adminGetStatisticsOverview(params: { date_from?: string; date_to?: string } = {}) {
+  return http.get<unknown, ApiResponse<StatisticsOverview>>("/admin/statistics/overview", { params });
+}
+
+export function adminGetCourtStatistics(params: { date_from?: string; date_to?: string } = {}) {
+  return http.get<unknown, ApiResponse<StatisticsList<CourtStatistic>>>("/admin/statistics/courts", { params });
+}
+
+export function adminGetTimeSlotStatistics(params: { date_from?: string; date_to?: string; limit?: number } = {}) {
+  return http.get<unknown, ApiResponse<StatisticsList<TimeSlotStatistic>>>("/admin/statistics/time-slots", { params });
+}
+
+export function adminGetUserStatistics(params: { date_from?: string; date_to?: string; limit?: number } = {}) {
+  return http.get<unknown, ApiResponse<StatisticsList<UserStatistic>>>("/admin/statistics/users", { params });
+}
+
+export function adminGetOperationLogs(params: {
+  module?: string;
+  action?: string;
+  username?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  page_size?: number;
+} = {}) {
+  return http.get<unknown, ApiResponse<PageResult<OperationLog>>>("/admin/logs", { params });
 }
