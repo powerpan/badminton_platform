@@ -4,6 +4,7 @@ from services import (
     announcement_service,
     config_service,
     court_service,
+    notification_service,
     operation_log_service,
     reservation_service,
     statistics_service,
@@ -381,6 +382,27 @@ class AdminAnnouncementStatusHandler(BaseHandler):
             detail={"title": announcement["title"], "status": announcement["status"]},
         )
         self.write_json(success(announcement))
+
+
+class AdminNotificationBroadcastHandler(BaseHandler):
+    async def post(self) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        data = await notification_service.broadcast_to_enabled_users(
+            settings,
+            current_user=current_user,
+            body=self.get_json_body(),
+        )
+        await _record_admin_log(
+            self,
+            current_user,
+            module="notification",
+            action="broadcast",
+            target_type="notification",
+            target_id=None,
+            detail={"sent_count": data["sent_count"]},
+        )
+        self.write_json(success(data, "通知已发送"))
 
 
 class AdminConfigsHandler(BaseHandler):

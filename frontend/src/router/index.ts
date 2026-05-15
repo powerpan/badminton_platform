@@ -1,10 +1,14 @@
 import { createRouter, createWebHistory } from "vue-router";
 
 import AdminDashboard from "../views/AdminDashboard.vue";
+import AnnouncementDetailView from "../views/AnnouncementDetailView.vue";
+import AnnouncementsView from "../views/AnnouncementsView.vue";
 import CourtsView from "../views/CourtsView.vue";
 import ForgotPasswordView from "../views/ForgotPasswordView.vue";
+import HelpCenterView from "../views/HelpCenterView.vue";
 import HomeView from "../views/HomeView.vue";
 import LoginView from "../views/LoginView.vue";
+import NotificationsView from "../views/NotificationsView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import ReservationsView from "../views/ReservationsView.vue";
 import RegisterView from "../views/RegisterView.vue";
@@ -14,6 +18,9 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", name: "home", component: HomeView },
+    { path: "/announcements", name: "announcements", component: AnnouncementsView },
+    { path: "/announcements/:id", name: "announcement-detail", component: AnnouncementDetailView },
+    { path: "/help", name: "help", component: HelpCenterView },
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: RegisterView },
     { path: "/forgot-password", name: "forgot-password", component: ForgotPasswordView },
@@ -25,6 +32,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
+    { path: "/notifications", name: "notifications", component: NotificationsView, meta: { requiresAuth: true } },
     {
       path: "/admin",
       name: "admin",

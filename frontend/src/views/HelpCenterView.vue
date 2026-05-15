@@ -1,0 +1,70 @@
+<script setup lang="ts">
+const guides = [
+  {
+    title: "预约流程",
+    items: [
+      "登录后进入场地预订，选择日期、场地和可用时间段。",
+      "系统会校验营业时间、提前预约天数、单次最长时长和每日预约次数。",
+      "预约成功后立即按会员折扣扣减余额，并发放对应积分。",
+    ],
+  },
+  {
+    title: "取消与退款",
+    items: [
+      "未开始的已确认预约可以在我的预订中取消。",
+      "取消后系统按原订单应付金额退回余额，并撤回本次预约发放的积分。",
+      "已开始、已完成或已过期的预约不能由用户自行取消。",
+    ],
+  },
+  {
+    title: "会员与折扣",
+    items: [
+      "普通会员无折扣，银卡会员 9.5 折，金卡会员 9 折，钻石会员 8.5 折。",
+      "会员等级到期后按普通会员价格计算，新预约会保存当时的等级和折扣快照。",
+      "余额和积分由管理员在后台调整，调整后会发送站内通知。",
+    ],
+  },
+  {
+    title: "场地使用须知",
+    items: [
+      "请按预约时间到场使用对应场地，超出时间需要重新预约。",
+      "场地停用时不能创建新预约，已有未来预约需要管理员先处理。",
+      "如需靠近门口、休息区等特殊安排，可在预约备注中说明。",
+    ],
+  },
+];
+
+const faqs = [
+  ["为什么提示余额不足？", "当前预约会按场地价格、预约时长和会员折扣计算应付金额，余额不足时需要联系管理员充值或调整余额。"],
+  ["为什么同一时间段无法预约？", "系统会锁定同一场地同一时间段，已有确认预约或正在提交中的预约都会阻止重复占用。"],
+  ["通知角标代表什么？", "顶部通知角标显示当前账号未读站内通知数量，进入通知中心后可以单条已读或全部已读。"],
+];
+</script>
+
+<template>
+  <section class="page-header">
+    <p class="eyebrow">帮助中心</p>
+    <h1>使用规则与常见问题</h1>
+    <p>预约、取消、会员和场地使用规则说明。</p>
+  </section>
+
+  <el-row :gutter="18" class="element-grid help-grid">
+    <el-col v-for="guide in guides" :key="guide.title" :xs="24" :md="12">
+      <el-card shadow="never" class="panel-card help-card">
+        <template #header><strong>{{ guide.title }}</strong></template>
+        <ul>
+          <li v-for="item in guide.items" :key="item">{{ item }}</li>
+        </ul>
+      </el-card>
+    </el-col>
+  </el-row>
+
+  <el-card shadow="never" class="panel-card faq-card">
+    <template #header><strong>常见问题</strong></template>
+    <el-collapse>
+      <el-collapse-item v-for="[question, answer] in faqs" :key="question" :title="question" :name="question">
+        <p>{{ answer }}</p>
+      </el-collapse-item>
+    </el-collapse>
+  </el-card>
+</template>

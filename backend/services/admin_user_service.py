@@ -5,6 +5,7 @@ from typing import Any
 from config.settings import Settings
 from repositories import member_repository, reservation_repository, user_repository
 from services.auth_service import public_user, revoke_user_refresh_tokens
+from services import notification_service
 from utils.member_levels import DEFAULT_MEMBER_LEVEL, valid_member_level
 from utils.passwords import hash_password
 from utils.query import clean_text
@@ -144,7 +145,15 @@ async def update_user_status(
     updated = await user_repository.get_user_by_id(settings, user_id)
     if updated is None:
         raise ApiError(404, "用户不存在", 404)
-    return public_user(updated)
+    result = public_user(updated)
+    await notification_service.notify_member_adjusted(
+        settings,
+        user=result,
+        balance_change_cents=balance_change_cents,
+        points_change=points_change,
+        operator_id=current_user.get("id"),
+    )
+    return result
 
 
 async def update_user_member(

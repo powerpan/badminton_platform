@@ -5,6 +5,7 @@ from typing import Any
 from config.settings import Settings
 from repositories import court_repository, reservation_repository
 from services.config_service import get_reservation_rules
+from services import notification_service
 from services.redis_service import acquire_lock, release_lock, reservation_lock_key
 from utils.query import clean_text
 from utils.response import ApiError
@@ -173,7 +174,9 @@ async def create_reservation(
         detail = await reservation_repository.get_reservation_detail(settings, reservation_id)
         if detail is None:
             raise ApiError(500, "预约成功但读取记录失败", 500)
-        return _normalize_reservation(detail)
+        normalized = _normalize_reservation(detail)
+        await notification_service.notify_reservation_created(settings, reservation=normalized)
+        return normalized
     finally:
         await release_lock(settings, lock_key, lock_value)
 
@@ -235,7 +238,14 @@ async def cancel_my_reservation(
     updated = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if updated is None:
         raise ApiError(404, "预约记录不存在", 404)
-    return _normalize_reservation(updated)
+    normalized = _normalize_reservation(updated)
+    await notification_service.notify_reservation_canceled(
+        settings,
+        reservation=normalized,
+        by_admin=False,
+        operator_id=current_user.get("id"),
+    )
+    return normalized
 
 
 async def list_admin_reservations(
@@ -315,4 +325,11 @@ async def admin_cancel_reservation(
     updated = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if updated is None:
         raise ApiError(404, "预约记录不存在", 404)
-    return _normalize_reservation(updated)
+    normalized = _normalize_reservation(updated)
+    await notification_service.notify_reservation_canceled(
+        settings,
+        reservation=normalized,
+        by_admin=True,
+        operator_id=current_user.get("id") if current_user else None,
+    )
+    return normalized

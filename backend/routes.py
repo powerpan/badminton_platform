@@ -11,6 +11,7 @@ from handlers.admin import (
     AdminReservationDetailHandler,
     AdminReservationsHandler,
     AdminOperationLogsHandler,
+    AdminNotificationBroadcastHandler,
     AdminStatisticsCourtsHandler,
     AdminStatisticsOverviewHandler,
     AdminStatisticsTimeSlotsHandler,
@@ -35,6 +36,12 @@ from handlers.auth import (
 )
 from handlers.courts import CourtsHandler, CourtSlotsHandler
 from handlers.health import HealthHandler
+from handlers.notifications import (
+    NotificationReadAllHandler,
+    NotificationReadHandler,
+    NotificationUnreadCountHandler,
+    NotificationsHandler,
+)
 from handlers.reservations import CancelReservationHandler, MyReservationsHandler, ReservationsHandler
 
 
@@ -53,6 +60,10 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/auth/password", PasswordHandler),
         (r"/api/announcements", AnnouncementsHandler),
         (r"/api/announcements/([0-9]+)", AnnouncementDetailHandler),
+        (r"/api/notifications", NotificationsHandler),
+        (r"/api/notifications/unread-count", NotificationUnreadCountHandler),
+        (r"/api/notifications/read-all", NotificationReadAllHandler),
+        (r"/api/notifications/([0-9]+)/read", NotificationReadHandler),
         (r"/api/courts", CourtsHandler),
         (r"/api/courts/([0-9]+)/slots", CourtSlotsHandler),
         (r"/api/reservations", ReservationsHandler),
@@ -77,6 +88,7 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/admin/announcements", AdminAnnouncementsHandler),
         (r"/api/admin/announcements/([0-9]+)/status", AdminAnnouncementStatusHandler),
         (r"/api/admin/announcements/([0-9]+)", AdminAnnouncementDetailHandler),
+        (r"/api/admin/notifications/broadcast", AdminNotificationBroadcastHandler),
         (r"/api/admin/configs", AdminConfigsHandler),
         (r"/api/admin/configs/([A-Za-z0-9_]+)", AdminConfigDetailHandler),
     ]

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { useAuthStore } from "./stores/auth";
+import { useNotificationStore } from "./stores/notification";
 
 const authStore = useAuthStore();
+const notificationStore = useNotificationStore();
 const route = useRoute();
 const router = useRouter();
 
@@ -13,9 +15,13 @@ const routeTitleMap: Record<string, string> = {
   login: "会员登录",
   register: "会员注册",
   "forgot-password": "找回密码",
+  announcements: "公告中心",
+  "announcement-detail": "公告详情",
   courts: "场地预订",
   reservations: "我的预订",
   profile: "会员中心",
+  notifications: "通知中心",
+  help: "帮助中心",
   admin: "管理后台",
 };
 
@@ -27,6 +33,7 @@ const primaryNav = computed(() => [
   { label: "我的预订", to: "/reservations", icon: "ticket", visible: authStore.isLoggedIn },
   { label: "会员中心", to: "/profile", icon: "user", visible: authStore.isLoggedIn },
   { label: "管理后台", to: "/admin", icon: "admin", visible: authStore.isAdmin },
+  { label: "帮助中心", to: "/help", icon: "help", visible: true },
 ]);
 
 const guestNav = [
@@ -38,7 +45,6 @@ const plannedNav = [
   { label: "活动赛事", icon: "flag" },
   { label: "球友圈", icon: "circle" },
   { label: "商城", icon: "cart" },
-  { label: "帮助中心", icon: "help" },
 ];
 
 function formatMoney(cents: number | null | undefined) {
@@ -54,6 +60,7 @@ function validityText(expiresAt: string | null | undefined) {
 
 async function logout() {
   await authStore.logout();
+  notificationStore.clear();
   await router.push("/login");
 }
 
@@ -61,10 +68,27 @@ onMounted(async () => {
   if (!authStore.token) return;
   try {
     await authStore.fetchProfile();
+    await notificationStore.fetchUnreadCount();
   } catch {
     authStore.clearSession();
+    notificationStore.clear();
   }
 });
+
+watch(
+  () => authStore.isLoggedIn,
+  async (isLoggedIn) => {
+    if (!isLoggedIn) {
+      notificationStore.clear();
+      return;
+    }
+    try {
+      await notificationStore.fetchUnreadCount();
+    } catch {
+      notificationStore.clear();
+    }
+  },
+);
 </script>
 
 <template>
@@ -141,7 +165,13 @@ onMounted(async () => {
         <div class="topbar-tools">
           <span class="weather-dot"></span>
           <span>28°C</span>
-          <span class="notice-bell">3</span>
+          <RouterLink v-if="authStore.isLoggedIn" class="notice-link" to="/notifications" aria-label="通知中心">
+            <span class="notice-bell">
+              <span v-if="notificationStore.unreadCount > 0" class="notice-count">
+                {{ notificationStore.unreadCount > 99 ? "99+" : notificationStore.unreadCount }}
+              </span>
+            </span>
+          </RouterLink>
           <div v-if="authStore.user" class="user-chip">
             <span class="avatar">{{ (authStore.user.nickname || authStore.user.username).slice(0, 1) }}</span>
             <div>

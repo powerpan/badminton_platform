@@ -2,6 +2,7 @@ from typing import Any
 
 from config.settings import Settings
 from repositories import announcement_repository
+from services import notification_service
 from utils.query import clean_text
 from utils.response import ApiError
 
@@ -80,6 +81,12 @@ async def create_announcement(
     announcement = await announcement_repository.get_announcement(settings, announcement_id)
     if announcement is None:
         raise ApiError(500, "创建公告后读取失败", 500)
+    if int(announcement["status"]) == 1:
+        await notification_service.safe_broadcast_announcement(
+            settings,
+            announcement=announcement,
+            created_by=current_user["id"],
+        )
     return announcement
 
 

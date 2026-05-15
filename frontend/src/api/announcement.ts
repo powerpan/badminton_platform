@@ -15,3 +15,7 @@ export interface Announcement {
 export function getAnnouncements(params: { page?: number; page_size?: number } = {}) {
   return http.get<unknown, ApiResponse<PageResult<Announcement>>>("/announcements", { params });
 }
+
+export function getAnnouncement(announcementId: number) {
+  return http.get<unknown, ApiResponse<Announcement>>(`/announcements/${announcementId}`);
+}

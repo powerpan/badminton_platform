@@ -8,7 +8,7 @@
 - 缓存：Redis
 - 认证：JWT
 
-当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、场地预约闭环、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以查看场地、选择时间段、创建预约、查看和取消自己的预约；管理员可以管理用户、会员账户、场地、预约、公告、预约规则配置、运营统计和操作日志。
+当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、场地预约闭环、站内通知、公告详情、帮助中心、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以查看场地、选择时间段、创建预约、查看和取消自己的预约、查看通知和公告详情；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、预约规则配置、运营统计和操作日志。
 
 ## 当前实现状态
 
@@ -31,6 +31,11 @@
 - 管理员场地新增、编辑、启停。
 - 管理员预约列表、详情和取消。
 - 管理员公告发布、编辑、隐藏。
+- 站内通知列表、未读数、单条已读和全部已读。
+- 预约成功、取消预约、会员账户调整和公告发布会自动生成站内通知。
+- 管理员支持向全部启用账号群发站内通知。
+- 公告中心和公告详情页已接入前端路由。
+- 帮助中心已提供预约、取消、会员和场地使用规则说明。
 - 管理员规则配置查询和更新。
 - 后台统计接口和统计视图：预约总量、今日预约、活跃用户、场地使用率、热门时间段、用户活跃度。
 - 管理员关键操作日志写入和日志查询。
@@ -43,7 +48,7 @@
 - 后台会员调整、场地编辑、公告编辑和规则配置编辑已改为弹窗表单，避免旧数据回填到顶部新增表单。
 - 预约冲突、空状态和加载状态的前端提示优化。
 - Vue3 前端骨架、Axios 请求封装、Pinia 登录态保存。
-- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/admin` 页面。
+- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/notifications`、`/announcements`、`/announcements/:id`、`/help`、`/admin` 页面。
 - 路由守卫：未登录跳转登录页，普通用户不能访问管理后台。
 - 初始化 SQL：核心表、默认配置、测试场地、默认管理员账号。
 
@@ -125,6 +130,7 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 - 场地表
 - 预约表
 - 公告表
+- 站内通知表
 - 系统配置表
 - 操作日志表
 - 默认系统配置和测试场地
@@ -137,6 +143,7 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 ```text
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase1_court_assets.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase2_member_accounts.sql
+mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase3_notifications.sql
 ```
 
 升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水和预约会员快照字段。两个升级脚本均按字段存在性判断，可重复执行。
@@ -161,6 +168,11 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/api/announcements` | 查询显示中的公告 |
+| GET | `/api/announcements/{id}` | 查询公告详情 |
+| GET | `/api/notifications` | 查询我的站内通知 |
+| GET | `/api/notifications/unread-count` | 查询未读通知数量 |
+| PUT | `/api/notifications/{id}/read` | 标记单条通知已读 |
+| PUT | `/api/notifications/read-all` | 标记全部通知已读 |
 | GET | `/api/courts` | 查询启用场地列表 |
 | GET | `/api/courts/{court_id}/slots?date=YYYY-MM-DD` | 查询场地时间段状态 |
 | POST | `/api/reservations` | 创建预约 |
@@ -185,6 +197,7 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | GET/POST | `/api/admin/announcements` | 公告列表和发布公告 |
 | PUT | `/api/admin/announcements/{id}` | 编辑公告 |
 | PUT | `/api/admin/announcements/{id}/status` | 显示或隐藏公告 |
+| POST | `/api/admin/notifications/broadcast` | 向全部启用账号群发站内通知 |
 | GET | `/api/admin/configs` | 查询规则配置 |
 | PUT | `/api/admin/configs/{config_key}` | 更新规则配置 |
 | GET | `/api/admin/statistics/overview` | 查询后台统计总览 |
@@ -254,12 +267,12 @@ http://localhost:8000
 
 ## 下一步开发顺序
 
-下一阶段建议优先推“通知、公告详情和帮助中心”：
+下一阶段建议优先推“活动赛事、球友圈和商城入口”：
 
-1. 增加站内通知列表，支持已读和未读状态。
-2. 顶部通知角标读取真实未读数量。
-3. 公告列表增加详情页或详情弹窗。
-4. 帮助中心提供预约、取消、会员和场地使用须知。
+1. 活动赛事先支持活动列表、详情和报名。
+2. 球友圈先支持简单动态列表和文本发布。
+3. 商城先支持商品展示和购买说明，不接入真实库存和支付。
+4. 管理端补齐活动和商品的基础维护能力。
 5. 同步更新数据库设计、接口设计和当前实现状态文档。
 
-当前第二阶段已完成会员账户、余额、积分、固定等级折扣、预约扣款和取消退款闭环。下一阶段应优先补齐信息类入口，让顶部通知和侧栏帮助中心从静态占位变成可用功能。
+当前第三阶段已完成站内通知、公告详情和帮助中心。下一阶段可以继续把侧栏中仍禁用的活动赛事、球友圈和商城入口逐步变成可访问页面。

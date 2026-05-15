@@ -8,6 +8,11 @@ const health = ref<HealthResponse | null>(null);
 const announcements = ref<Announcement[]>([]);
 const errorMessage = ref("");
 
+function announcementSummary(content: string) {
+  const text = content.replace(/\s+/g, " ").trim();
+  return text.length > 72 ? `${text.slice(0, 72)}...` : text;
+}
+
 onMounted(async () => {
   try {
     const [healthResponse, announcementResponse] = await Promise.all([
@@ -62,14 +67,16 @@ onMounted(async () => {
         <template #header>
           <div class="card-header-row">
             <strong>场馆公告</strong>
-            <el-tag effect="plain">{{ announcements.length }} 条</el-tag>
+            <RouterLink class="inline-action" to="/announcements">公告中心</RouterLink>
           </div>
         </template>
         <el-empty v-if="announcements.length === 0" description="暂无公告" />
         <el-timeline v-else>
           <el-timeline-item v-for="announcement in announcements" :key="announcement.id">
-            <strong>{{ announcement.title }}</strong>
-            <p class="muted-text">{{ announcement.content }}</p>
+            <RouterLink :to="`/announcements/${announcement.id}`" class="timeline-link">
+              <strong>{{ announcement.title }}</strong>
+            </RouterLink>
+            <p class="muted-text">{{ announcementSummary(announcement.content) }}</p>
           </el-timeline-item>
         </el-timeline>
       </el-card>

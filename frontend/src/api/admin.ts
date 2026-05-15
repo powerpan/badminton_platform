@@ -85,6 +85,11 @@ export interface OperationLog {
   created_at: string;
 }
 
+export interface BroadcastNotificationResult {
+  sent_count: number;
+  created_at: string;
+}
+
 export function adminGetUsers(params: { role?: string; status?: string; page?: number; page_size?: number } = {}) {
   return http.get<unknown, ApiResponse<PageResult<UserInfo>>>("/admin/users", { params });
 }
@@ -190,6 +195,10 @@ export function adminUpdateAnnouncement(announcementId: number, payload: {
 
 export function adminUpdateAnnouncementStatus(announcementId: number, status: number) {
   return http.put<unknown, ApiResponse<Announcement>>(`/admin/announcements/${announcementId}/status`, { status });
+}
+
+export function adminBroadcastNotification(payload: { title: string; content: string }) {
+  return http.post<unknown, ApiResponse<BroadcastNotificationResult>>("/admin/notifications/broadcast", payload);
 }
 
 export function adminGetConfigs() {

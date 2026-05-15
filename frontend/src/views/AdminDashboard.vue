@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 
 import type { Announcement } from "../api/announcement";
 import {
+  adminBroadcastNotification,
   adminCancelReservation,
   adminCreateAnnouncement,
   adminCreateCourt,
@@ -39,7 +40,15 @@ import type { Court } from "../api/court";
 import type { Reservation } from "../api/reservation";
 import { useAuthStore } from "../stores/auth";
 
-type AdminTab = "statistics" | "users" | "courts" | "reservations" | "announcements" | "configs" | "logs";
+type AdminTab =
+  | "statistics"
+  | "users"
+  | "courts"
+  | "reservations"
+  | "announcements"
+  | "notifications"
+  | "configs"
+  | "logs";
 
 interface PageState {
   page: number;
@@ -57,6 +66,7 @@ const tabs: Array<{ key: AdminTab; label: string }> = [
   { key: "courts", label: "场地" },
   { key: "reservations", label: "预约" },
   { key: "announcements", label: "公告" },
+  { key: "notifications", label: "通知" },
   { key: "configs", label: "规则" },
   { key: "logs", label: "日志" },
 ];
@@ -260,6 +270,11 @@ const announcementForm = ref({ title: "", content: "", status: 1 });
 const editingAnnouncementId = ref<number | null>(null);
 const editingAnnouncement = ref<Announcement | null>(null);
 const announcementEditForm = ref({ title: "", content: "", status: 1 });
+
+const broadcastForm = ref({
+  title: "",
+  content: "",
+});
 
 const configs = ref<ConfigItem[]>([]);
 const editingConfig = ref<ConfigItem | null>(null);
@@ -669,6 +684,26 @@ async function toggleAnnouncementStatus(announcement: Announcement) {
   }
 }
 
+async function submitBroadcastNotification() {
+  const title = broadcastForm.value.title.trim();
+  const content = broadcastForm.value.content.trim();
+  if (!title || !content) {
+    setError(new Error("通知标题和内容不能为空"), "发送通知失败");
+    return;
+  }
+  if (!(await confirmAction("确认向全部启用账号发送这条站内通知？"))) return;
+  loading.value = true;
+  try {
+    const response = await adminBroadcastNotification({ title, content });
+    broadcastForm.value = { title: "", content: "" };
+    setSuccess(`通知已发送给 ${response.data.sent_count} 个账号`);
+  } catch (error) {
+    setError(error, "发送通知失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
 async function loadConfigs() {
   const response = await adminGetConfigs();
   configs.value = response.data;
@@ -742,6 +777,7 @@ async function loadActiveTab() {
       await loadReservations();
     }
     if (activeTab.value === "announcements") await loadAnnouncements();
+    if (activeTab.value === "notifications") return;
     if (activeTab.value === "configs") await loadConfigs();
     if (activeTab.value === "logs") await loadOperationLogs();
   } catch (error) {
@@ -767,7 +803,7 @@ onMounted(loadActiveTab);
   <section class="page-header">
     <p class="eyebrow">管理端</p>
     <h1>后台管理</h1>
-    <p>集中管理统计、用户、场地、预约、公告、规则配置和操作日志。</p>
+    <p>集中管理统计、用户、场地、预约、公告、通知、规则配置和操作日志。</p>
   </section>
 
   <el-card shadow="never" class="admin-shell element-admin">
@@ -1053,6 +1089,22 @@ onMounted(loadActiveTab);
       <el-pagination class="element-pagination" :current-page="announcementPage.page" :page-size="announcementPage.page_size" :total="announcementPage.total" layout="prev, pager, next, total" @current-change="changeAnnouncementPage" />
     </section>
 
+    <section v-if="activeTab === 'notifications'" v-loading="loading" class="admin-section">
+      <el-card shadow="never" class="panel-card">
+        <template #header><strong>全员通知</strong></template>
+        <el-alert title="此处发送给全部启用账号。预约、取消、会员调整和公告发布会由系统自动发送通知。" type="info" show-icon :closable="false" />
+        <el-form label-position="top" class="element-form dialog-form" @submit.prevent="submitBroadcastNotification">
+          <el-form-item label="通知标题">
+            <el-input v-model="broadcastForm.title" maxlength="100" show-word-limit />
+          </el-form-item>
+          <el-form-item label="通知内容">
+            <el-input v-model="broadcastForm.content" type="textarea" :rows="6" maxlength="2000" show-word-limit />
+          </el-form-item>
+          <el-button type="primary" :loading="loading" native-type="submit">发送通知</el-button>
+        </el-form>
+      </el-card>
+    </section>
+
     <section v-if="activeTab === 'configs'" v-loading="loading" class="admin-section">
       <el-table :data="configs" empty-text="暂无规则配置" stripe>
         <el-table-column prop="config_key" label="配置键" min-width="220" />
@@ -1070,6 +1122,7 @@ onMounted(loadActiveTab);
             <el-option label="场地" value="court" />
             <el-option label="预约" value="reservation" />
             <el-option label="公告" value="announcement" />
+            <el-option label="通知" value="notification" />
             <el-option label="规则" value="config" />
           </el-select>
         </el-form-item>
@@ -1082,6 +1135,7 @@ onMounted(loadActiveTab);
             <el-option label="member" value="member" />
             <el-option label="cancel" value="cancel" />
             <el-option label="hide" value="hide" />
+            <el-option label="broadcast" value="broadcast" />
           </el-select>
         </el-form-item>
         <el-form-item label="操作人"><el-input v-model="logFilters.username" placeholder="用户名" @keyup.enter="refreshOperationLogs(true)" /></el-form-item>
