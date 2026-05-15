@@ -24,6 +24,9 @@ export interface Reservation {
   original_amount_cents: number;
   discount_amount_cents: number;
   payable_amount_cents: number;
+  member_level_snapshot: string;
+  discount_rate: number;
+  points_awarded: number;
   created_at: string;
   updated_at?: string;
   canceled_at?: string | null;

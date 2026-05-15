@@ -20,6 +20,19 @@ CREATE TABLE IF NOT EXISTS user (
   KEY idx_user_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS member_account (
+  user_id BIGINT PRIMARY KEY,
+  member_level VARCHAR(20) NOT NULL DEFAULT 'normal',
+  balance_cents INT NOT NULL DEFAULT 0,
+  points INT NOT NULL DEFAULT 0,
+  expires_at DATE NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_member_level (member_level),
+  KEY idx_member_expires_at (expires_at),
+  CONSTRAINT fk_member_account_user FOREIGN KEY (user_id) REFERENCES user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS court (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   court_name VARCHAR(100) NOT NULL,
@@ -52,6 +65,9 @@ CREATE TABLE IF NOT EXISTS reservation (
   original_amount_cents INT NOT NULL DEFAULT 12000,
   discount_amount_cents INT NOT NULL DEFAULT 0,
   payable_amount_cents INT NOT NULL DEFAULT 12000,
+  member_level_snapshot VARCHAR(20) NOT NULL DEFAULT 'normal',
+  discount_rate INT NOT NULL DEFAULT 100,
+  points_awarded INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   canceled_at DATETIME NULL,
@@ -62,6 +78,29 @@ CREATE TABLE IF NOT EXISTS reservation (
   KEY idx_reservation_slot (court_id, reserve_date, start_time, end_time),
   CONSTRAINT fk_reservation_user FOREIGN KEY (user_id) REFERENCES user(id),
   CONSTRAINT fk_reservation_court FOREIGN KEY (court_id) REFERENCES court(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS member_account_transaction (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  reservation_id BIGINT NULL,
+  transaction_type VARCHAR(50) NOT NULL,
+  balance_change_cents INT NOT NULL DEFAULT 0,
+  points_change INT NOT NULL DEFAULT 0,
+  balance_before_cents INT NOT NULL DEFAULT 0,
+  balance_after_cents INT NOT NULL DEFAULT 0,
+  points_before INT NOT NULL DEFAULT 0,
+  points_after INT NOT NULL DEFAULT 0,
+  reason VARCHAR(255) NULL,
+  operator_id BIGINT NULL,
+  operator_username VARCHAR(50) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_member_transaction_user (user_id),
+  KEY idx_member_transaction_reservation (reservation_id),
+  KEY idx_member_transaction_type (transaction_type),
+  KEY idx_member_transaction_created_at (created_at),
+  CONSTRAINT fk_member_transaction_user FOREIGN KEY (user_id) REFERENCES user(id),
+  CONSTRAINT fk_member_transaction_reservation FOREIGN KEY (reservation_id) REFERENCES reservation(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS announcement (
@@ -140,3 +179,12 @@ ON DUPLICATE KEY UPDATE
   role = VALUES(role),
   contact = VALUES(contact),
   status = VALUES(status);
+
+INSERT INTO member_account (user_id, member_level, balance_cents, points, expires_at)
+SELECT id, 'diamond', 200000, 0, '2026-12-31'
+FROM user
+WHERE username = 'admin'
+ON DUPLICATE KEY UPDATE
+  member_level = VALUES(member_level),
+  balance_cents = VALUES(balance_cents),
+  expires_at = VALUES(expires_at);

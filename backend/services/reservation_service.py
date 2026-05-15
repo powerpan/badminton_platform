@@ -157,6 +157,8 @@ async def create_reservation(
             raise ApiError(409, "该时间段已被预约", 409)
         if failure_reason == "daily_limit":
             raise ApiError(400, "当天预约次数已达上限", 400)
+        if failure_reason == "insufficient_balance":
+            raise ApiError(400, "会员余额不足，请联系管理员充值或调整余额", 400)
         if failure_reason == "court_not_found":
             raise ApiError(404, "场地不存在", 404)
         if failure_reason == "court_disabled":
@@ -219,7 +221,17 @@ async def cancel_my_reservation(
     start_dt = datetime.combine(reserve_date, start_time if isinstance(start_time, time) else (datetime.min + start_time).time())
     if start_dt <= datetime.now():
         raise ApiError(400, "已开始或已过期的预约不能取消", 400)
-    await reservation_repository.cancel_reservation(settings, reservation_id)
+    _canceled_id, failure_reason = await reservation_repository.cancel_reservation_atomic(
+        settings,
+        reservation_id,
+        operator_id=current_user.get("id"),
+        operator_username=current_user.get("username"),
+        reason="用户取消预约退款",
+    )
+    if failure_reason == "not_found":
+        raise ApiError(404, "预约记录不存在", 404)
+    if failure_reason == "not_confirmed":
+        raise ApiError(400, "当前预约状态不能取消", 400)
     updated = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if updated is None:
         raise ApiError(404, "预约记录不存在", 404)
@@ -275,7 +287,12 @@ async def get_admin_reservation(settings: Settings, reservation_id: int) -> dict
     return _normalize_reservation(reservation)
 
 
-async def admin_cancel_reservation(settings: Settings, reservation_id: int) -> dict[str, Any]:
+async def admin_cancel_reservation(
+    settings: Settings,
+    reservation_id: int,
+    *,
+    current_user: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     await refresh_reservation_statuses(settings)
     reservation = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if reservation is None:
@@ -284,7 +301,17 @@ async def admin_cancel_reservation(settings: Settings, reservation_id: int) -> d
         raise ApiError(400, "预约已取消", 400)
     if reservation["status"] in {"completed", "expired"}:
         raise ApiError(400, "当前预约状态不能取消", 400)
-    await reservation_repository.cancel_reservation(settings, reservation_id)
+    _canceled_id, failure_reason = await reservation_repository.cancel_reservation_atomic(
+        settings,
+        reservation_id,
+        operator_id=current_user.get("id") if current_user else None,
+        operator_username=current_user.get("username") if current_user else None,
+        reason="管理员取消预约退款",
+    )
+    if failure_reason == "not_found":
+        raise ApiError(404, "预约记录不存在", 404)
+    if failure_reason == "not_confirmed":
+        raise ApiError(400, "当前预约状态不能取消", 400)
     updated = await reservation_repository.get_reservation_detail(settings, reservation_id)
     if updated is None:
         raise ApiError(404, "预约记录不存在", 404)

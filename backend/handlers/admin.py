@@ -110,6 +110,34 @@ class AdminUserRoleHandler(BaseHandler):
         self.write_json(success(user))
 
 
+class AdminUserMemberHandler(BaseHandler):
+    async def put(self, user_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        user = await admin_user_service.update_user_member(
+            settings,
+            current_user=current_user,
+            user_id=int(user_id),
+            body=self.get_json_body(),
+        )
+        await _record_admin_log(
+            self,
+            current_user,
+            module="user",
+            action="member",
+            target_type="user",
+            target_id=user["id"],
+            detail={
+                "username": user["username"],
+                "member_level": user["member"]["level"],
+                "balance_cents": user["member"]["balance_cents"],
+                "points": user["member"]["points"],
+                "expires_at": user["member"]["expires_at"],
+            },
+        )
+        self.write_json(success(user))
+
+
 class AdminUserPasswordHandler(BaseHandler):
     async def put(self, user_id: str) -> None:
         current_user = await self.require_admin()
@@ -239,7 +267,11 @@ class AdminReservationCancelHandler(BaseHandler):
     async def put(self, reservation_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        reservation = await reservation_service.admin_cancel_reservation(settings, int(reservation_id))
+        reservation = await reservation_service.admin_cancel_reservation(
+            settings,
+            int(reservation_id),
+            current_user=current_user,
+        )
         await _record_admin_log(
             self,
             current_user,

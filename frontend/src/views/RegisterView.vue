@@ -62,43 +62,38 @@ onMounted(loadCaptcha);
 
 <template>
   <section class="auth-layout">
-    <div class="auth-panel">
+    <el-card class="auth-panel element-auth-card" shadow="never">
       <p class="eyebrow">新用户注册</p>
       <h1>创建普通用户账号</h1>
-      <form class="form-stack" @submit.prevent="handleRegister">
-        <label>
-          用户名
-          <input v-model="username" autocomplete="username" required />
-        </label>
-        <label>
-          昵称
-          <input v-model="nickname" autocomplete="name" />
-        </label>
-        <label>
-          联系方式
-          <input v-model="contact" autocomplete="tel" />
-        </label>
-        <label>
-          密码
-          <input v-model="password" autocomplete="new-password" minlength="6" required type="password" />
-        </label>
-        <label>
-          验证码
+      <el-form label-position="top" class="element-form" @submit.prevent="handleRegister">
+        <el-form-item label="用户名" required>
+          <el-input v-model="username" autocomplete="username" size="large" />
+        </el-form-item>
+        <el-form-item label="昵称">
+          <el-input v-model="nickname" autocomplete="name" size="large" />
+        </el-form-item>
+        <el-form-item label="联系方式">
+          <el-input v-model="contact" autocomplete="tel" size="large" />
+        </el-form-item>
+        <el-form-item label="密码" required>
+          <el-input v-model="password" autocomplete="new-password" type="password" show-password size="large" />
+        </el-form-item>
+        <el-form-item label="验证码" required>
           <div class="captcha-row">
-            <input v-model="captchaCode" autocomplete="off" maxlength="4" required />
-            <button class="captcha-image-button" :disabled="captchaLoading" type="button" @click="loadCaptcha">
+            <el-input v-model="captchaCode" autocomplete="off" maxlength="4" size="large" />
+            <el-button class="captcha-image-button element-captcha" :loading="captchaLoading" native-type="button" @click="loadCaptcha">
               <img v-if="captchaImage" :src="captchaImage" alt="验证码" />
-              <span v-else>{{ captchaLoading ? "加载中" : "刷新" }}</span>
-            </button>
+              <span v-else>刷新</span>
+            </el-button>
           </div>
-        </label>
-        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
-        <p v-if="successMessage" class="success-text">{{ successMessage }}</p>
-        <button class="primary-button" :disabled="loading" type="submit">
-          {{ loading ? "注册中..." : "注册" }}
-        </button>
-      </form>
+        </el-form-item>
+        <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" />
+        <el-alert v-if="successMessage" :title="successMessage" type="success" show-icon :closable="false" />
+        <el-button class="full-button" type="primary" size="large" :loading="loading" native-type="submit">
+          注册
+        </el-button>
+      </el-form>
       <p class="muted-link">已有账号？<RouterLink to="/login">去登录</RouterLink></p>
-    </div>
+    </el-card>
   </section>
 </template>

@@ -4,9 +4,10 @@ import uuid
 from typing import Any
 
 from config.settings import Settings
-from repositories import user_repository
+from repositories import member_repository, user_repository
 from services import captcha_service, redis_service
 from utils.passwords import hash_password, verify_password
+from utils.member_levels import public_member
 from utils.response import ApiError
 from utils.tokens import create_access_token, create_refresh_token, decode_refresh_token
 
@@ -36,6 +37,12 @@ def _password_reset_key(reset_token: str) -> str:
 
 
 def public_user(user: dict[str, Any]) -> dict[str, Any]:
+    member_account = {
+        "member_level": user.get("member_level"),
+        "balance_cents": user.get("balance_cents"),
+        "points": user.get("points"),
+        "expires_at": user.get("member_expires_at"),
+    }
     return {
         "id": user["id"],
         "username": user["username"],
@@ -43,6 +50,7 @@ def public_user(user: dict[str, Any]) -> dict[str, Any]:
         "role": user["role"],
         "contact": user.get("contact") or "",
         "status": user["status"],
+        "member": public_member(member_account),
     }
 
 
@@ -103,6 +111,7 @@ async def register(settings: Settings, body: dict[str, Any]) -> dict[str, Any]:
         nickname=nickname,
         contact=contact,
     )
+    await member_repository.create_default_member_account(settings, user_id)
     user = await user_repository.get_user_by_id(settings, user_id)
     if user is None:
         raise ApiError(500, "注册成功但读取用户信息失败", 500)

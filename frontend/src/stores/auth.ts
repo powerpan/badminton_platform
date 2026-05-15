@@ -10,6 +10,17 @@ import {
   type UserInfo,
 } from "../api/auth";
 
+const defaultMember = {
+  level: "normal" as const,
+  level_label: "普通会员",
+  balance_cents: 0,
+  points: 0,
+  expires_at: null,
+  discount_rate: 100,
+  effective_level: "normal" as const,
+  effective_discount_rate: 100,
+};
+
 interface UserState {
   user: UserInfo | null;
   token: string;
@@ -22,11 +33,17 @@ function readStoredUser(): UserInfo | null {
     return null;
   }
   try {
-    return JSON.parse(rawUser) as UserInfo;
+    const user = JSON.parse(rawUser) as UserInfo;
+    return normalizeUser(user);
   } catch {
     localStorage.removeItem("bf_user");
     return null;
   }
+}
+
+function normalizeUser(user: UserInfo): UserInfo {
+  user.member = { ...defaultMember, ...(user.member || {}) };
+  return user;
 }
 
 export const useAuthStore = defineStore("auth", {
@@ -43,10 +60,10 @@ export const useAuthStore = defineStore("auth", {
     setSession(token: string, refreshToken: string, user: UserInfo) {
       this.token = token;
       this.refreshToken = refreshToken;
-      this.user = user;
+      this.user = normalizeUser(user);
       localStorage.setItem("bf_token", token);
       localStorage.setItem("bf_refresh_token", refreshToken);
-      localStorage.setItem("bf_user", JSON.stringify(user));
+      localStorage.setItem("bf_user", JSON.stringify(this.user));
     },
     async login(username: string, password: string, captchaId: string, captchaCode: string) {
       const response = await loginRequest({
@@ -72,14 +89,14 @@ export const useAuthStore = defineStore("auth", {
         return null;
       }
       const response = await getProfile();
-      this.user = response.data;
-      localStorage.setItem("bf_user", JSON.stringify(response.data));
-      return response.data;
+      this.user = normalizeUser(response.data);
+      localStorage.setItem("bf_user", JSON.stringify(this.user));
+      return this.user;
     },
     async updateProfile(payload: { nickname: string; contact: string }) {
       const response = await updateProfile(payload);
-      this.user = response.data;
-      localStorage.setItem("bf_user", JSON.stringify(response.data));
+      this.user = normalizeUser(response.data);
+      localStorage.setItem("bf_user", JSON.stringify(this.user));
     },
     async changePassword(payload: { old_password: string; new_password: string }) {
       await changePassword(payload);

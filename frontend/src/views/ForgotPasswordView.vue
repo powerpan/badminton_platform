@@ -80,50 +80,45 @@ onMounted(loadCaptcha);
 
 <template>
   <section class="auth-layout">
-    <div class="auth-panel">
+    <el-card class="auth-panel element-auth-card" shadow="never">
       <p class="eyebrow">找回密码</p>
       <h1>重置登录密码</h1>
-      <form v-if="!resetToken" class="form-stack" @submit.prevent="handleVerify">
-        <label>
-          用户名
-          <input v-model="username" autocomplete="username" required />
-        </label>
-        <label>
-          联系方式
-          <input v-model="contact" autocomplete="tel" required />
-        </label>
-        <label>
-          验证码
+      <el-form v-if="!resetToken" label-position="top" class="element-form" @submit.prevent="handleVerify">
+        <el-form-item label="用户名" required>
+          <el-input v-model="username" autocomplete="username" size="large" />
+        </el-form-item>
+        <el-form-item label="联系方式" required>
+          <el-input v-model="contact" autocomplete="tel" size="large" />
+        </el-form-item>
+        <el-form-item label="验证码" required>
           <div class="captcha-row">
-            <input v-model="captchaCode" autocomplete="off" maxlength="4" required />
-            <button class="captcha-image-button" :disabled="captchaLoading" type="button" @click="loadCaptcha">
+            <el-input v-model="captchaCode" autocomplete="off" maxlength="4" size="large" />
+            <el-button class="captcha-image-button element-captcha" :loading="captchaLoading" native-type="button" @click="loadCaptcha">
               <img v-if="captchaImage" :src="captchaImage" alt="验证码" />
-              <span v-else>{{ captchaLoading ? "加载中" : "刷新" }}</span>
-            </button>
+              <span v-else>刷新</span>
+            </el-button>
           </div>
-        </label>
-        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
-        <p v-if="successMessage" class="success-text">{{ successMessage }}</p>
-        <button class="primary-button" :disabled="loading" type="submit">
-          {{ loading ? "验证中..." : "验证身份" }}
-        </button>
-      </form>
-      <form v-else class="form-stack" @submit.prevent="handleReset">
-        <label>
-          新密码
-          <input v-model="newPassword" autocomplete="new-password" minlength="6" required type="password" />
-        </label>
-        <label>
-          确认新密码
-          <input v-model="confirmPassword" autocomplete="new-password" minlength="6" required type="password" />
-        </label>
-        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
-        <p v-if="successMessage" class="success-text">{{ successMessage }}</p>
-        <button class="primary-button" :disabled="loading" type="submit">
-          {{ loading ? "提交中..." : "重置密码" }}
-        </button>
-      </form>
+        </el-form-item>
+        <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" />
+        <el-alert v-if="successMessage" :title="successMessage" type="success" show-icon :closable="false" />
+        <el-button class="full-button" type="primary" size="large" :loading="loading" native-type="submit">
+          验证身份
+        </el-button>
+      </el-form>
+      <el-form v-else label-position="top" class="element-form" @submit.prevent="handleReset">
+        <el-form-item label="新密码" required>
+          <el-input v-model="newPassword" autocomplete="new-password" type="password" show-password size="large" />
+        </el-form-item>
+        <el-form-item label="确认新密码" required>
+          <el-input v-model="confirmPassword" autocomplete="new-password" type="password" show-password size="large" />
+        </el-form-item>
+        <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" />
+        <el-alert v-if="successMessage" :title="successMessage" type="success" show-icon :closable="false" />
+        <el-button class="full-button" type="primary" size="large" :loading="loading" native-type="submit">
+          重置密码
+        </el-button>
+      </el-form>
       <p class="muted-link"><RouterLink to="/login">返回登录</RouterLink></p>
-    </div>
+    </el-card>
   </section>
 </template>

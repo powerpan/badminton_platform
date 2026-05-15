@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { ElMessageBox } from "element-plus";
 
 import {
   cancelReservation,
@@ -7,6 +8,9 @@ import {
   type Reservation,
   type ReservationStatus,
 } from "../api/reservation";
+import { useAuthStore } from "../stores/auth";
+
+const authStore = useAuthStore();
 
 const filters: Array<{ label: string; value: "" | ReservationStatus }> = [
   { label: "全部", value: "" },
@@ -31,7 +35,21 @@ function canCancel(reservation: Reservation) {
 }
 
 function formatMoney(cents: number | null | undefined) {
-  return `￥${((cents || 0) / 100).toFixed(0)}`;
+  return `￥${((cents || 0) / 100).toLocaleString("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function statusType(status: ReservationStatus) {
+  const map: Record<ReservationStatus, "primary" | "success" | "info" | "warning" | "danger"> = {
+    pending: "warning",
+    confirmed: "success",
+    canceled: "info",
+    expired: "danger",
+    completed: "primary",
+  };
+  return map[status];
 }
 
 async function loadReservations() {
@@ -57,13 +75,26 @@ async function switchStatus(status: "" | ReservationStatus) {
   await loadReservations();
 }
 
+async function switchStatusValue(value: string | number | boolean) {
+  await switchStatus(String(value) as "" | ReservationStatus);
+}
+
 async function cancel(id: number) {
-  if (!window.confirm("确认取消该预约？")) return;
+  try {
+    await ElMessageBox.confirm("确认取消该预约？取消后会退回余额并扣回对应积分。", "取消预约", {
+      confirmButtonText: "确认取消",
+      cancelButtonText: "再看看",
+      type: "warning",
+    });
+  } catch {
+    return;
+  }
   actionId.value = id;
   message.value = "";
   errorMessage.value = "";
   try {
     await cancelReservation(id);
+    await authStore.fetchProfile();
     message.value = "预约已取消";
     await loadReservations();
   } catch (error) {
@@ -83,63 +114,56 @@ onMounted(loadReservations);
     <p>查看自己的预约记录，并取消尚未开始的已确认预约。</p>
   </section>
 
-  <section class="panel">
-    <div class="section-title">
-      <div class="tabs">
-        <button
-          v-for="filter in filters"
-          :key="filter.value || 'all'"
-          type="button"
-          :class="{ active: activeStatus === filter.value }"
-          @click="switchStatus(filter.value)"
-        >
+  <el-card shadow="never" class="panel-card">
+    <div class="section-title element-section-title">
+      <el-radio-group :model-value="activeStatus" @change="switchStatusValue">
+        <el-radio-button v-for="filter in filters" :key="filter.value || 'all'" :value="filter.value">
           {{ filter.label }}
-        </button>
-      </div>
-      <span>共 {{ total }} 条</span>
+        </el-radio-button>
+      </el-radio-group>
+      <el-tag effect="plain">共 {{ total }} 条</el-tag>
     </div>
 
-    <p v-if="loading">正在加载预约记录...</p>
-    <div v-else-if="reservations.length === 0" class="empty-state">暂无预约记录</div>
-    <div v-else class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>预约号</th>
-            <th>场地</th>
-            <th>日期</th>
-            <th>时间</th>
-            <th>应付金额</th>
-            <th>状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="reservation in reservations" :key="reservation.id">
-            <td>{{ reservation.reservation_no }}</td>
-            <td>{{ reservation.court_name }}</td>
-            <td>{{ reservation.reserve_date }}</td>
-            <td>{{ reservation.start_time }}-{{ reservation.end_time }}</td>
-            <td>{{ formatMoney(reservation.payable_amount_cents) }}</td>
-            <td>
-              <span class="state-pill" :class="reservation.status">{{ reservation.status }}</span>
-            </td>
-            <td>
-              <button
-                type="button"
-                class="text-button"
-                :disabled="!canCancel(reservation) || actionId === reservation.id"
-                @click="cancel(reservation.id)"
-              >
-                {{ actionId === reservation.id ? "处理中" : "取消" }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <el-alert v-if="message" class="page-alert" :title="message" type="success" show-icon :closable="false" />
+    <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
 
-    <p v-if="message" class="success-text">{{ message }}</p>
-    <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
-  </section>
+    <el-table v-loading="loading" :data="reservations" empty-text="暂无预约记录" stripe>
+      <el-table-column prop="reservation_no" label="预约号" min-width="160" />
+      <el-table-column prop="court_name" label="场地" min-width="110" />
+      <el-table-column prop="reserve_date" label="日期" min-width="115" />
+      <el-table-column label="时间" min-width="130">
+        <template #default="{ row }">{{ row.start_time }}-{{ row.end_time }}</template>
+      </el-table-column>
+      <el-table-column label="原价" min-width="110">
+        <template #default="{ row }">{{ formatMoney(row.original_amount_cents) }}</template>
+      </el-table-column>
+      <el-table-column label="折扣" min-width="110">
+        <template #default="{ row }">-{{ formatMoney(row.discount_amount_cents) }}</template>
+      </el-table-column>
+      <el-table-column label="应付金额" min-width="120">
+        <template #default="{ row }">{{ formatMoney(row.payable_amount_cents) }}</template>
+      </el-table-column>
+      <el-table-column label="积分" min-width="90">
+        <template #default="{ row }">+{{ row.points_awarded }}</template>
+      </el-table-column>
+      <el-table-column label="状态" min-width="100">
+        <template #default="{ row }">
+          <el-tag :type="statusType(row.status)" effect="plain">{{ row.status }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" fixed="right" width="110">
+        <template #default="{ row }">
+          <el-button
+            link
+            type="danger"
+            :disabled="!canCancel(row) || actionId === row.id"
+            :loading="actionId === row.id"
+            @click="cancel(row.id)"
+          >
+            取消
+          </el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+  </el-card>
 </template>

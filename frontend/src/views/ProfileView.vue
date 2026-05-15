@@ -16,6 +16,22 @@ const loadingProfile = ref(false);
 const loadingPassword = ref(false);
 
 const currentUser = computed(() => authStore.user);
+const currentMember = computed(() => currentUser.value?.member);
+
+function formatMoney(cents: number | null | undefined) {
+  return `￥${((cents || 0) / 100).toLocaleString("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function validityText(value: string | null | undefined) {
+  return value ? `有效期至 ${value}` : "长期有效";
+}
+
+function discountText(rate: number) {
+  return rate >= 100 ? "无折扣" : `${rate / 10} 折`;
+}
 
 watchEffect(() => {
   if (authStore.user) {
@@ -68,44 +84,72 @@ async function savePassword() {
     <p v-if="currentUser">当前登录：{{ currentUser.username }} / {{ currentUser.role }}</p>
   </section>
 
-  <section class="module-grid">
-    <div v-if="currentUser?.must_change_password" class="panel warning-panel">
-      <h2>默认管理员密码提醒</h2>
-      <p>当前管理员账号仍在使用默认密码，请先完成密码修改，再继续用于演示或部署。</p>
-    </div>
+  <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
 
-    <form class="panel form-stack" @submit.prevent="saveProfile">
-      <h2>基本信息</h2>
-      <label>
-        昵称
-        <input v-model="nickname" />
-      </label>
-      <label>
-        联系方式
-        <input v-model="contact" />
-      </label>
-      <p v-if="profileMessage" class="success-text">{{ profileMessage }}</p>
-      <button class="primary-button" :disabled="loadingProfile" type="submit">
-        {{ loadingProfile ? "保存中..." : "保存资料" }}
-      </button>
-    </form>
+  <el-row :gutter="18" class="element-grid">
+    <el-col v-if="currentUser?.must_change_password" :xs="24">
+      <el-alert title="默认管理员密码提醒" description="当前管理员账号仍在使用默认密码，请先完成密码修改，再继续用于演示或部署。" type="warning" show-icon :closable="false" />
+    </el-col>
 
-    <form class="panel form-stack" @submit.prevent="savePassword">
-      <h2>修改密码</h2>
-      <label>
-        旧密码
-        <input v-model="oldPassword" autocomplete="current-password" required type="password" />
-      </label>
-      <label>
-        新密码
-        <input v-model="newPassword" autocomplete="new-password" minlength="6" required type="password" />
-      </label>
-      <p v-if="passwordMessage" class="success-text">{{ passwordMessage }}</p>
-      <button class="primary-button" :disabled="loadingPassword" type="submit">
-        {{ loadingPassword ? "修改中..." : "修改密码" }}
-      </button>
-    </form>
-  </section>
+    <el-col v-if="currentMember" :xs="24" :lg="10">
+      <el-card shadow="never" class="panel-card member-profile-card">
+        <template #header>
+          <div class="card-header-row">
+            <strong>会员账户</strong>
+            <el-tag type="success" effect="plain">{{ currentMember.level_label }}</el-tag>
+          </div>
+        </template>
+        <div class="member-profile-main">
+          <strong>{{ currentMember.level_label }}</strong>
+          <span>{{ validityText(currentMember.expires_at) }}</span>
+        </div>
+        <div class="member-metric-list">
+          <div>
+            <span>余额</span>
+            <strong>{{ formatMoney(currentMember.balance_cents) }}</strong>
+          </div>
+          <div>
+            <span>积分</span>
+            <strong>{{ currentMember.points.toLocaleString("zh-CN") }}</strong>
+          </div>
+          <div>
+            <span>当前折扣</span>
+            <strong>{{ discountText(currentMember.effective_discount_rate) }}</strong>
+          </div>
+        </div>
+      </el-card>
+    </el-col>
 
-  <p v-if="errorMessage" class="error-text profile-error">{{ errorMessage }}</p>
+    <el-col :xs="24" :lg="7">
+      <el-card shadow="never" class="panel-card">
+        <template #header><strong>基本信息</strong></template>
+        <el-form label-position="top" class="element-form" @submit.prevent="saveProfile">
+          <el-form-item label="昵称">
+            <el-input v-model="nickname" />
+          </el-form-item>
+          <el-form-item label="联系方式">
+            <el-input v-model="contact" />
+          </el-form-item>
+          <el-alert v-if="profileMessage" :title="profileMessage" type="success" show-icon :closable="false" />
+          <el-button type="primary" :loading="loadingProfile" native-type="submit">保存资料</el-button>
+        </el-form>
+      </el-card>
+    </el-col>
+
+    <el-col :xs="24" :lg="7">
+      <el-card shadow="never" class="panel-card">
+        <template #header><strong>修改密码</strong></template>
+        <el-form label-position="top" class="element-form" @submit.prevent="savePassword">
+          <el-form-item label="旧密码" required>
+            <el-input v-model="oldPassword" autocomplete="current-password" type="password" show-password />
+          </el-form-item>
+          <el-form-item label="新密码" required>
+            <el-input v-model="newPassword" autocomplete="new-password" type="password" show-password />
+          </el-form-item>
+          <el-alert v-if="passwordMessage" :title="passwordMessage" type="success" show-icon :closable="false" />
+          <el-button type="primary" :loading="loadingPassword" native-type="submit">修改密码</el-button>
+        </el-form>
+      </el-card>
+    </el-col>
+  </el-row>
 </template>

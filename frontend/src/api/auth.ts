@@ -1,5 +1,16 @@
 import { http } from "./http";
 
+export interface MemberInfo {
+  level: "normal" | "silver" | "gold" | "diamond";
+  level_label: string;
+  balance_cents: number;
+  points: number;
+  expires_at: string | null;
+  discount_rate: number;
+  effective_level: "normal" | "silver" | "gold" | "diamond";
+  effective_discount_rate: number;
+}
+
 export interface UserInfo {
   id: number;
   username: string;
@@ -7,6 +18,7 @@ export interface UserInfo {
   role: "user" | "admin";
   contact: string;
   status: number;
+  member: MemberInfo;
   must_change_password?: boolean;
 }
 

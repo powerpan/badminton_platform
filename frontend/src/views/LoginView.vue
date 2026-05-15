@@ -52,38 +52,35 @@ onMounted(loadCaptcha);
 
 <template>
   <section class="auth-layout">
-    <div class="auth-panel">
+    <el-card class="auth-panel element-auth-card" shadow="never">
       <p class="eyebrow">账号登录</p>
       <h1>登录 BF 羽毛球馆管理平台</h1>
-      <form class="form-stack" @submit.prevent="handleLogin">
-        <label>
-          用户名
-          <input v-model="username" autocomplete="username" required />
-        </label>
-        <label>
-          密码
-          <input v-model="password" autocomplete="current-password" required type="password" />
-        </label>
-        <label>
-          验证码
+      <el-form label-position="top" class="element-form" @submit.prevent="handleLogin">
+        <el-form-item label="用户名" required>
+          <el-input v-model="username" autocomplete="username" size="large" />
+        </el-form-item>
+        <el-form-item label="密码" required>
+          <el-input v-model="password" autocomplete="current-password" type="password" show-password size="large" />
+        </el-form-item>
+        <el-form-item label="验证码" required>
           <div class="captcha-row">
-            <input v-model="captchaCode" autocomplete="off" maxlength="4" required />
-            <button class="captcha-image-button" :disabled="captchaLoading" type="button" @click="loadCaptcha">
+            <el-input v-model="captchaCode" autocomplete="off" maxlength="4" size="large" />
+            <el-button class="captcha-image-button element-captcha" :loading="captchaLoading" native-type="button" @click="loadCaptcha">
               <img v-if="captchaImage" :src="captchaImage" alt="验证码" />
-              <span v-else>{{ captchaLoading ? "加载中" : "刷新" }}</span>
-            </button>
+              <span v-else>刷新</span>
+            </el-button>
           </div>
-        </label>
-        <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
-        <button class="primary-button" :disabled="loading" type="submit">
-          {{ loading ? "登录中..." : "登录" }}
-        </button>
-      </form>
+        </el-form-item>
+        <el-alert v-if="errorMessage" :title="errorMessage" type="error" show-icon :closable="false" />
+        <el-button class="full-button" type="primary" size="large" :loading="loading" native-type="submit">
+          登录
+        </el-button>
+      </el-form>
       <p class="muted-link">
         还没有账号？<RouterLink to="/register">去注册</RouterLink>
         <span> · </span>
         <RouterLink to="/forgot-password">忘记密码</RouterLink>
       </p>
-    </div>
+    </el-card>
   </section>
 </template>

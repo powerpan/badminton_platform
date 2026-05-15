@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 import type { Announcement } from "../api/announcement";
 import {
@@ -23,10 +24,11 @@ import {
   adminUpdateConfig,
   adminUpdateCourt,
   adminUpdateCourtStatus,
+  adminUpdateUserMember,
   adminUpdateUserRole,
   adminUpdateUserStatus,
-  type CourtStatistic,
   type ConfigItem,
+  type CourtStatistic,
   type OperationLog,
   type StatisticsOverview,
   type TimeSlotStatistic,
@@ -35,13 +37,19 @@ import {
 import type { UserInfo } from "../api/auth";
 import type { Court } from "../api/court";
 import type { Reservation } from "../api/reservation";
+import { useAuthStore } from "../stores/auth";
 
 type AdminTab = "statistics" | "users" | "courts" | "reservations" | "announcements" | "configs" | "logs";
+
 interface PageState {
   page: number;
   page_size: number;
   total: number;
 }
+
+const authStore = useAuthStore();
+const activeTab = ref<AdminTab>("statistics");
+const loading = ref(false);
 
 const tabs: Array<{ key: AdminTab; label: string }> = [
   { key: "statistics", label: "统计" },
@@ -52,11 +60,6 @@ const tabs: Array<{ key: AdminTab; label: string }> = [
   { key: "configs", label: "规则" },
   { key: "logs", label: "日志" },
 ];
-
-const activeTab = ref<AdminTab>("statistics");
-const loading = ref(false);
-const message = ref("");
-const errorMessage = ref("");
 
 function formatDate(value: Date) {
   const local = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
@@ -69,98 +72,11 @@ function addDays(days: number) {
   return formatDate(value);
 }
 
-const statsRange = ref({
-  date_from: addDays(0),
-  date_to: addDays(6),
-});
-const statisticsOverview = ref<StatisticsOverview | null>(null);
-const courtStatistics = ref<CourtStatistic[]>([]);
-const timeSlotStatistics = ref<TimeSlotStatistic[]>([]);
-const userStatistics = ref<UserStatistic[]>([]);
-const maxCourtActiveCount = computed(() => Math.max(0, ...courtStatistics.value.map((item) => item.active_count)));
-const maxTimeSlotCount = computed(() => Math.max(0, ...timeSlotStatistics.value.map((item) => item.reservation_count)));
-
-const users = ref<UserInfo[]>([]);
-const userPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
-const userFilters = ref({ role: "", status: "" });
-const userForm = ref({
-  username: "",
-  password: "",
-  nickname: "",
-  contact: "",
-  role: "user",
-  status: 1,
-});
-
-const courts = ref<Court[]>([]);
-const courtOptions = ref<Court[]>([]);
-const courtPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
-const courtStatus = ref("");
-const editingCourtId = ref<number | null>(null);
-const courtForm = ref({
-  court_no: "",
-  court_name: "",
-  description: "",
-  price_per_hour_yuan: "120",
-  image_url: "/courts/default-court.png",
-  tags_text: "空调开放,标准场地",
-  capacity: 6,
-  status: 1,
-});
-
-const reservations = ref<Reservation[]>([]);
-const reservationPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
-const reservationFilters = ref({
-  status: "",
-  username: "",
-  court_id: "",
-  date_from: "",
-  date_to: "",
-});
-
-const announcements = ref<Announcement[]>([]);
-const announcementPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
-const announcementStatus = ref("");
-const editingAnnouncementId = ref<number | null>(null);
-const announcementForm = ref({
-  title: "",
-  content: "",
-  status: 1,
-});
-
-const configs = ref<ConfigItem[]>([]);
-
-const operationLogs = ref<OperationLog[]>([]);
-const logPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
-const logFilters = ref({
-  module: "",
-  action: "",
-  username: "",
-  date_from: "",
-  date_to: "",
-});
-
-function setMessage(text: string) {
-  message.value = text;
-  errorMessage.value = "";
-}
-
-function setError(error: unknown, fallback: string) {
-  errorMessage.value = error instanceof Error ? error.message : fallback;
-  message.value = "";
-}
-
-function confirmAction(messageText: string) {
-  return window.confirm(messageText);
-}
-
-function barWidth(value: number, max: number) {
-  if (!max) return "0%";
-  return `${Math.max(6, Math.round((value / max) * 100))}%`;
-}
-
 function formatMoney(cents: number | null | undefined) {
-  return `￥${((cents || 0) / 100).toFixed(0)}`;
+  return `￥${((cents || 0) / 100).toLocaleString("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function centsToYuanInput(cents: number | null | undefined) {
@@ -176,6 +92,23 @@ function yuanInputToCents(value: string) {
   return Math.round(number * 100);
 }
 
+function yuanDeltaToCents(value: string) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    throw new Error("余额调整格式错误");
+  }
+  return Math.round(number * 100);
+}
+
+function discountText(rate: number | null | undefined) {
+  const value = rate || 100;
+  return value >= 100 ? "无折扣" : `${value / 10} 折`;
+}
+
+function memberValidity(value: string | null | undefined) {
+  return value ? `至 ${value}` : "长期有效";
+}
+
 function tagTextToArray(value: string) {
   return value
     .split(",")
@@ -183,23 +116,9 @@ function tagTextToArray(value: string) {
     .filter(Boolean);
 }
 
-function courtPayload() {
-  return {
-    court_no: courtForm.value.court_no,
-    court_name: courtForm.value.court_name,
-    description: courtForm.value.description,
-    status: courtForm.value.status,
-    price_per_hour_cents: yuanInputToCents(courtForm.value.price_per_hour_yuan),
-    image_url: courtForm.value.image_url,
-    tags: tagTextToArray(courtForm.value.tags_text),
-    capacity: courtForm.value.capacity,
-  };
-}
-
 function operationDetail(detail: string) {
   try {
-    const parsed = JSON.parse(detail);
-    return Object.entries(parsed)
+    return Object.entries(JSON.parse(detail))
       .map(([key, value]) => `${key}: ${value}`)
       .join("，");
   } catch {
@@ -207,41 +126,181 @@ function operationDetail(detail: string) {
   }
 }
 
-function pageCount(pageState: PageState) {
-  return Math.max(1, Math.ceil(pageState.total / pageState.page_size));
+function statusTagType(status: string) {
+  const map: Record<string, "primary" | "success" | "info" | "warning" | "danger"> = {
+    pending: "warning",
+    confirmed: "success",
+    completed: "primary",
+    canceled: "info",
+    expired: "danger",
+  };
+  return map[status] || "info";
 }
 
-async function changePage(pageState: PageState, nextPage: number, loader: () => Promise<void>) {
-  pageState.page = Math.min(Math.max(1, nextPage), pageCount(pageState));
-  await loader();
+async function confirmAction(message: string, title = "确认操作") {
+  try {
+    await ElMessageBox.confirm(message, title, {
+      confirmButtonText: "确认",
+      cancelButtonText: "取消",
+      type: "warning",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function setSuccess(message: string) {
+  ElMessage.success(message);
+}
+
+function setError(error: unknown, fallback: string) {
+  ElMessage.error(error instanceof Error ? error.message : fallback);
 }
 
 function resetPage(pageState: PageState) {
   pageState.page = 1;
 }
 
+async function changePage(pageState: PageState, nextPage: number, loader: () => Promise<void>) {
+  pageState.page = Math.max(1, nextPage);
+  await loader();
+}
+
+async function changeUserPage(page: number) {
+  await changePage(userPage.value, page, () => refreshUsers());
+}
+
+async function changeCourtPage(page: number) {
+  await changePage(courtPage.value, page, () => refreshCourts());
+}
+
+async function changeReservationPage(page: number) {
+  await changePage(reservationPage.value, page, () => refreshReservations());
+}
+
+async function changeAnnouncementPage(page: number) {
+  await changePage(announcementPage.value, page, () => refreshAnnouncements());
+}
+
+async function changeLogPage(page: number) {
+  await changePage(logPage.value, page, () => refreshOperationLogs());
+}
+
+const statsRange = ref({
+  date_from: addDays(0),
+  date_to: addDays(6),
+});
+const statisticsOverview = ref<StatisticsOverview | null>(null);
+const courtStatistics = ref<CourtStatistic[]>([]);
+const timeSlotStatistics = ref<TimeSlotStatistic[]>([]);
+const userStatistics = ref<UserStatistic[]>([]);
+
+const users = ref<UserInfo[]>([]);
+const userPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const userFilters = ref({ role: "", status: "" });
+const memberLevelOptions = [
+  { value: "normal", label: "普通会员" },
+  { value: "silver", label: "银卡会员" },
+  { value: "gold", label: "金卡会员" },
+  { value: "diamond", label: "钻石会员" },
+];
+const userForm = ref({
+  username: "",
+  password: "",
+  nickname: "",
+  contact: "",
+  role: "user",
+  status: 1,
+});
+const editingMemberUser = ref<UserInfo | null>(null);
+const memberForm = ref({
+  member_level: "normal",
+  expires_at: "",
+  balance_change_yuan: "0",
+  points_change: 0,
+  reason: "",
+});
+const resettingPasswordUser = ref<UserInfo | null>(null);
+const resetPasswordForm = ref({ password: "" });
+
+const courts = ref<Court[]>([]);
+const courtOptions = ref<Court[]>([]);
+const courtPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const courtStatus = ref("");
+const emptyCourtForm = () => ({
+  court_no: "",
+  court_name: "",
+  description: "",
+  price_per_hour_yuan: "120",
+  image_url: "/courts/default-court.png",
+  tags_text: "空调开放,标准场地",
+  capacity: 6,
+  status: 1,
+});
+const courtForm = ref(emptyCourtForm());
+const editingCourtId = ref<number | null>(null);
+const editingCourt = ref<Court | null>(null);
+const courtEditForm = ref(emptyCourtForm());
+
+const reservations = ref<Reservation[]>([]);
+const reservationPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const reservationFilters = ref({
+  status: "",
+  username: "",
+  court_id: "",
+  date_from: "",
+  date_to: "",
+});
+
+const announcements = ref<Announcement[]>([]);
+const announcementPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const announcementStatus = ref("");
+const announcementForm = ref({ title: "", content: "", status: 1 });
+const editingAnnouncementId = ref<number | null>(null);
+const editingAnnouncement = ref<Announcement | null>(null);
+const announcementEditForm = ref({ title: "", content: "", status: 1 });
+
+const configs = ref<ConfigItem[]>([]);
+const editingConfig = ref<ConfigItem | null>(null);
+const configForm = ref({ config_value: "" });
+
+const operationLogs = ref<OperationLog[]>([]);
+const logPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const logFilters = ref({
+  module: "",
+  action: "",
+  username: "",
+  date_from: "",
+  date_to: "",
+});
+
+const usageTable = computed(() =>
+  courtStatistics.value.map((item) => ({
+    ...item,
+    progress: Math.min(100, Math.max(0, Number(item.usage_rate || 0))),
+  })),
+);
+
 async function loadStatistics() {
-  const params = {
-    date_from: statsRange.value.date_from,
-    date_to: statsRange.value.date_to,
-  };
-  const [overview, courts, timeSlots, users] = await Promise.all([
+  const params = { date_from: statsRange.value.date_from, date_to: statsRange.value.date_to };
+  const [overview, courtsResult, slotsResult, usersResult] = await Promise.all([
     adminGetStatisticsOverview(params),
     adminGetCourtStatistics(params),
     adminGetTimeSlotStatistics({ ...params, limit: 12 }),
     adminGetUserStatistics({ ...params, limit: 10 }),
   ]);
   statisticsOverview.value = overview.data;
-  courtStatistics.value = courts.data.items;
-  timeSlotStatistics.value = timeSlots.data.items;
-  userStatistics.value = users.data.items;
+  courtStatistics.value = courtsResult.data.items;
+  timeSlotStatistics.value = slotsResult.data.items;
+  userStatistics.value = usersResult.data.items;
 }
 
 async function refreshStatistics() {
   loading.value = true;
   try {
     await loadStatistics();
-    setMessage("统计已刷新");
+    setSuccess("统计已刷新");
   } catch (error) {
     setError(error, "统计数据加载失败");
   } finally {
@@ -279,7 +338,7 @@ async function submitUser() {
     userForm.value = { username: "", password: "", nickname: "", contact: "", role: "user", status: 1 };
     resetPage(userPage.value);
     await loadUsers();
-    setMessage("用户已创建");
+    setSuccess("用户已创建");
   } catch (error) {
     setError(error, "创建用户失败");
   } finally {
@@ -289,12 +348,12 @@ async function submitUser() {
 
 async function toggleUserStatus(user: UserInfo) {
   const nextStatusLabel = user.status === 1 ? "禁用" : "启用";
-  if (!confirmAction(`确认${nextStatusLabel}用户 ${user.username}？`)) return;
+  if (!(await confirmAction(`确认${nextStatusLabel}用户 ${user.username}？`))) return;
   loading.value = true;
   try {
     await adminUpdateUserStatus(user.id, user.status === 1 ? 0 : 1);
     await loadUsers();
-    setMessage("用户状态已更新");
+    setSuccess("用户状态已更新");
   } catch (error) {
     setError(error, "更新用户状态失败");
   } finally {
@@ -302,23 +361,106 @@ async function toggleUserStatus(user: UserInfo) {
   }
 }
 
-async function changeUserRole(user: UserInfo, event: Event) {
-  const role = (event.target as HTMLSelectElement).value;
-  if (role !== user.role && !confirmAction(`确认将用户 ${user.username} 的角色修改为 ${role}？`)) {
-    (event.target as HTMLSelectElement).value = user.role;
-    return;
-  }
+async function changeUserRoleValue(user: UserInfo, roleValue: string | number | boolean) {
+  const role = String(roleValue);
+  if (role !== user.role && !(await confirmAction(`确认将用户 ${user.username} 的角色修改为 ${role}？`))) return;
   loading.value = true;
   try {
     await adminUpdateUserRole(user.id, role);
     await loadUsers();
-    setMessage("用户角色已更新");
+    setSuccess("用户角色已更新");
   } catch (error) {
     setError(error, "更新用户角色失败");
     await loadUsers();
   } finally {
     loading.value = false;
   }
+}
+
+function editUserMember(user: UserInfo) {
+  editingMemberUser.value = user;
+  memberForm.value = {
+    member_level: user.member.level,
+    expires_at: user.member.expires_at || "",
+    balance_change_yuan: "0",
+    points_change: 0,
+    reason: "",
+  };
+}
+
+function resetMemberForm() {
+  editingMemberUser.value = null;
+  memberForm.value = { member_level: "normal", expires_at: "", balance_change_yuan: "0", points_change: 0, reason: "" };
+}
+
+async function submitMember() {
+  if (!editingMemberUser.value) return;
+  try {
+    const targetUserId = editingMemberUser.value.id;
+    const balanceChangeCents = yuanDeltaToCents(memberForm.value.balance_change_yuan);
+    const pointsChange = Number(memberForm.value.points_change || 0);
+    if (!Number.isFinite(pointsChange)) throw new Error("积分调整格式错误");
+    const levelLabel = memberLevelOptions.find((item) => item.value === memberForm.value.member_level)?.label || memberForm.value.member_level;
+    const expiresText = memberForm.value.expires_at || "长期有效";
+    const balanceText = `${balanceChangeCents >= 0 ? "+" : ""}${(balanceChangeCents / 100).toFixed(2)} 元`;
+    const pointsText = `${pointsChange >= 0 ? "+" : ""}${pointsChange} 分`;
+    if (!(await confirmAction(`确认调整 ${editingMemberUser.value.username} 的会员账户？\n等级：${levelLabel}\n有效期：${expiresText}\n余额变动：${balanceText}\n积分变动：${pointsText}`))) return;
+    loading.value = true;
+    await adminUpdateUserMember(targetUserId, {
+      member_level: memberForm.value.member_level,
+      expires_at: memberForm.value.expires_at || null,
+      balance_change_cents: balanceChangeCents,
+      points_change: pointsChange,
+      reason: memberForm.value.reason.trim() || "后台调整会员账户",
+    });
+    resetMemberForm();
+    await loadUsers();
+    if (targetUserId === authStore.user?.id) await authStore.fetchProfile();
+    setSuccess("会员账户已更新");
+  } catch (error) {
+    setError(error, "更新会员账户失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+function resetUserPassword(user: UserInfo) {
+  resettingPasswordUser.value = user;
+  resetPasswordForm.value = { password: "" };
+}
+
+function resetPasswordDialog() {
+  resettingPasswordUser.value = null;
+  resetPasswordForm.value = { password: "" };
+}
+
+async function submitResetPassword() {
+  if (!resettingPasswordUser.value || !resetPasswordForm.value.password) return;
+  const user = resettingPasswordUser.value;
+  if (!(await confirmAction(`确认重置用户 ${user.username} 的密码？该用户旧登录态会失效。`))) return;
+  loading.value = true;
+  try {
+    await adminResetUserPassword(user.id, resetPasswordForm.value.password);
+    resetPasswordDialog();
+    setSuccess("用户密码已重置");
+  } catch (error) {
+    setError(error, "重置密码失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+function courtPayload(form: ReturnType<typeof emptyCourtForm>) {
+  return {
+    court_no: form.court_no,
+    court_name: form.court_name,
+    description: form.description,
+    status: form.status,
+    price_per_hour_cents: yuanInputToCents(form.price_per_hour_yuan),
+    image_url: form.image_url,
+    tags: tagTextToArray(form.tags_text),
+    capacity: form.capacity,
+  };
 }
 
 async function loadCourts() {
@@ -349,9 +491,35 @@ async function refreshCourts(reset = false) {
   }
 }
 
+async function submitCourt() {
+  const isEdit = Boolean(editingCourtId.value);
+  const form = isEdit ? courtEditForm.value : courtForm.value;
+  if (isEdit && form.status === 0 && !(await confirmAction("确认停用该场地？如存在未来预约，后端会拒绝停用。"))) return;
+  loading.value = true;
+  try {
+    const payload = courtPayload(form);
+    if (editingCourtId.value) {
+      await adminUpdateCourt(editingCourtId.value, payload);
+      setSuccess("场地已更新");
+    } else {
+      await adminCreateCourt(payload);
+      setSuccess("场地已创建");
+    }
+    resetCourtForm();
+    resetPage(courtPage.value);
+    courtOptions.value = [];
+    await loadCourts();
+  } catch (error) {
+    setError(error, "保存场地失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
 function editCourt(court: Court) {
   editingCourtId.value = court.id;
-  courtForm.value = {
+  editingCourt.value = court;
+  courtEditForm.value = {
     court_no: court.court_no,
     court_name: court.court_name,
     description: court.description || "",
@@ -365,52 +533,20 @@ function editCourt(court: Court) {
 
 function resetCourtForm() {
   editingCourtId.value = null;
-  courtForm.value = {
-    court_no: "",
-    court_name: "",
-    description: "",
-    price_per_hour_yuan: "120",
-    image_url: "/courts/default-court.png",
-    tags_text: "空调开放,标准场地",
-    capacity: 6,
-    status: 1,
-  };
-}
-
-async function submitCourt() {
-  if (editingCourtId.value && courtForm.value.status === 0 && !confirmAction("确认停用该场地？如存在未来预约，后端会拒绝停用。")) {
-    return;
-  }
-  loading.value = true;
-  try {
-    const payload = courtPayload();
-    if (editingCourtId.value) {
-      await adminUpdateCourt(editingCourtId.value, payload);
-      setMessage("场地已更新");
-    } else {
-      await adminCreateCourt(payload);
-      setMessage("场地已创建");
-    }
-    resetCourtForm();
-    resetPage(courtPage.value);
-    courtOptions.value = [];
-    await loadCourts();
-  } catch (error) {
-    setError(error, "保存场地失败");
-  } finally {
-    loading.value = false;
-  }
+  editingCourt.value = null;
+  courtForm.value = emptyCourtForm();
+  courtEditForm.value = emptyCourtForm();
 }
 
 async function toggleCourtStatus(court: Court) {
   const nextStatusLabel = court.status === 1 ? "停用" : "启用";
-  if (!confirmAction(`确认${nextStatusLabel}场地 ${court.court_no} ${court.court_name}？`)) return;
+  if (!(await confirmAction(`确认${nextStatusLabel}场地 ${court.court_no} ${court.court_name}？`))) return;
   loading.value = true;
   try {
     await adminUpdateCourtStatus(court.id, court.status === 1 ? 0 : 1);
     courtOptions.value = [];
     await loadCourts();
-    setMessage("场地状态已更新");
+    setSuccess("场地状态已更新");
   } catch (error) {
     setError(error, "更新场地状态失败");
   } finally {
@@ -445,12 +581,12 @@ async function refreshReservations(reset = false) {
 }
 
 async function cancelAdminReservation(reservation: Reservation) {
-  if (!confirmAction(`确认取消预约 ${reservation.reservation_no}？`)) return;
+  if (!(await confirmAction(`确认取消预约 ${reservation.reservation_no}？`))) return;
   loading.value = true;
   try {
     await adminCancelReservation(reservation.id);
     await loadReservations();
-    setMessage("预约已取消");
+    setSuccess("预约已取消");
   } catch (error) {
     setError(error, "取消预约失败");
   } finally {
@@ -480,29 +616,16 @@ async function refreshAnnouncements(reset = false) {
   }
 }
 
-function editAnnouncement(announcement: Announcement) {
-  editingAnnouncementId.value = announcement.id;
-  announcementForm.value = {
-    title: announcement.title,
-    content: announcement.content,
-    status: announcement.status,
-  };
-}
-
-function resetAnnouncementForm() {
-  editingAnnouncementId.value = null;
-  announcementForm.value = { title: "", content: "", status: 1 };
-}
-
 async function submitAnnouncement() {
+  const payload = editingAnnouncementId.value ? announcementEditForm.value : announcementForm.value;
   loading.value = true;
   try {
     if (editingAnnouncementId.value) {
-      await adminUpdateAnnouncement(editingAnnouncementId.value, announcementForm.value);
-      setMessage("公告已更新");
+      await adminUpdateAnnouncement(editingAnnouncementId.value, payload);
+      setSuccess("公告已更新");
     } else {
-      await adminCreateAnnouncement(announcementForm.value);
-      setMessage("公告已创建");
+      await adminCreateAnnouncement(payload);
+      setSuccess("公告已创建");
     }
     resetAnnouncementForm();
     resetPage(announcementPage.value);
@@ -514,14 +637,31 @@ async function submitAnnouncement() {
   }
 }
 
+function editAnnouncement(announcement: Announcement) {
+  editingAnnouncementId.value = announcement.id;
+  editingAnnouncement.value = announcement;
+  announcementEditForm.value = {
+    title: announcement.title,
+    content: announcement.content,
+    status: announcement.status,
+  };
+}
+
+function resetAnnouncementForm() {
+  editingAnnouncementId.value = null;
+  editingAnnouncement.value = null;
+  announcementForm.value = { title: "", content: "", status: 1 };
+  announcementEditForm.value = { title: "", content: "", status: 1 };
+}
+
 async function toggleAnnouncementStatus(announcement: Announcement) {
   const nextStatusLabel = announcement.status === 1 ? "隐藏" : "显示";
-  if (!confirmAction(`确认${nextStatusLabel}公告《${announcement.title}》？`)) return;
+  if (!(await confirmAction(`确认${nextStatusLabel}公告《${announcement.title}》？`))) return;
   loading.value = true;
   try {
     await adminUpdateAnnouncementStatus(announcement.id, announcement.status === 1 ? 0 : 1);
     await loadAnnouncements();
-    setMessage("公告状态已更新");
+    setSuccess("公告状态已更新");
   } catch (error) {
     setError(error, "更新公告状态失败");
   } finally {
@@ -532,6 +672,37 @@ async function toggleAnnouncementStatus(announcement: Announcement) {
 async function loadConfigs() {
   const response = await adminGetConfigs();
   configs.value = response.data;
+}
+
+function editConfig(config: ConfigItem) {
+  editingConfig.value = config;
+  configForm.value = { config_value: config.config_value };
+}
+
+function resetConfigForm() {
+  editingConfig.value = null;
+  configForm.value = { config_value: "" };
+}
+
+async function submitConfig() {
+  if (!editingConfig.value) return;
+  const nextValue = configForm.value.config_value.trim();
+  if (!nextValue) {
+    setError(new Error("配置值不能为空"), "更新规则配置失败");
+    return;
+  }
+  if (!(await confirmAction(`确认保存规则 ${editingConfig.value.config_key} = ${nextValue}？`))) return;
+  loading.value = true;
+  try {
+    await adminUpdateConfig(editingConfig.value.config_key, nextValue);
+    resetConfigForm();
+    await loadConfigs();
+    setSuccess("规则配置已更新");
+  } catch (error) {
+    setError(error, "更新规则配置失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function loadOperationLogs() {
@@ -548,26 +719,11 @@ async function loadOperationLogs() {
   logPage.value.total = response.data.total;
 }
 
-async function resetUserPassword(user: UserInfo) {
-  const password = window.prompt(`重置 ${user.username} 的密码，至少6位`);
-  if (!password) return;
-  if (!confirmAction(`确认重置用户 ${user.username} 的密码？该用户旧登录态会失效。`)) return;
-  loading.value = true;
-  try {
-    await adminResetUserPassword(user.id, password);
-    setMessage("用户密码已重置");
-  } catch (error) {
-    setError(error, "重置密码失败");
-  } finally {
-    loading.value = false;
-  }
-}
-
-async function refreshOperationLogs() {
+async function refreshOperationLogs(reset = false) {
+  if (reset) resetPage(logPage.value);
   loading.value = true;
   try {
     await loadOperationLogs();
-    setMessage("日志已刷新");
   } catch (error) {
     setError(error, "日志加载失败");
   } finally {
@@ -575,29 +731,8 @@ async function refreshOperationLogs() {
   }
 }
 
-async function searchOperationLogs() {
-  resetPage(logPage.value);
-  await refreshOperationLogs();
-}
-
-async function saveConfig(config: ConfigItem) {
-  if (!confirmAction(`确认保存规则 ${config.config_key} = ${config.config_value}？`)) return;
-  loading.value = true;
-  try {
-    await adminUpdateConfig(config.config_key, config.config_value);
-    await loadConfigs();
-    setMessage("规则配置已更新");
-  } catch (error) {
-    setError(error, "更新规则配置失败");
-  } finally {
-    loading.value = false;
-  }
-}
-
 async function loadActiveTab() {
   loading.value = true;
-  message.value = "";
-  errorMessage.value = "";
   try {
     if (activeTab.value === "statistics") await loadStatistics();
     if (activeTab.value === "users") await loadUsers();
@@ -621,6 +756,10 @@ async function switchTab(tab: AdminTab) {
   await loadActiveTab();
 }
 
+async function switchTabByName(name: string | number) {
+  await switchTab(String(name) as AdminTab);
+}
+
 onMounted(loadActiveTab);
 </script>
 
@@ -631,505 +770,419 @@ onMounted(loadActiveTab);
     <p>集中管理统计、用户、场地、预约、公告、规则配置和操作日志。</p>
   </section>
 
-  <section class="panel admin-shell">
-    <div class="tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        type="button"
-        :class="{ active: activeTab === tab.key }"
-        @click="switchTab(tab.key)"
-      >
-        {{ tab.label }}
-      </button>
-    </div>
+  <el-card shadow="never" class="admin-shell element-admin">
+    <el-tabs :model-value="activeTab" @tab-change="switchTabByName">
+      <el-tab-pane v-for="tab in tabs" :key="tab.key" :label="tab.label" :name="tab.key" />
+    </el-tabs>
 
-    <p v-if="message" class="success-text">{{ message }}</p>
-    <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+    <section v-if="activeTab === 'statistics'" v-loading="loading" class="admin-section">
+      <el-form inline class="element-filter">
+        <el-form-item label="开始日期">
+          <el-date-picker v-model="statsRange.date_from" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="结束日期">
+          <el-date-picker v-model="statsRange.date_to" type="date" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :loading="loading" @click="refreshStatistics">刷新统计</el-button>
+        </el-form-item>
+      </el-form>
 
-    <div v-if="activeTab === 'statistics'" class="admin-section">
-      <div class="toolbar-row">
-        <label>
-          开始日期
-          <input v-model="statsRange.date_from" type="date" />
-        </label>
-        <label>
-          结束日期
-          <input v-model="statsRange.date_to" type="date" />
-        </label>
-        <button class="primary-button" type="button" :disabled="loading" @click="refreshStatistics">刷新统计</button>
-      </div>
+      <el-row v-if="statisticsOverview" :gutter="14" class="element-grid">
+        <el-col :xs="24" :sm="12" :lg="4">
+          <el-statistic title="预约总量" :value="statisticsOverview.reservation_total" />
+        </el-col>
+        <el-col :xs="24" :sm="12" :lg="4">
+          <el-statistic title="今日预约" :value="statisticsOverview.today_reservations" />
+        </el-col>
+        <el-col :xs="24" :sm="12" :lg="4">
+          <el-statistic title="活跃用户" :value="statisticsOverview.active_users" />
+        </el-col>
+        <el-col :xs="24" :sm="12" :lg="4">
+          <el-statistic title="场地使用率" :value="statisticsOverview.utilization_rate" suffix="%" />
+        </el-col>
+        <el-col :xs="24" :sm="12" :lg="4">
+          <el-statistic title="启用场地" :value="statisticsOverview.enabled_courts" />
+        </el-col>
+        <el-col :xs="24" :sm="12" :lg="4">
+          <el-statistic title="已完成预约" :value="statisticsOverview.completed_reservations" />
+        </el-col>
+      </el-row>
 
-      <div v-if="statisticsOverview" class="metric-grid">
-        <article class="metric-card">
-          <span>预约总量</span>
-          <strong>{{ statisticsOverview.reservation_total }}</strong>
-          <small>{{ statisticsOverview.date_from }} 至 {{ statisticsOverview.date_to }}</small>
-        </article>
-        <article class="metric-card">
-          <span>今日预约</span>
-          <strong>{{ statisticsOverview.today_reservations }}</strong>
-          <small>当天预约记录</small>
-        </article>
-        <article class="metric-card">
-          <span>活跃用户</span>
-          <strong>{{ statisticsOverview.active_users }}</strong>
-          <small>区间内有预约的用户</small>
-        </article>
-        <article class="metric-card">
-          <span>场地使用率</span>
-          <strong>{{ statisticsOverview.utilization_rate }}%</strong>
-          <small>{{ statisticsOverview.occupied_slots }}/{{ statisticsOverview.capacity_slots }} 时间段</small>
-        </article>
-        <article class="metric-card">
-          <span>启用场地</span>
-          <strong>{{ statisticsOverview.enabled_courts }}/{{ statisticsOverview.total_courts }}</strong>
-          <small>可预约场地数量</small>
-        </article>
-        <article class="metric-card">
-          <span>预约状态</span>
-          <strong>{{ statisticsOverview.confirmed_reservations }}/{{ statisticsOverview.completed_reservations }}</strong>
-          <small>confirmed / completed</small>
-        </article>
-      </div>
+      <el-row :gutter="16" class="element-grid">
+        <el-col :xs="24" :lg="12">
+          <el-card shadow="never" class="panel-card">
+            <template #header><strong>场地使用率</strong></template>
+            <el-table :data="usageTable" empty-text="暂无场地统计数据">
+              <el-table-column label="场地" min-width="150">
+                <template #default="{ row }">{{ row.court_no }} {{ row.court_name }}</template>
+              </el-table-column>
+              <el-table-column prop="active_count" label="有效预约" width="100" />
+              <el-table-column label="使用率" min-width="180">
+                <template #default="{ row }">
+                  <el-progress :percentage="row.progress" />
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :lg="12">
+          <el-card shadow="never" class="panel-card">
+            <template #header><strong>热门时间段</strong></template>
+            <el-table :data="timeSlotStatistics" empty-text="暂无时间段统计数据">
+              <el-table-column prop="time_slot" label="时间段" />
+              <el-table-column prop="reservation_count" label="预约次数" width="120" />
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
 
-      <div class="stat-layout">
-        <section class="stat-panel">
-          <div class="section-title">
-            <h2>场地使用率</h2>
-          </div>
-          <div v-if="courtStatistics.length" class="bar-list">
-            <div v-for="court in courtStatistics" :key="court.court_id" class="bar-item">
-              <div>
-                <strong>{{ court.court_no }} {{ court.court_name }}</strong>
-                <span>{{ court.active_count }} 次 / {{ court.usage_rate }}%</span>
-              </div>
-              <div class="bar-track">
-                <i :style="{ width: barWidth(court.active_count, maxCourtActiveCount) }"></i>
-              </div>
-            </div>
-          </div>
-          <p v-else class="empty-state">暂无场地统计数据</p>
-        </section>
+      <el-card shadow="never" class="panel-card">
+        <template #header><strong>用户活跃度</strong></template>
+        <el-table :data="userStatistics" empty-text="暂无用户统计数据" stripe>
+          <el-table-column label="用户" min-width="130">
+            <template #default="{ row }">{{ row.nickname || row.username }}</template>
+          </el-table-column>
+          <el-table-column prop="reservation_count" label="预约总数" />
+          <el-table-column prop="confirmed_count" label="已确认" />
+          <el-table-column prop="completed_count" label="已完成" />
+          <el-table-column prop="canceled_count" label="已取消" />
+          <el-table-column prop="last_reserve_date" label="最近预约日期" min-width="130" />
+        </el-table>
+      </el-card>
+    </section>
 
-        <section class="stat-panel">
-          <div class="section-title">
-            <h2>热门时间段</h2>
-          </div>
-          <div v-if="timeSlotStatistics.length" class="bar-list">
-            <div v-for="slot in timeSlotStatistics" :key="slot.time_slot" class="bar-item">
-              <div>
-                <strong>{{ slot.time_slot }}</strong>
-                <span>{{ slot.reservation_count }} 次</span>
-              </div>
-              <div class="bar-track">
-                <i :style="{ width: barWidth(slot.reservation_count, maxTimeSlotCount) }"></i>
-              </div>
-            </div>
-          </div>
-          <p v-else class="empty-state">暂无时间段统计数据</p>
-        </section>
-      </div>
+    <section v-if="activeTab === 'users'" v-loading="loading" class="admin-section">
+      <el-card shadow="never" class="panel-card">
+        <template #header><strong>新增用户</strong></template>
+        <el-form inline class="element-filter" @submit.prevent="submitUser">
+          <el-form-item label="用户名"><el-input v-model="userForm.username" /></el-form-item>
+          <el-form-item label="密码"><el-input v-model="userForm.password" type="password" show-password /></el-form-item>
+          <el-form-item label="昵称"><el-input v-model="userForm.nickname" /></el-form-item>
+          <el-form-item label="联系方式"><el-input v-model="userForm.contact" /></el-form-item>
+          <el-form-item label="角色">
+            <el-select v-model="userForm.role" class="short-select">
+              <el-option label="user" value="user" />
+              <el-option label="admin" value="admin" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="userForm.status" class="short-select">
+              <el-option label="启用" :value="1" />
+              <el-option label="禁用" :value="0" />
+            </el-select>
+          </el-form-item>
+          <el-form-item><el-button type="primary" native-type="submit">新增用户</el-button></el-form-item>
+        </el-form>
+      </el-card>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>用户</th>
-              <th>预约总数</th>
-              <th>已确认</th>
-              <th>已完成</th>
-              <th>已取消</th>
-              <th>最近预约日期</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in userStatistics" :key="user.user_id">
-              <td>{{ user.nickname || user.username }}</td>
-              <td>{{ user.reservation_count }}</td>
-              <td>{{ user.confirmed_count }}</td>
-              <td>{{ user.completed_count }}</td>
-              <td>{{ user.canceled_count }}</td>
-              <td>{{ user.last_reserve_date || "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <el-form inline class="element-filter">
+        <el-form-item label="角色">
+          <el-select v-model="userFilters.role" clearable class="short-select" @change="refreshUsers(true)">
+            <el-option label="user" value="user" />
+            <el-option label="admin" value="admin" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="userFilters.status" clearable class="short-select" @change="refreshUsers(true)">
+            <el-option label="启用" value="1" />
+            <el-option label="禁用" value="0" />
+          </el-select>
+        </el-form-item>
+      </el-form>
 
-    <div v-if="activeTab === 'users'" class="admin-section">
-      <form class="form-inline" @submit.prevent="submitUser">
-        <input v-model="userForm.username" placeholder="用户名" />
-        <input v-model="userForm.password" placeholder="密码" type="password" />
-        <input v-model="userForm.nickname" placeholder="昵称" />
-        <input v-model="userForm.contact" placeholder="联系方式" />
-        <select v-model="userForm.role">
-          <option value="user">user</option>
-          <option value="admin">admin</option>
-        </select>
-        <select v-model.number="userForm.status">
-          <option :value="1">启用</option>
-          <option :value="0">禁用</option>
-        </select>
-        <button class="primary-button" type="submit" :disabled="loading">新增用户</button>
-      </form>
+      <el-table :data="users" empty-text="暂无用户数据" stripe>
+        <el-table-column prop="username" label="用户名" min-width="110" />
+        <el-table-column prop="nickname" label="昵称" min-width="110" />
+        <el-table-column prop="contact" label="联系方式" min-width="130" />
+        <el-table-column label="角色" min-width="120">
+          <template #default="{ row }">
+            <el-select :model-value="row.role" size="small" @change="changeUserRoleValue(row, $event)">
+              <el-option label="user" value="user" />
+              <el-option label="admin" value="admin" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="会员" min-width="170">
+          <template #default="{ row }">
+            <el-tag effect="plain">{{ row.member.level_label }}</el-tag>
+            <div class="table-subtext">{{ memberValidity(row.member.expires_at) }} / {{ discountText(row.member.effective_discount_rate) }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="余额" min-width="110">
+          <template #default="{ row }">{{ formatMoney(row.member.balance_cents) }}</template>
+        </el-table-column>
+        <el-table-column label="积分" min-width="90">
+          <template #default="{ row }">{{ row.member.points }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 1 ? 'success' : 'info'" effect="plain">{{ row.status === 1 ? "启用" : "禁用" }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" fixed="right" width="230">
+          <template #default="{ row }">
+            <el-button link type="warning" @click="toggleUserStatus(row)">{{ row.status === 1 ? "禁用" : "启用" }}</el-button>
+            <el-button link type="primary" @click="editUserMember(row)">会员</el-button>
+            <el-button link type="danger" @click="resetUserPassword(row)">重置密码</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination class="element-pagination" :current-page="userPage.page" :page-size="userPage.page_size" :total="userPage.total" layout="prev, pager, next, total" @current-change="changeUserPage" />
+    </section>
 
-      <div class="toolbar-row">
-        <label>
-          角色
-          <select v-model="userFilters.role" @change="refreshUsers(true)">
-            <option value="">全部</option>
-            <option value="user">user</option>
-            <option value="admin">admin</option>
-          </select>
-        </label>
-        <label>
-          状态
-          <select v-model="userFilters.status" @change="refreshUsers(true)">
-            <option value="">全部</option>
-            <option value="1">启用</option>
-            <option value="0">禁用</option>
-          </select>
-        </label>
-      </div>
+    <section v-if="activeTab === 'courts'" v-loading="loading" class="admin-section">
+      <el-card shadow="never" class="panel-card">
+        <template #header><strong>新增场地</strong></template>
+        <el-form inline class="element-filter" @submit.prevent="submitCourt">
+          <el-form-item label="编号"><el-input v-model="courtForm.court_no" /></el-form-item>
+          <el-form-item label="名称"><el-input v-model="courtForm.court_name" /></el-form-item>
+          <el-form-item label="说明"><el-input v-model="courtForm.description" /></el-form-item>
+          <el-form-item label="价格"><el-input v-model="courtForm.price_per_hour_yuan" /></el-form-item>
+          <el-form-item label="图片"><el-input v-model="courtForm.image_url" /></el-form-item>
+          <el-form-item label="标签"><el-input v-model="courtForm.tags_text" /></el-form-item>
+          <el-form-item label="人数"><el-input-number v-model="courtForm.capacity" :min="1" :max="50" /></el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="courtForm.status" class="short-select">
+              <el-option label="启用" :value="1" />
+              <el-option label="停用" :value="0" />
+            </el-select>
+          </el-form-item>
+          <el-form-item><el-button type="primary" native-type="submit">新增场地</el-button></el-form-item>
+        </el-form>
+      </el-card>
 
-      <div v-if="users.length === 0" class="empty-state">暂无用户数据</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>用户名</th>
-              <th>昵称</th>
-              <th>联系方式</th>
-              <th>角色</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="user in users" :key="user.id">
-              <td>{{ user.username }}</td>
-              <td>{{ user.nickname }}</td>
-              <td>{{ user.contact || "-" }}</td>
-              <td>
-                <select :value="user.role" @change="changeUserRole(user, $event)">
-                  <option value="user">user</option>
-                  <option value="admin">admin</option>
-                </select>
-              </td>
-              <td><span class="state-pill" :class="user.status === 1 ? 'confirmed' : 'canceled'">{{ user.status === 1 ? "启用" : "禁用" }}</span></td>
-              <td>
-                <button class="text-button" type="button" @click="toggleUserStatus(user)">{{ user.status === 1 ? "禁用" : "启用" }}</button>
-                <button class="text-button" type="button" @click="resetUserPassword(user)">重置密码</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pagination-row">
-        <button class="text-button" type="button" :disabled="userPage.page <= 1" @click="changePage(userPage, userPage.page - 1, () => refreshUsers())">上一页</button>
-        <span>第 {{ userPage.page }} / {{ pageCount(userPage) }} 页，共 {{ userPage.total }} 条</span>
-        <button class="text-button" type="button" :disabled="userPage.page >= pageCount(userPage)" @click="changePage(userPage, userPage.page + 1, () => refreshUsers())">下一页</button>
-      </div>
-    </div>
+      <el-form inline class="element-filter">
+        <el-form-item label="状态">
+          <el-select v-model="courtStatus" clearable class="short-select" @change="refreshCourts(true)">
+            <el-option label="启用" value="1" />
+            <el-option label="停用" value="0" />
+          </el-select>
+        </el-form-item>
+      </el-form>
 
-    <div v-if="activeTab === 'courts'" class="admin-section">
-      <form class="form-inline" @submit.prevent="submitCourt">
-        <input v-model="courtForm.court_no" placeholder="场地编号" />
-        <input v-model="courtForm.court_name" placeholder="场地名称" />
-        <input v-model="courtForm.description" placeholder="说明" />
-        <input v-model="courtForm.price_per_hour_yuan" placeholder="每小时价格（元）" />
-        <input v-model="courtForm.image_url" placeholder="图片路径，如 /courts/default-court.png" />
-        <input v-model="courtForm.tags_text" placeholder="标签，逗号分隔" />
-        <input v-model.number="courtForm.capacity" placeholder="容纳人数" type="number" min="1" max="50" />
-        <select v-model.number="courtForm.status">
-          <option :value="1">启用</option>
-          <option :value="0">停用</option>
-        </select>
-        <button class="primary-button" type="submit" :disabled="loading">{{ editingCourtId ? "保存场地" : "新增场地" }}</button>
-        <button class="text-button" type="button" @click="resetCourtForm">清空</button>
-      </form>
+      <el-table :data="courts" empty-text="暂无场地数据" stripe>
+        <el-table-column prop="court_no" label="编号" width="90" />
+        <el-table-column prop="court_name" label="名称" min-width="120" />
+        <el-table-column prop="description" label="说明" min-width="180" />
+        <el-table-column label="价格" width="120"><template #default="{ row }">{{ formatMoney(row.price_per_hour_cents) }}/小时</template></el-table-column>
+        <el-table-column label="标签" min-width="170"><template #default="{ row }">{{ row.tags?.join("，") || "-" }}</template></el-table-column>
+        <el-table-column prop="capacity" label="人数" width="80" />
+        <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'" effect="plain">{{ row.status === 1 ? "启用" : "停用" }}</el-tag></template></el-table-column>
+        <el-table-column label="操作" fixed="right" width="140">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="editCourt(row)">编辑</el-button>
+            <el-button link type="warning" @click="toggleCourtStatus(row)">{{ row.status === 1 ? "停用" : "启用" }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination class="element-pagination" :current-page="courtPage.page" :page-size="courtPage.page_size" :total="courtPage.total" layout="prev, pager, next, total" @current-change="changeCourtPage" />
+    </section>
 
-      <div class="toolbar-row">
-        <label>
-          状态
-          <select v-model="courtStatus" @change="refreshCourts(true)">
-            <option value="">全部</option>
-            <option value="1">启用</option>
-            <option value="0">停用</option>
-          </select>
-        </label>
-      </div>
+    <section v-if="activeTab === 'reservations'" v-loading="loading" class="admin-section">
+      <el-form inline class="element-filter">
+        <el-form-item label="状态">
+          <el-select v-model="reservationFilters.status" clearable class="short-select" @change="refreshReservations(true)">
+            <el-option label="confirmed" value="confirmed" />
+            <el-option label="canceled" value="canceled" />
+            <el-option label="pending" value="pending" />
+            <el-option label="completed" value="completed" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="用户"><el-input v-model="reservationFilters.username" placeholder="用户名或昵称" @keyup.enter="refreshReservations(true)" /></el-form-item>
+        <el-form-item label="场地">
+          <el-select v-model="reservationFilters.court_id" clearable filterable class="medium-select" @change="refreshReservations(true)">
+            <el-option v-for="court in courtOptions" :key="court.id" :label="`${court.court_no} ${court.court_name}`" :value="String(court.id)" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="开始日期"><el-date-picker v-model="reservationFilters.date_from" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+        <el-form-item label="结束日期"><el-date-picker v-model="reservationFilters.date_to" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+        <el-form-item><el-button type="primary" @click="refreshReservations(true)">查询预约</el-button></el-form-item>
+      </el-form>
 
-      <div v-if="courts.length === 0" class="empty-state">暂无场地数据</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>编号</th>
-              <th>名称</th>
-              <th>说明</th>
-              <th>价格</th>
-              <th>标签</th>
-              <th>人数</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="court in courts" :key="court.id">
-              <td>{{ court.court_no }}</td>
-              <td>{{ court.court_name }}</td>
-              <td>{{ court.description || "-" }}</td>
-              <td>{{ formatMoney(court.price_per_hour_cents) }}/小时</td>
-              <td>{{ court.tags?.join("，") || "-" }}</td>
-              <td>{{ court.capacity }}</td>
-              <td><span class="state-pill" :class="court.status === 1 ? 'confirmed' : 'canceled'">{{ court.status === 1 ? "启用" : "停用" }}</span></td>
-              <td>
-                <button class="text-button" type="button" @click="editCourt(court)">编辑</button>
-                <button class="text-button" type="button" @click="toggleCourtStatus(court)">{{ court.status === 1 ? "停用" : "启用" }}</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pagination-row">
-        <button class="text-button" type="button" :disabled="courtPage.page <= 1" @click="changePage(courtPage, courtPage.page - 1, () => refreshCourts())">上一页</button>
-        <span>第 {{ courtPage.page }} / {{ pageCount(courtPage) }} 页，共 {{ courtPage.total }} 条</span>
-        <button class="text-button" type="button" :disabled="courtPage.page >= pageCount(courtPage)" @click="changePage(courtPage, courtPage.page + 1, () => refreshCourts())">下一页</button>
-      </div>
-    </div>
+      <el-table :data="reservations" empty-text="暂无预约数据" stripe>
+        <el-table-column prop="reservation_no" label="预约号" min-width="160" />
+        <el-table-column label="用户" min-width="130"><template #default="{ row }">{{ row.nickname || row.username }}</template></el-table-column>
+        <el-table-column prop="court_name" label="场地" min-width="110" />
+        <el-table-column prop="reserve_date" label="日期" min-width="115" />
+        <el-table-column label="时间" min-width="130"><template #default="{ row }">{{ row.start_time }}-{{ row.end_time }}</template></el-table-column>
+        <el-table-column label="会员" min-width="130"><template #default="{ row }">{{ row.member_level_snapshot }} / {{ discountText(row.discount_rate) }}</template></el-table-column>
+        <el-table-column label="应付金额" min-width="120"><template #default="{ row }">{{ formatMoney(row.payable_amount_cents) }}</template></el-table-column>
+        <el-table-column label="状态" min-width="100"><template #default="{ row }"><el-tag :type="statusTagType(row.status)" effect="plain">{{ row.status }}</el-tag></template></el-table-column>
+        <el-table-column label="操作" fixed="right" width="100"><template #default="{ row }"><el-button link type="danger" :disabled="row.status !== 'confirmed'" @click="cancelAdminReservation(row)">取消</el-button></template></el-table-column>
+      </el-table>
+      <el-pagination class="element-pagination" :current-page="reservationPage.page" :page-size="reservationPage.page_size" :total="reservationPage.total" layout="prev, pager, next, total" @current-change="changeReservationPage" />
+    </section>
 
-    <div v-if="activeTab === 'reservations'" class="admin-section">
-      <div class="toolbar-row">
-        <label>
-          状态
-          <select v-model="reservationFilters.status" @change="refreshReservations(true)">
-            <option value="">全部</option>
-            <option value="confirmed">confirmed</option>
-            <option value="canceled">canceled</option>
-            <option value="pending">pending</option>
-            <option value="completed">completed</option>
-          </select>
-        </label>
-        <label>
-          用户
-          <input v-model="reservationFilters.username" placeholder="用户名或昵称" @keyup.enter="refreshReservations(true)" />
-        </label>
-        <label>
-          场地
-          <select v-model="reservationFilters.court_id" @change="refreshReservations(true)">
-            <option value="">全部</option>
-            <option v-for="court in courtOptions" :key="court.id" :value="String(court.id)">{{ court.court_no }} {{ court.court_name }}</option>
-          </select>
-        </label>
-        <label>
-          开始日期
-          <input v-model="reservationFilters.date_from" type="date" />
-        </label>
-        <label>
-          结束日期
-          <input v-model="reservationFilters.date_to" type="date" />
-        </label>
-        <button class="primary-button" type="button" :disabled="loading" @click="refreshReservations(true)">查询预约</button>
-      </div>
+    <section v-if="activeTab === 'announcements'" v-loading="loading" class="admin-section">
+      <el-card shadow="never" class="panel-card">
+        <template #header><strong>新增公告</strong></template>
+        <el-form label-position="top" class="element-form" @submit.prevent="submitAnnouncement">
+          <el-form-item label="公告标题"><el-input v-model="announcementForm.title" /></el-form-item>
+          <el-form-item label="公告内容"><el-input v-model="announcementForm.content" type="textarea" :rows="4" /></el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="announcementForm.status" class="short-select">
+              <el-option label="显示" :value="1" />
+              <el-option label="隐藏" :value="0" />
+            </el-select>
+          </el-form-item>
+          <el-button type="primary" native-type="submit">新增公告</el-button>
+        </el-form>
+      </el-card>
 
-      <div v-if="reservations.length === 0" class="empty-state">暂无预约数据</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>预约号</th>
-              <th>用户</th>
-              <th>场地</th>
-              <th>日期</th>
-              <th>时间</th>
-              <th>应付金额</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="reservation in reservations" :key="reservation.id">
-              <td>{{ reservation.reservation_no }}</td>
-              <td>{{ reservation.nickname || reservation.username }}</td>
-              <td>{{ reservation.court_name }}</td>
-              <td>{{ reservation.reserve_date }}</td>
-              <td>{{ reservation.start_time }}-{{ reservation.end_time }}</td>
-              <td>{{ formatMoney(reservation.payable_amount_cents) }}</td>
-              <td><span class="state-pill" :class="reservation.status">{{ reservation.status }}</span></td>
-              <td>
-                <button
-                  class="text-button"
-                  type="button"
-                  :disabled="['canceled', 'completed', 'expired'].includes(reservation.status)"
-                  @click="cancelAdminReservation(reservation)"
-                >
-                  取消
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pagination-row">
-        <button class="text-button" type="button" :disabled="reservationPage.page <= 1" @click="changePage(reservationPage, reservationPage.page - 1, () => refreshReservations())">上一页</button>
-        <span>第 {{ reservationPage.page }} / {{ pageCount(reservationPage) }} 页，共 {{ reservationPage.total }} 条</span>
-        <button class="text-button" type="button" :disabled="reservationPage.page >= pageCount(reservationPage)" @click="changePage(reservationPage, reservationPage.page + 1, () => refreshReservations())">下一页</button>
-      </div>
-    </div>
+      <el-form inline class="element-filter">
+        <el-form-item label="状态">
+          <el-select v-model="announcementStatus" clearable class="short-select" @change="refreshAnnouncements(true)">
+            <el-option label="显示" value="1" />
+            <el-option label="隐藏" value="0" />
+          </el-select>
+        </el-form-item>
+      </el-form>
 
-    <div v-if="activeTab === 'announcements'" class="admin-section">
-      <form class="form-stack compact-form" @submit.prevent="submitAnnouncement">
-        <input v-model="announcementForm.title" placeholder="公告标题" />
-        <textarea v-model="announcementForm.content" placeholder="公告内容" rows="4"></textarea>
-        <select v-model.number="announcementForm.status">
-          <option :value="1">显示</option>
-          <option :value="0">隐藏</option>
-        </select>
-        <div class="button-row">
-          <button class="primary-button" type="submit" :disabled="loading">{{ editingAnnouncementId ? "保存公告" : "新增公告" }}</button>
-          <button class="text-button" type="button" @click="resetAnnouncementForm">清空</button>
-        </div>
-      </form>
+      <el-table :data="announcements" empty-text="暂无公告数据" stripe>
+        <el-table-column prop="title" label="标题" min-width="220" />
+        <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'" effect="plain">{{ row.status === 1 ? "显示" : "隐藏" }}</el-tag></template></el-table-column>
+        <el-table-column prop="updated_at" label="更新时间" min-width="170" />
+        <el-table-column label="操作" fixed="right" width="150">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="editAnnouncement(row)">编辑</el-button>
+            <el-button link type="warning" @click="toggleAnnouncementStatus(row)">{{ row.status === 1 ? "隐藏" : "显示" }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-pagination class="element-pagination" :current-page="announcementPage.page" :page-size="announcementPage.page_size" :total="announcementPage.total" layout="prev, pager, next, total" @current-change="changeAnnouncementPage" />
+    </section>
 
-      <div class="toolbar-row">
-        <label>
-          状态
-          <select v-model="announcementStatus" @change="refreshAnnouncements(true)">
-            <option value="">全部</option>
-            <option value="1">显示</option>
-            <option value="0">隐藏</option>
-          </select>
-        </label>
-      </div>
+    <section v-if="activeTab === 'configs'" v-loading="loading" class="admin-section">
+      <el-table :data="configs" empty-text="暂无规则配置" stripe>
+        <el-table-column prop="config_key" label="配置键" min-width="220" />
+        <el-table-column prop="config_value" label="配置值" min-width="160" />
+        <el-table-column prop="description" label="说明" min-width="260" />
+        <el-table-column label="操作" fixed="right" width="100"><template #default="{ row }"><el-button link type="primary" @click="editConfig(row)">编辑</el-button></template></el-table-column>
+      </el-table>
+    </section>
 
-      <div v-if="announcements.length === 0" class="empty-state">暂无公告数据</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>标题</th>
-              <th>状态</th>
-              <th>更新时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="announcement in announcements" :key="announcement.id">
-              <td>{{ announcement.title }}</td>
-              <td><span class="state-pill" :class="announcement.status === 1 ? 'confirmed' : 'canceled'">{{ announcement.status === 1 ? "显示" : "隐藏" }}</span></td>
-              <td>{{ announcement.updated_at }}</td>
-              <td>
-                <button class="text-button" type="button" @click="editAnnouncement(announcement)">编辑</button>
-                <button class="text-button" type="button" @click="toggleAnnouncementStatus(announcement)">{{ announcement.status === 1 ? "隐藏" : "显示" }}</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="pagination-row">
-        <button class="text-button" type="button" :disabled="announcementPage.page <= 1" @click="changePage(announcementPage, announcementPage.page - 1, () => refreshAnnouncements())">上一页</button>
-        <span>第 {{ announcementPage.page }} / {{ pageCount(announcementPage) }} 页，共 {{ announcementPage.total }} 条</span>
-        <button class="text-button" type="button" :disabled="announcementPage.page >= pageCount(announcementPage)" @click="changePage(announcementPage, announcementPage.page + 1, () => refreshAnnouncements())">下一页</button>
-      </div>
-    </div>
+    <section v-if="activeTab === 'logs'" v-loading="loading" class="admin-section">
+      <el-form inline class="element-filter">
+        <el-form-item label="模块">
+          <el-select v-model="logFilters.module" clearable class="short-select" @change="refreshOperationLogs(true)">
+            <el-option label="用户" value="user" />
+            <el-option label="场地" value="court" />
+            <el-option label="预约" value="reservation" />
+            <el-option label="公告" value="announcement" />
+            <el-option label="规则" value="config" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="操作">
+          <el-select v-model="logFilters.action" clearable class="short-select" @change="refreshOperationLogs(true)">
+            <el-option label="create" value="create" />
+            <el-option label="update" value="update" />
+            <el-option label="status" value="status" />
+            <el-option label="role" value="role" />
+            <el-option label="member" value="member" />
+            <el-option label="cancel" value="cancel" />
+            <el-option label="hide" value="hide" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="操作人"><el-input v-model="logFilters.username" placeholder="用户名" @keyup.enter="refreshOperationLogs(true)" /></el-form-item>
+        <el-form-item label="开始日期"><el-date-picker v-model="logFilters.date_from" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+        <el-form-item label="结束日期"><el-date-picker v-model="logFilters.date_to" type="date" value-format="YYYY-MM-DD" /></el-form-item>
+        <el-form-item><el-button type="primary" @click="refreshOperationLogs(true)">查询日志</el-button></el-form-item>
+      </el-form>
 
-    <div v-if="activeTab === 'configs'" class="admin-section">
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>配置键</th>
-              <th>配置值</th>
-              <th>说明</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="config in configs" :key="config.config_key">
-              <td>{{ config.config_key }}</td>
-              <td><input v-model="config.config_value" /></td>
-              <td>{{ config.description }}</td>
-              <td><button class="text-button" type="button" @click="saveConfig(config)">保存</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <el-table :data="operationLogs" empty-text="暂无操作日志" stripe>
+        <el-table-column prop="created_at" label="时间" min-width="170" />
+        <el-table-column label="操作人" min-width="120"><template #default="{ row }">{{ row.username || "-" }}</template></el-table-column>
+        <el-table-column prop="module" label="模块" width="110" />
+        <el-table-column prop="action" label="操作" width="110" />
+        <el-table-column label="目标" min-width="130"><template #default="{ row }">{{ row.target_type || "-" }} #{{ row.target_id || "-" }}</template></el-table-column>
+        <el-table-column label="详情" min-width="260"><template #default="{ row }">{{ operationDetail(row.detail) }}</template></el-table-column>
+        <el-table-column label="IP" min-width="130"><template #default="{ row }">{{ row.ip || "-" }}</template></el-table-column>
+      </el-table>
+      <el-pagination class="element-pagination" :current-page="logPage.page" :page-size="logPage.page_size" :total="logPage.total" layout="prev, pager, next, total" @current-change="changeLogPage" />
+    </section>
+  </el-card>
 
-    <div v-if="activeTab === 'logs'" class="admin-section">
-      <div class="toolbar-row">
-        <label>
-          模块
-          <select v-model="logFilters.module" @change="searchOperationLogs">
-            <option value="">全部</option>
-            <option value="user">用户</option>
-            <option value="court">场地</option>
-            <option value="reservation">预约</option>
-            <option value="announcement">公告</option>
-            <option value="config">规则</option>
-          </select>
-        </label>
-        <label>
-          操作
-          <select v-model="logFilters.action" @change="searchOperationLogs">
-            <option value="">全部</option>
-            <option value="create">create</option>
-            <option value="update">update</option>
-            <option value="status">status</option>
-            <option value="role">role</option>
-            <option value="cancel">cancel</option>
-            <option value="hide">hide</option>
-          </select>
-        </label>
-        <label>
-          操作人
-          <input v-model="logFilters.username" placeholder="用户名" @keyup.enter="searchOperationLogs" />
-        </label>
-        <label>
-          开始日期
-          <input v-model="logFilters.date_from" type="date" />
-        </label>
-        <label>
-          结束日期
-          <input v-model="logFilters.date_to" type="date" />
-        </label>
-        <button class="primary-button" type="button" :disabled="loading" @click="searchOperationLogs">查询日志</button>
+  <el-dialog :model-value="Boolean(editingMemberUser)" title="调整会员" width="560px" @close="resetMemberForm">
+    <el-alert title="余额和积分填写本次增减值，正数为增加，负数为扣减，不是账户最终值。" type="info" show-icon :closable="false" />
+    <el-form label-position="top" class="element-form dialog-form" @submit.prevent="submitMember">
+      <el-form-item label="会员等级">
+        <el-select v-model="memberForm.member_level">
+          <el-option v-for="level in memberLevelOptions" :key="level.value" :label="level.label" :value="level.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="有效期">
+        <el-date-picker v-model="memberForm.expires_at" type="date" value-format="YYYY-MM-DD" placeholder="不填表示长期有效" />
+      </el-form-item>
+      <el-form-item label="余额增减（元）"><el-input v-model="memberForm.balance_change_yuan" placeholder="如 50 或 -20" /></el-form-item>
+      <el-form-item label="积分增减"><el-input-number v-model="memberForm.points_change" /></el-form-item>
+      <el-form-item label="调整原因"><el-input v-model="memberForm.reason" placeholder="默认：后台调整会员账户" /></el-form-item>
+      <div class="dialog-actions">
+        <el-button @click="resetMemberForm">取消</el-button>
+        <el-button type="primary" :loading="loading" native-type="submit">保存会员</el-button>
       </div>
+    </el-form>
+  </el-dialog>
 
-      <div v-if="operationLogs.length === 0" class="empty-state">暂无操作日志</div>
-      <div v-else class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>操作人</th>
-              <th>模块</th>
-              <th>操作</th>
-              <th>目标</th>
-              <th>详情</th>
-              <th>IP</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="log in operationLogs" :key="log.id">
-              <td>{{ log.created_at }}</td>
-              <td>{{ log.username || "-" }}</td>
-              <td>{{ log.module }}</td>
-              <td>{{ log.action }}</td>
-              <td>{{ log.target_type || "-" }} #{{ log.target_id || "-" }}</td>
-              <td>{{ operationDetail(log.detail) }}</td>
-              <td>{{ log.ip || "-" }}</td>
-            </tr>
-          </tbody>
-        </table>
+  <el-dialog :model-value="Boolean(resettingPasswordUser)" title="重置密码" width="460px" @close="resetPasswordDialog">
+    <el-form label-position="top" class="element-form" @submit.prevent="submitResetPassword">
+      <el-alert title="新密码至少 6 位。保存后该用户旧登录态会失效。" type="warning" show-icon :closable="false" />
+      <el-form-item label="新密码"><el-input v-model="resetPasswordForm.password" type="password" show-password /></el-form-item>
+      <div class="dialog-actions">
+        <el-button @click="resetPasswordDialog">取消</el-button>
+        <el-button type="primary" :loading="loading" native-type="submit">重置密码</el-button>
       </div>
-      <div class="pagination-row">
-        <button class="text-button" type="button" :disabled="logPage.page <= 1" @click="changePage(logPage, logPage.page - 1, () => refreshOperationLogs())">上一页</button>
-        <span>第 {{ logPage.page }} / {{ pageCount(logPage) }} 页，共 {{ logPage.total }} 条</span>
-        <button class="text-button" type="button" :disabled="logPage.page >= pageCount(logPage)" @click="changePage(logPage, logPage.page + 1, () => refreshOperationLogs())">下一页</button>
+    </el-form>
+  </el-dialog>
+
+  <el-dialog :model-value="Boolean(editingCourtId)" :title="`编辑场地：${editingCourt?.court_name || ''}`" width="680px" @close="resetCourtForm">
+    <el-alert title="修改场地资料会影响后续展示和新预约价格；历史预约保留创建时的金额快照。" type="info" show-icon :closable="false" />
+    <el-form label-position="top" class="element-form dialog-form" @submit.prevent="submitCourt">
+      <el-form-item label="场地编号"><el-input v-model="courtEditForm.court_no" /></el-form-item>
+      <el-form-item label="场地名称"><el-input v-model="courtEditForm.court_name" /></el-form-item>
+      <el-form-item label="说明"><el-input v-model="courtEditForm.description" /></el-form-item>
+      <el-form-item label="每小时价格（元）"><el-input v-model="courtEditForm.price_per_hour_yuan" /></el-form-item>
+      <el-form-item label="图片路径"><el-input v-model="courtEditForm.image_url" /></el-form-item>
+      <el-form-item label="标签"><el-input v-model="courtEditForm.tags_text" /></el-form-item>
+      <el-form-item label="容纳人数"><el-input-number v-model="courtEditForm.capacity" :min="1" :max="50" /></el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="courtEditForm.status">
+          <el-option label="启用" :value="1" />
+          <el-option label="停用" :value="0" />
+        </el-select>
+      </el-form-item>
+      <div class="dialog-actions">
+        <el-button @click="resetCourtForm">取消</el-button>
+        <el-button type="primary" :loading="loading" native-type="submit">保存场地</el-button>
       </div>
-    </div>
-  </section>
+    </el-form>
+  </el-dialog>
+
+  <el-dialog :model-value="Boolean(editingAnnouncementId)" :title="`编辑公告：${editingAnnouncement?.title || ''}`" width="640px" @close="resetAnnouncementForm">
+    <el-form label-position="top" class="element-form" @submit.prevent="submitAnnouncement">
+      <el-form-item label="公告标题"><el-input v-model="announcementEditForm.title" /></el-form-item>
+      <el-form-item label="公告内容"><el-input v-model="announcementEditForm.content" type="textarea" :rows="5" /></el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="announcementEditForm.status">
+          <el-option label="显示" :value="1" />
+          <el-option label="隐藏" :value="0" />
+        </el-select>
+      </el-form-item>
+      <div class="dialog-actions">
+        <el-button @click="resetAnnouncementForm">取消</el-button>
+        <el-button type="primary" :loading="loading" native-type="submit">保存公告</el-button>
+      </div>
+    </el-form>
+  </el-dialog>
+
+  <el-dialog :model-value="Boolean(editingConfig)" :title="`编辑规则：${editingConfig?.config_key || ''}`" width="520px" @close="resetConfigForm">
+    <el-alert :title="editingConfig?.description || '修改后会影响后续业务判断。'" type="info" show-icon :closable="false" />
+    <el-form label-position="top" class="element-form" @submit.prevent="submitConfig">
+      <el-form-item label="配置值"><el-input v-model="configForm.config_value" /></el-form-item>
+      <div class="dialog-actions">
+        <el-button @click="resetConfigForm">取消</el-button>
+        <el-button type="primary" :loading="loading" native-type="submit">保存规则</el-button>
+      </div>
+    </el-form>
+  </el-dialog>
 </template>

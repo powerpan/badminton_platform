@@ -4,7 +4,9 @@ from typing import Any
 import aiomysql
 
 from config.settings import Settings
+from repositories import member_repository
 from repositories.database import execute, fetch_all, fetch_one, get_pool
+from utils.member_levels import discount_rate_for_level, effective_member_level
 
 
 ACTIVE_STATUSES = ("pending", "confirmed")
@@ -12,7 +14,8 @@ ACTIVE_STATUSES = ("pending", "confirmed")
 
 RESERVATION_MONEY_COLUMNS = (
     "r.price_per_hour_cents, r.duration_minutes, r.original_amount_cents, "
-    "r.discount_amount_cents, r.payable_amount_cents"
+    "r.discount_amount_cents, r.payable_amount_cents, "
+    "r.member_level_snapshot, r.discount_rate, r.points_awarded"
 )
 
 
@@ -123,10 +126,7 @@ async def create_confirmed_reservation_atomic(
         try:
             await connection.begin()
             async with connection.cursor(aiomysql.DictCursor) as cursor:
-                await cursor.execute(
-                    "SELECT id, status FROM user WHERE id = %s FOR UPDATE",
-                    (user_id,),
-                )
+                await cursor.execute("SELECT id, username, status FROM user WHERE id = %s FOR UPDATE", (user_id,))
                 user = await cursor.fetchone()
                 if user is None:
                     await connection.rollback()
@@ -149,8 +149,23 @@ async def create_confirmed_reservation_atomic(
                 price_per_hour_cents = int(court.get("price_per_hour_cents") or 12000)
                 duration_minutes = _minutes(end_time) - _minutes(start_time)
                 original_amount_cents = price_per_hour_cents * duration_minutes // 60
-                discount_amount_cents = 0
-                payable_amount_cents = original_amount_cents
+                member_account = await member_repository.get_or_create_account_for_update(cursor, user_id)
+                member_level_snapshot = effective_member_level(
+                    member_account.get("member_level"),
+                    member_account.get("expires_at"),
+                    reserve_date,
+                )
+                discount_rate = discount_rate_for_level(member_level_snapshot)
+                payable_amount_cents = original_amount_cents * discount_rate // 100
+                discount_amount_cents = original_amount_cents - payable_amount_cents
+                points_awarded = payable_amount_cents // 100
+                balance_before = int(member_account.get("balance_cents") or 0)
+                points_before = int(member_account.get("points") or 0)
+                if balance_before < payable_amount_cents:
+                    await connection.rollback()
+                    return None, "insufficient_balance"
+                balance_after = balance_before - payable_amount_cents
+                points_after = points_before + points_awarded
 
                 await cursor.execute(
                     """
@@ -192,8 +207,8 @@ async def create_confirmed_reservation_atomic(
                     INSERT INTO reservation
                       (reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, status, remark,
                        price_per_hour_cents, duration_minutes, original_amount_cents, discount_amount_cents,
-                       payable_amount_cents)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'confirmed', %s, %s, %s, %s, %s, %s)
+                       payable_amount_cents, member_level_snapshot, discount_rate, points_awarded)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'confirmed', %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         reservation_no,
@@ -209,9 +224,31 @@ async def create_confirmed_reservation_atomic(
                         original_amount_cents,
                         discount_amount_cents,
                         payable_amount_cents,
+                        member_level_snapshot,
+                        discount_rate,
+                        points_awarded,
                     ),
                 )
                 reservation_id = int(cursor.lastrowid)
+                await cursor.execute(
+                    "UPDATE member_account SET balance_cents = %s, points = %s WHERE user_id = %s",
+                    (balance_after, points_after, user_id),
+                )
+                await member_repository.insert_member_transaction_with_cursor(
+                    cursor,
+                    user_id=user_id,
+                    reservation_id=reservation_id,
+                    transaction_type="reservation_charge",
+                    balance_change_cents=-payable_amount_cents,
+                    points_change=points_awarded,
+                    balance_before_cents=balance_before,
+                    balance_after_cents=balance_after,
+                    points_before=points_before,
+                    points_after=points_after,
+                    reason=f"预约扣费 {reservation_no}",
+                    operator_id=user_id,
+                    operator_username=user.get("username"),
+                )
             await connection.commit()
             return reservation_id, None
         except Exception:
@@ -423,6 +460,79 @@ async def cancel_reservation(settings: Settings, reservation_id: int) -> None:
         "UPDATE reservation SET status = 'canceled', canceled_at = NOW() WHERE id = %s",
         (reservation_id,),
     )
+
+
+async def cancel_reservation_atomic(
+    settings: Settings,
+    reservation_id: int,
+    *,
+    operator_id: int | None,
+    operator_username: str | None,
+    reason: str,
+) -> tuple[int | None, str | None]:
+    pool = await get_pool(settings)
+    async with pool.acquire() as connection:
+        await connection.autocommit(False)
+        try:
+            await connection.begin()
+            async with connection.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    """
+                    SELECT id, reservation_no, user_id, status, payable_amount_cents, points_awarded
+                    FROM reservation
+                    WHERE id = %s
+                    FOR UPDATE
+                    """,
+                    (reservation_id,),
+                )
+                reservation = await cursor.fetchone()
+                if reservation is None:
+                    await connection.rollback()
+                    return None, "not_found"
+                if reservation["status"] != "confirmed":
+                    await connection.rollback()
+                    return None, "not_confirmed"
+
+                user_id = int(reservation["user_id"])
+                member_account = await member_repository.get_or_create_account_for_update(cursor, user_id)
+                balance_before = int(member_account.get("balance_cents") or 0)
+                points_before = int(member_account.get("points") or 0)
+                refund_cents = int(reservation.get("payable_amount_cents") or 0)
+                points_awarded = int(reservation.get("points_awarded") or 0)
+                points_revoke = min(points_awarded, points_before)
+                balance_after = balance_before + refund_cents
+                points_after = points_before - points_revoke
+
+                await cursor.execute(
+                    "UPDATE reservation SET status = 'canceled', canceled_at = NOW() WHERE id = %s",
+                    (reservation_id,),
+                )
+                await cursor.execute(
+                    "UPDATE member_account SET balance_cents = %s, points = %s WHERE user_id = %s",
+                    (balance_after, points_after, user_id),
+                )
+                await member_repository.insert_member_transaction_with_cursor(
+                    cursor,
+                    user_id=user_id,
+                    reservation_id=reservation_id,
+                    transaction_type="reservation_refund",
+                    balance_change_cents=refund_cents,
+                    points_change=-points_revoke,
+                    balance_before_cents=balance_before,
+                    balance_after_cents=balance_after,
+                    points_before=points_before,
+                    points_after=points_after,
+                    reason=reason,
+                    operator_id=operator_id,
+                    operator_username=operator_username,
+                )
+            await connection.commit()
+            return reservation_id, None
+        except Exception:
+            await connection.rollback()
+            raise
+        finally:
+            await connection.autocommit(True)
 
 
 async def complete_finished_reservations(settings: Settings) -> int:

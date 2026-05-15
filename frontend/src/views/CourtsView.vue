@@ -3,8 +3,10 @@ import { computed, onMounted, ref, watch } from "vue";
 
 import { getCourtSlots, getCourts, type Court, type SlotItem } from "../api/court";
 import { createReservation } from "../api/reservation";
+import { useAuthStore } from "../stores/auth";
 
 const DEFAULT_COURT_IMAGE_URL = "/courts/default-court.png";
+const authStore = useAuthStore();
 
 const courts = ref<Court[]>([]);
 const selectedCourtId = ref<number | null>(null);
@@ -18,6 +20,7 @@ const message = ref("");
 const errorMessage = ref("");
 
 const selectedCourt = computed(() => courts.value.find((court) => court.id === selectedCourtId.value) || null);
+const currentMember = computed(() => authStore.user?.member || null);
 const visibleCourts = computed(() => courts.value.slice(0, 4));
 const timelineRows = computed(() => {
   const rows = new Map<string, { start_time: string; end_time: string }>();
@@ -33,29 +36,33 @@ const timelineRows = computed(() => {
 });
 
 const selectedDurationMinutes = computed(() => {
-  if (!selectedSlot.value) {
-    return 0;
-  }
+  if (!selectedSlot.value) return 0;
   const start = timeToMinutes(selectedSlot.value.start_time);
   const end = timeToMinutes(selectedSlot.value.end_time);
   return Math.max(0, end - start);
 });
 
 const selectedDurationLabel = computed(() => {
-  if (!selectedDurationMinutes.value) {
-    return "0 小时";
-  }
+  if (!selectedDurationMinutes.value) return "0 小时";
   const hours = selectedDurationMinutes.value / 60;
   return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} 小时`;
 });
 const selectedFeeCents = computed(() => {
-  if (!selectedCourt.value || !selectedDurationMinutes.value) {
-    return 0;
-  }
+  if (!selectedCourt.value || !selectedDurationMinutes.value) return 0;
   return Math.floor((selectedCourt.value.price_per_hour_cents * selectedDurationMinutes.value) / 60);
 });
-const discountCents = computed(() => 0);
+const selectedDiscountRate = computed(() => {
+  const member = currentMember.value;
+  if (!member) return 100;
+  if (member.expires_at && selectedDate.value > member.expires_at) return 100;
+  return member.discount_rate || 100;
+});
+const discountCents = computed(() => {
+  const payable = Math.floor((selectedFeeCents.value * selectedDiscountRate.value) / 100);
+  return Math.max(0, selectedFeeCents.value - payable);
+});
 const payableFeeCents = computed(() => Math.max(0, selectedFeeCents.value - discountCents.value));
+const balanceEnough = computed(() => !currentMember.value || currentMember.value.balance_cents >= payableFeeCents.value);
 const selectedDateLabel = computed(() => formatDisplayDate(selectedDate.value));
 
 const dateOptions = computed(() => {
@@ -65,8 +72,7 @@ const dateOptions = computed(() => {
     date.setDate(today.getDate() + index);
     return {
       value: formatDateValue(date),
-      label: index === 0 ? "今天" : weekdayLabel(date),
-      short: `${date.getMonth() + 1}.${date.getDate()}`,
+      label: `${index === 0 ? "今天" : weekdayLabel(date)} ${date.getMonth() + 1}.${date.getDate()}`,
     };
   });
 });
@@ -97,7 +103,14 @@ function timeToMinutes(value: string) {
 }
 
 function formatMoney(cents: number | null | undefined) {
-  return `￥${((cents || 0) / 100).toFixed(0)}`;
+  return `￥${((cents || 0) / 100).toLocaleString("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function discountText(rate: number) {
+  return rate >= 100 ? "普通价" : `${rate / 10} 折`;
 }
 
 function courtImage(court: Court | null) {
@@ -117,6 +130,13 @@ function statusText(status: SlotItem["status"]) {
     disabled: "不可用",
   };
   return textMap[status];
+}
+
+function slotButtonType(status: SlotItem["status"] | undefined) {
+  if (status === "available") return "success";
+  if (status === "reserved") return "info";
+  if (status === "locked") return "warning";
+  return "";
 }
 
 function getSlot(courtId: number, row: { start_time: string; end_time: string }) {
@@ -171,21 +191,16 @@ function selectCourt(court: Court) {
   message.value = "";
 }
 
-function selectCourtFromInput(event: Event) {
-  const value = Number((event.target as HTMLSelectElement).value);
-  selectedCourtId.value = Number.isFinite(value) && value > 0 ? value : courts.value[0]?.id || null;
-  selectedSlot.value = null;
-  message.value = "";
-}
-
 function chooseDate(value: string) {
   selectedDate.value = value;
 }
 
+function chooseDateValue(value: string | number) {
+  selectedDate.value = String(value);
+}
+
 function chooseSlot(court: Court, slot: SlotItem) {
-  if (slot.status !== "available") {
-    return;
-  }
+  if (slot.status !== "available") return;
   selectedCourtId.value = court.id;
   selectedSlot.value = slot;
   message.value = "";
@@ -194,6 +209,10 @@ function chooseSlot(court: Court, slot: SlotItem) {
 async function submitReservation() {
   if (!selectedCourtId.value || !selectedSlot.value) {
     errorMessage.value = "请先选择可预约时间段";
+    return;
+  }
+  if (!balanceEnough.value) {
+    errorMessage.value = "会员余额不足，请联系管理员充值或调整余额";
     return;
   }
   submitting.value = true;
@@ -208,6 +227,7 @@ async function submitReservation() {
       remark: remark.value,
     });
     remark.value = "";
+    await authStore.fetchProfile();
     await loadSlots();
     message.value = "预约成功，已加入我的预约";
   } catch (error) {
@@ -232,39 +252,27 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="booking-screen">
+  <section class="booking-screen element-booking">
     <div class="booking-main">
-      <div class="booking-toolbar">
-        <button type="button" class="calendar-square" aria-label="选择日期">
-          <span></span>
-        </button>
-        <div class="date-strip">
-          <button
-            v-for="item in dateOptions"
-            :key="item.value"
-            type="button"
-            :class="{ active: selectedDate === item.value }"
-            @click="chooseDate(item.value)"
-          >
-            <span>{{ item.label }}</span>
-            <strong>{{ item.short }}</strong>
-          </button>
+      <el-card shadow="never" class="panel-card booking-toolbar-card">
+        <div class="booking-toolbar element-toolbar">
+          <el-segmented
+            :model-value="selectedDate"
+            :options="dateOptions"
+            @change="chooseDateValue"
+          />
+          <el-select v-model="selectedCourtId" placeholder="全部场馆" filterable clearable @change="selectedSlot = null">
+            <el-option v-for="court in courts" :key="court.id" :label="court.court_name" :value="court.id" />
+          </el-select>
+          <el-button :loading="loading" @click="loadSlots">刷新时间段</el-button>
         </div>
-        <select class="venue-select" :value="selectedCourtId || ''" @change="selectCourtFromInput">
-          <option value="">全部场馆</option>
-          <option v-for="court in courts" :key="court.id" :value="court.id">
-            {{ court.court_name }}
-          </option>
-        </select>
-        <button type="button" class="filter-button">
-          <span></span>
-          筛选
-        </button>
-      </div>
+      </el-card>
 
-      <div v-if="loading && courts.length === 0" class="loading-block">正在加载场地...</div>
-      <div v-else-if="courts.length === 0" class="empty-state">暂无可预约场地</div>
-      <div v-else class="court-gallery">
+      <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
+      <el-alert v-if="message" class="page-alert" :title="message" type="success" show-icon :closable="false" />
+
+      <el-empty v-if="!loading && courts.length === 0" description="暂无可预约场地" />
+      <div v-else class="court-gallery" v-loading="loading && courts.length === 0">
         <button
           v-for="court in visibleCourts"
           :key="court.id"
@@ -273,74 +281,69 @@ onMounted(async () => {
           :class="{ active: selectedCourtId === court.id }"
           @click="selectCourt(court)"
         >
-          <span class="court-status">{{ court.tags?.[0] || "标准场地" }}</span>
+          <el-tag class="court-status" type="success" effect="dark">{{ court.tags?.[0] || "标准场地" }}</el-tag>
           <img :src="courtImage(court)" :alt="court.court_name" />
           <span v-if="selectedCourtId === court.id" class="selected-check"></span>
           <span class="court-card-body">
             <strong>{{ court.court_name }}</strong>
             <small>{{ court.description || courtSummary(court) }}</small>
             <span class="court-tags">
-              <i v-for="tag in court.tags" :key="tag">{{ tag }}</i>
-              <i>{{ court.capacity }} 人制</i>
+              <el-tag v-for="tag in court.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+              <el-tag size="small" effect="plain">{{ court.capacity }} 人制</el-tag>
             </span>
             <span class="court-price">{{ formatMoney(court.price_per_hour_cents) }} <em>/ 小时</em></span>
           </span>
         </button>
       </div>
 
-      <div class="slot-header">
-        <div>
-          <h2>选择时间段</h2>
-          <p>{{ selectedDateLabel }}，系统按后台规则实时生成状态。</p>
+      <el-card shadow="never" class="panel-card">
+        <div class="slot-header">
+          <div>
+            <h2>选择时间段</h2>
+            <p>{{ selectedDateLabel }}，系统按后台规则实时生成状态。</p>
+          </div>
+          <div class="legend">
+            <span><i class="legend-available"></i>可预订</span>
+            <span><i class="legend-reserved"></i>已预订</span>
+            <span><i class="legend-disabled"></i>不可用</span>
+          </div>
         </div>
-        <div class="legend">
-          <span><i class="legend-available"></i>可预订</span>
-          <span><i class="legend-reserved"></i>已预订</span>
-          <span><i class="legend-disabled"></i>不可用</span>
-        </div>
-      </div>
 
-      <div v-if="loading && courts.length > 0" class="loading-line">正在刷新时间段...</div>
-      <div v-if="timelineRows.length === 0 && !loading" class="empty-state">暂无可显示时间段</div>
-      <div v-else class="slot-matrix">
-        <div class="slot-matrix-head">
-          <span></span>
-          <strong v-for="court in visibleCourts" :key="court.id">{{ court.court_name }}</strong>
+        <el-empty v-if="timelineRows.length === 0 && !loading" description="暂无可显示时间段" />
+        <div v-else class="slot-matrix" v-loading="loading && courts.length > 0">
+          <div class="slot-matrix-head">
+            <span></span>
+            <strong v-for="court in visibleCourts" :key="court.id">{{ court.court_name }}</strong>
+          </div>
+          <div v-for="row in timelineRows" :key="`${row.start_time}-${row.end_time}`" class="slot-matrix-row">
+            <span class="time-axis">{{ timeLabel(row.start_time) }} - {{ timeLabel(row.end_time) }}</span>
+            <el-button
+              v-for="court in visibleCourts"
+              :key="court.id"
+              class="slot-button element-slot-button"
+              :type="slotButtonType(getSlot(court.id, row)?.status)"
+              :plain="selectedCourtId !== court.id || selectedSlot?.start_time !== row.start_time || selectedSlot?.end_time !== row.end_time"
+              :disabled="getSlot(court.id, row)?.status !== 'available'"
+              @click="getSlot(court.id, row) && chooseSlot(court, getSlot(court.id, row) as SlotItem)"
+            >
+              {{
+                getSlot(court.id, row)?.status === "available"
+                  ? formatMoney(court.price_per_hour_cents)
+                  : statusText(getSlot(court.id, row)?.status || "disabled")
+              }}
+            </el-button>
+          </div>
         </div>
-        <div v-for="row in timelineRows" :key="`${row.start_time}-${row.end_time}`" class="slot-matrix-row">
-          <span class="time-axis">{{ timeLabel(row.start_time) }} - {{ timeLabel(row.end_time) }}</span>
-          <button
-            v-for="court in visibleCourts"
-            :key="court.id"
-            type="button"
-            class="slot-button"
-            :class="[
-              getSlot(court.id, row)?.status || 'disabled',
-              {
-                active:
-                  selectedCourtId === court.id &&
-                  selectedSlot?.start_time === row.start_time &&
-                  selectedSlot?.end_time === row.end_time,
-              },
-            ]"
-            :disabled="getSlot(court.id, row)?.status !== 'available'"
-            @click="getSlot(court.id, row) && chooseSlot(court, getSlot(court.id, row) as SlotItem)"
-          >
-            {{
-              getSlot(court.id, row)?.status === "available"
-                ? formatMoney(court.price_per_hour_cents)
-                : statusText(getSlot(court.id, row)?.status || "disabled")
-            }}
-          </button>
-        </div>
-      </div>
+      </el-card>
     </div>
 
-    <aside class="booking-summary">
-      <div class="summary-title">
-        <h2>预订清单</h2>
-        <button type="button" aria-label="清空选择" @click="selectedSlot = null"></button>
-      </div>
+    <el-card shadow="never" class="booking-summary element-summary">
+      <template #header>
+        <div class="summary-title">
+          <h2>预订清单</h2>
+          <el-button link type="info" @click="selectedSlot = null">清空</el-button>
+        </div>
+      </template>
 
       <section class="summary-block">
         <h3>已选场地</h3>
@@ -352,13 +355,13 @@ onMounted(async () => {
             <b>{{ formatMoney(selectedCourt.price_per_hour_cents) }} <em>/ 小时</em></b>
           </div>
         </div>
-        <p v-else class="muted-text">请选择场地</p>
+        <el-empty v-else description="请选择场地" :image-size="80" />
       </section>
 
       <section class="summary-block">
         <div class="summary-row-title">
           <h3>已选时间</h3>
-          <button type="button" @click="selectedSlot = null">编辑</button>
+          <el-button link @click="selectedSlot = null">编辑</el-button>
         </div>
         <p v-if="selectedSlot" class="summary-time">
           {{ selectedDateLabel }}<br />
@@ -368,45 +371,30 @@ onMounted(async () => {
         <p v-else class="muted-text">请选择可预订时间段</p>
       </section>
 
-      <section class="summary-block coupon-row">
-        <h3>优惠券</h3>
-        <span>{{ selectedSlot ? "本阶段暂无折扣" : "未使用优惠券" }}</span>
-      </section>
+      <el-descriptions :column="1" border>
+        <el-descriptions-item label="会员折扣">{{ selectedSlot ? discountText(selectedDiscountRate) : "请选择时间段" }}</el-descriptions-item>
+        <el-descriptions-item label="场地费">{{ formatMoney(selectedFeeCents) }}</el-descriptions-item>
+        <el-descriptions-item label="优惠金额">-{{ formatMoney(discountCents) }}</el-descriptions-item>
+        <el-descriptions-item label="当前余额">{{ formatMoney(currentMember?.balance_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="合计">{{ formatMoney(payableFeeCents) }}</el-descriptions-item>
+      </el-descriptions>
 
-      <section class="summary-block">
-        <h3>费用明细</h3>
-        <div class="fee-row">
-          <span>场地费</span>
-          <strong>{{ formatMoney(selectedFeeCents) }}</strong>
-        </div>
-        <div class="fee-row">
-          <span>会员折扣</span>
-          <strong>-{{ formatMoney(discountCents) }}</strong>
-        </div>
-        <div class="fee-total">
-          <span>合计</span>
-          <strong>{{ formatMoney(payableFeeCents) }}</strong>
-        </div>
-      </section>
+      <el-alert v-if="selectedSlot && !balanceEnough" class="page-alert" title="余额不足，无法提交预约" type="error" show-icon :closable="false" />
 
-      <form class="summary-actions" @submit.prevent="submitReservation">
-        <label>
-          备注
-          <input v-model="remark" maxlength="255" placeholder="可选，如需靠近门口" />
-        </label>
-        <button class="primary-button" type="submit" :disabled="submitting || !selectedSlot">
-          {{ submitting ? "提交中..." : "确认预约" }}
-        </button>
-        <button type="button" class="secondary-button" @click="selectedSlot = null">继续选场</button>
-      </form>
-
-      <p v-if="message" class="success-text">{{ message }}</p>
-      <p v-if="errorMessage" class="error-text">{{ errorMessage }}</p>
+      <el-form label-position="top" class="summary-actions element-form" @submit.prevent="submitReservation">
+        <el-form-item label="备注">
+          <el-input v-model="remark" maxlength="255" placeholder="可选，如需靠近门口" />
+        </el-form-item>
+        <el-button type="primary" size="large" :loading="submitting" :disabled="!selectedSlot || !balanceEnough" native-type="submit">
+          确认预约
+        </el-button>
+        <el-button size="large" @click="selectedSlot = null">继续选场</el-button>
+      </el-form>
 
       <div class="policy-box">
         <strong>取消政策</strong>
         <span>预约前请查看场地使用须知</span>
       </div>
-    </aside>
+    </el-card>
   </section>
 </template>

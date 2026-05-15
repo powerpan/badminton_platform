@@ -9,7 +9,7 @@ from utils.response import ApiError
 
 
 VALID_MODULES = {"user", "court", "reservation", "announcement", "config"}
-VALID_ACTIONS = {"create", "update", "status", "role", "cancel", "hide"}
+VALID_ACTIONS = {"create", "update", "status", "role", "member", "cancel", "hide"}
 
 
 def _parse_date_arg(value: Any, field_name: str) -> datetime | None:

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { useAuthStore } from "./stores/auth";
@@ -41,10 +41,30 @@ const plannedNav = [
   { label: "帮助中心", icon: "help" },
 ];
 
+function formatMoney(cents: number | null | undefined) {
+  return `￥${((cents || 0) / 100).toLocaleString("zh-CN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function validityText(expiresAt: string | null | undefined) {
+  return expiresAt ? `有效期至 ${expiresAt}` : "长期有效";
+}
+
 async function logout() {
   await authStore.logout();
   await router.push("/login");
 }
+
+onMounted(async () => {
+  if (!authStore.token) return;
+  try {
+    await authStore.fetchProfile();
+  } catch {
+    authStore.clearSession();
+  }
+});
 </script>
 
 <template>
@@ -94,16 +114,16 @@ async function logout() {
       <div class="session-box">
         <template v-if="authStore.user">
           <div class="session-title">
-            <span>尊享会员卡</span>
-            <small>有效期至 2026-12-31</small>
+            <span>{{ authStore.user.member.level_label }}</span>
+            <small>{{ validityText(authStore.user.member.expires_at) }}</small>
           </div>
           <div class="session-balance">
             <small>余额</small>
-            <strong>￥1,248.00</strong>
+            <strong>{{ formatMoney(authStore.user.member.balance_cents) }}</strong>
           </div>
           <div class="session-balance">
             <small>积分</small>
-            <strong>2,560</strong>
+            <strong>{{ authStore.user.member.points.toLocaleString("zh-CN") }}</strong>
           </div>
           <small v-if="authStore.user.must_change_password" class="warning-line">默认密码待修改</small>
           <RouterLink class="session-link" to="/profile">会员权益</RouterLink>

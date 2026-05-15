@@ -5,15 +5,21 @@ from repositories.database import execute, fetch_all, fetch_one
 
 
 USER_COLUMNS = """
-    id, username, password_hash, nickname, role, contact, status,
-    last_login_at, created_at, updated_at
+    u.id, u.username, u.password_hash, u.nickname, u.role, u.contact, u.status,
+    u.last_login_at, u.created_at, u.updated_at,
+    ma.member_level, ma.balance_cents, ma.points, ma.expires_at AS member_expires_at
 """
 
 
 async def get_user_by_id(settings: Settings, user_id: int) -> dict[str, Any] | None:
     return await fetch_one(
         settings,
-        f"SELECT {USER_COLUMNS} FROM user WHERE id = %s",
+        f"""
+        SELECT {USER_COLUMNS}
+        FROM user u
+        LEFT JOIN member_account ma ON ma.user_id = u.id
+        WHERE u.id = %s
+        """,
         (user_id,),
     )
 
@@ -21,7 +27,12 @@ async def get_user_by_id(settings: Settings, user_id: int) -> dict[str, Any] | N
 async def get_user_by_username(settings: Settings, username: str) -> dict[str, Any] | None:
     return await fetch_one(
         settings,
-        f"SELECT {USER_COLUMNS} FROM user WHERE username = %s",
+        f"""
+        SELECT {USER_COLUMNS}
+        FROM user u
+        LEFT JOIN member_account ma ON ma.user_id = u.id
+        WHERE u.username = %s
+        """,
         (username,),
     )
 
@@ -92,9 +103,10 @@ async def list_users(
         settings,
         f"""
         SELECT {USER_COLUMNS}
-        FROM user
+        FROM user u
+        LEFT JOIN member_account ma ON ma.user_id = u.id
         {where_sql}
-        ORDER BY id DESC
+        ORDER BY u.id DESC
         LIMIT %s, %s
         """,
         args,

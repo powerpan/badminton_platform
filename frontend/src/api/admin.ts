@@ -108,6 +108,16 @@ export function adminUpdateUserRole(userId: number, role: string) {
   return http.put<unknown, ApiResponse<UserInfo>>(`/admin/users/${userId}/role`, { role });
 }
 
+export function adminUpdateUserMember(userId: number, payload: {
+  member_level: string;
+  expires_at: string | null;
+  balance_change_cents: number;
+  points_change: number;
+  reason: string;
+}) {
+  return http.put<unknown, ApiResponse<UserInfo>>(`/admin/users/${userId}/member`, payload);
+}
+
 export function adminResetUserPassword(userId: number, password: string) {
   return http.put<unknown, ApiResponse<UserInfo>>(`/admin/users/${userId}/password`, { password });
 }
