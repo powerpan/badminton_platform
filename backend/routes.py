@@ -15,12 +15,23 @@ from handlers.admin import (
     AdminStatisticsOverviewHandler,
     AdminStatisticsTimeSlotsHandler,
     AdminStatisticsUsersHandler,
+    AdminUserPasswordHandler,
     AdminUserRoleHandler,
     AdminUserStatusHandler,
     AdminUsersHandler,
 )
 from handlers.announcements import AnnouncementDetailHandler, AnnouncementsHandler
-from handlers.auth import LoginHandler, PasswordHandler, ProfileHandler, RegisterHandler
+from handlers.auth import (
+    CaptchaHandler,
+    LoginHandler,
+    LogoutHandler,
+    PasswordHandler,
+    PasswordResetConfirmHandler,
+    PasswordResetRequestHandler,
+    ProfileHandler,
+    RefreshHandler,
+    RegisterHandler,
+)
 from handlers.courts import CourtsHandler, CourtSlotsHandler
 from handlers.health import HealthHandler
 from handlers.reservations import CancelReservationHandler, MyReservationsHandler, ReservationsHandler
@@ -30,8 +41,13 @@ def build_routes() -> list[tuple[str, object]]:
     return [
         (r"/api/health", HealthHandler),
         (r"/api/admin/health", HealthHandler),
+        (r"/api/auth/captcha", CaptchaHandler),
         (r"/api/auth/register", RegisterHandler),
         (r"/api/auth/login", LoginHandler),
+        (r"/api/auth/refresh", RefreshHandler),
+        (r"/api/auth/logout", LogoutHandler),
+        (r"/api/auth/password-reset/request", PasswordResetRequestHandler),
+        (r"/api/auth/password-reset/confirm", PasswordResetConfirmHandler),
         (r"/api/auth/profile", ProfileHandler),
         (r"/api/auth/password", PasswordHandler),
         (r"/api/announcements", AnnouncementsHandler),
@@ -44,6 +60,7 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/admin/users", AdminUsersHandler),
         (r"/api/admin/users/([0-9]+)/status", AdminUserStatusHandler),
         (r"/api/admin/users/([0-9]+)/role", AdminUserRoleHandler),
+        (r"/api/admin/users/([0-9]+)/password", AdminUserPasswordHandler),
         (r"/api/admin/courts", AdminCourtsHandler),
         (r"/api/admin/courts/([0-9]+)/status", AdminCourtStatusHandler),
         (r"/api/admin/courts/([0-9]+)", AdminCourtDetailHandler),

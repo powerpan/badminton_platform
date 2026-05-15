@@ -7,6 +7,7 @@ export interface UserInfo {
   role: "user" | "admin";
   contact: string;
   status: number;
+  must_change_password?: boolean;
 }
 
 export interface ApiResponse<T> {
@@ -17,7 +18,24 @@ export interface ApiResponse<T> {
 
 export interface LoginResult {
   token: string;
+  access_token: string;
+  refresh_token: string;
   user: UserInfo;
+}
+
+export interface CaptchaResult {
+  captcha_id: string;
+  image_data: string;
+  expires_in: number;
+}
+
+export interface PasswordResetRequestResult {
+  reset_token: string;
+  expires_in: number;
+}
+
+export function getCaptcha() {
+  return http.get<unknown, ApiResponse<CaptchaResult>>("/auth/captcha");
 }
 
 export function register(payload: {
@@ -25,12 +43,35 @@ export function register(payload: {
   password: string;
   nickname: string;
   contact: string;
+  captcha_id: string;
+  captcha_code: string;
 }) {
   return http.post<unknown, ApiResponse<UserInfo>>("/auth/register", payload);
 }
 
-export function login(payload: { username: string; password: string }) {
+export function login(payload: { username: string; password: string; captcha_id: string; captcha_code: string }) {
   return http.post<unknown, ApiResponse<LoginResult>>("/auth/login", payload);
+}
+
+export function refreshLogin(payload: { refresh_token: string }) {
+  return http.post<unknown, ApiResponse<LoginResult>>("/auth/refresh", payload);
+}
+
+export function logout(payload: { refresh_token: string }) {
+  return http.post<unknown, ApiResponse<null>>("/auth/logout", payload);
+}
+
+export function requestPasswordReset(payload: {
+  username: string;
+  contact: string;
+  captcha_id: string;
+  captcha_code: string;
+}) {
+  return http.post<unknown, ApiResponse<PasswordResetRequestResult>>("/auth/password-reset/request", payload);
+}
+
+export function confirmPasswordReset(payload: { reset_token: string; new_password: string }) {
+  return http.post<unknown, ApiResponse<null>>("/auth/password-reset/confirm", payload);
 }
 
 export function getProfile() {

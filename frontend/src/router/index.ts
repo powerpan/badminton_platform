@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import AdminDashboard from "../views/AdminDashboard.vue";
 import CourtsView from "../views/CourtsView.vue";
+import ForgotPasswordView from "../views/ForgotPasswordView.vue";
 import HomeView from "../views/HomeView.vue";
 import LoginView from "../views/LoginView.vue";
 import ProfileView from "../views/ProfileView.vue";
@@ -15,6 +16,7 @@ const router = createRouter({
     { path: "/", name: "home", component: HomeView },
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: RegisterView },
+    { path: "/forgot-password", name: "forgot-password", component: ForgotPasswordView },
     { path: "/courts", name: "courts", component: CourtsView, meta: { requiresAuth: true } },
     {
       path: "/reservations",
@@ -51,7 +53,7 @@ router.beforeEach(async (to) => {
     return { name: "home" };
   }
 
-  if ((to.name === "login" || to.name === "register") && authStore.isLoggedIn) {
+  if ((to.name === "login" || to.name === "register" || to.name === "forgot-password") && authStore.isLoggedIn) {
     return { name: "home" };
   }
 

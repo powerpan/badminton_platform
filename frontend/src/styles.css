@@ -91,6 +91,10 @@ a {
   display: block;
 }
 
+.warning-line {
+  color: #fbd38d;
+}
+
 .session-box button {
   width: 100%;
   padding: 8px 10px;
@@ -238,6 +242,38 @@ td select:focus {
   border-color: #2f7f64;
 }
 
+.captcha-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 10px;
+  align-items: center;
+}
+
+.captcha-image-button {
+  display: grid;
+  width: 132px;
+  height: 46px;
+  padding: 0;
+  place-items: center;
+  overflow: hidden;
+  color: #256f57;
+  cursor: pointer;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.captcha-image-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.captcha-image-button img {
+  display: block;
+  width: 132px;
+  height: 46px;
+}
+
 .primary-button {
   padding: 11px 14px;
   color: #ffffff;
@@ -258,6 +294,12 @@ td select:focus {
 
 .success-text {
   color: #167044;
+}
+
+.warning-panel {
+  color: #7a4b12;
+  background: #fff8e6;
+  border-color: #f7d992;
 }
 
 .muted-link {
@@ -282,13 +324,18 @@ td select:focus {
 
 .toolbar-row,
 .section-title,
-.button-row {
+.button-row,
+.pagination-row {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.pagination-row {
+  justify-content: flex-end;
 }
 
 .toolbar-row label {

@@ -20,6 +20,12 @@ class Settings:
     app_port: int
     jwt_secret: str
     jwt_expire_seconds: int
+    jwt_refresh_expire_seconds: int
+    login_fail_max: int
+    login_fail_window_seconds: int
+    login_lock_seconds: int
+    captcha_expire_seconds: int
+    password_reset_expire_seconds: int
     mysql_host: str
     mysql_port: int
     mysql_user: str
@@ -36,6 +42,12 @@ def load_settings() -> Settings:
         app_port=_int_env("APP_PORT", 8000),
         jwt_secret=os.getenv("JWT_SECRET", "change-me"),
         jwt_expire_seconds=_int_env("JWT_EXPIRE_SECONDS", 86400),
+        jwt_refresh_expire_seconds=_int_env("JWT_REFRESH_EXPIRE_SECONDS", 604800),
+        login_fail_max=_int_env("LOGIN_FAIL_MAX", 5),
+        login_fail_window_seconds=_int_env("LOGIN_FAIL_WINDOW_SECONDS", 600),
+        login_lock_seconds=_int_env("LOGIN_LOCK_SECONDS", 600),
+        captcha_expire_seconds=_int_env("CAPTCHA_EXPIRE_SECONDS", 300),
+        password_reset_expire_seconds=_int_env("PASSWORD_RESET_EXPIRE_SECONDS", 600),
         mysql_host=os.getenv("MYSQL_HOST", "127.0.0.1"),
         mysql_port=_int_env("MYSQL_PORT", 3306),
         mysql_user=os.getenv("MYSQL_USER", "root"),

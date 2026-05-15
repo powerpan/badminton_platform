@@ -8,7 +8,7 @@
 - 缓存：Redis
 - 认证：JWT
 
-当前阶段已完成开发框架骨架、用户认证闭环、场地预约闭环、后台基础管理、统计分析、操作日志和预约状态自动处理。普通用户可以查看场地、选择时间段、创建预约、查看和取消自己的预约；管理员可以管理用户、场地、预约、公告、预约规则配置、运营统计和操作日志。
+当前阶段已完成开发框架骨架、用户认证闭环、场地预约闭环、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码和基础安全增强。普通用户可以查看场地、选择时间段、创建预约、查看和取消自己的预约；管理员可以管理用户、场地、预约、公告、预约规则配置、运营统计和操作日志。
 
 ## 当前实现状态
 
@@ -17,7 +17,7 @@
 - Tornado 后端基础应用、路由和统一 JSON 响应。
 - MySQL 连接池和用户数据访问封装。
 - Redis / MySQL / API 健康检查。
-- 用户注册、登录、JWT 鉴权、个人资料、修改密码。
+- 用户注册、登录、验证码、JWT 鉴权、个人资料、修改密码、找回密码。
 - 场地列表、按规则生成时间段、时间段状态查询。
 - 预约创建、Redis 临时锁、MySQL 时间重叠冲突校验。
 - 我的预约列表和未开始预约取消。
@@ -29,15 +29,18 @@
 - 后台统计接口和统计视图：预约总量、今日预约、活跃用户、场地使用率、热门时间段、用户活跃度。
 - 管理员关键操作日志写入和日志查询。
 - 预约状态自动处理：已结束的 `confirmed` 预约自动转为 `completed`。
+- Refresh token、退出登录、登录失败锁定和默认管理员改密提醒。
+- 密码重置会清理对应用户的 refresh token，降低旧登录态继续使用的风险。
+- 后台用户、场地、预约、公告、日志分页与筛选。
+- 预约冲突、空状态和加载状态的前端提示优化。
 - Vue3 前端骨架、Axios 请求封装、Pinia 登录态保存。
-- `/login`、`/register`、`/profile`、`/courts`、`/reservations`、`/admin` 页面。
+- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/admin` 页面。
 - 路由守卫：未登录跳转登录页，普通用户不能访问管理后台。
 - 初始化 SQL：核心表、默认配置、测试场地、默认管理员账号。
 
 待开发：
 
 - 后端自动化接口测试。
-- 找回密码、刷新 token、验证码等安全增强。
 - Docker 部署和生产环境配置。
 
 ## 目录结构
@@ -116,6 +119,11 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 | --- | --- | --- |
 | POST | `/api/auth/register` | 注册普通用户 |
 | POST | `/api/auth/login` | 登录并返回 JWT |
+| GET | `/api/auth/captcha` | 获取图形验证码 |
+| POST | `/api/auth/refresh` | 使用 refresh token 刷新登录态 |
+| POST | `/api/auth/logout` | 退出登录并删除 refresh token |
+| POST | `/api/auth/password-reset/request` | 校验用户名、联系方式和验证码，申请重置密码 |
+| POST | `/api/auth/password-reset/confirm` | 使用重置凭证提交新密码 |
 | GET | `/api/auth/profile` | 获取当前用户信息 |
 | PUT | `/api/auth/profile` | 修改昵称和联系方式 |
 | PUT | `/api/auth/password` | 修改密码 |
@@ -138,6 +146,7 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 | GET/POST | `/api/admin/users` | 用户列表和新增用户 |
 | PUT | `/api/admin/users/{id}/status` | 启用或禁用用户 |
 | PUT | `/api/admin/users/{id}/role` | 修改用户角色 |
+| PUT | `/api/admin/users/{id}/password` | 管理员重置用户密码 |
 | GET/POST | `/api/admin/courts` | 场地列表和新增场地 |
 | PUT | `/api/admin/courts/{id}` | 编辑场地 |
 | PUT | `/api/admin/courts/{id}/status` | 启用或停用场地 |
@@ -216,12 +225,12 @@ http://localhost:8000
 
 ## 下一步开发顺序
 
-下一阶段建议优先推“测试与部署稳定化”，不包含一键演示脚本：
+下一阶段建议优先推“自动化测试与部署稳定化”，不包含一键演示脚本：
 
 1. 补后端自动化接口测试，覆盖认证、预约、统计、日志和后台权限。
 2. 整理测试数据准备和清理流程，保证重复运行稳定。
 3. 补 Docker Compose 或生产部署配置，统一 MySQL、Redis、后端和前端环境。
-4. 增强安全能力：刷新 token、验证码、找回密码、默认管理员改密提醒。
+4. 继续增强安全能力：敏感操作二次确认、管理员操作审计细化。
 5. 根据验收需要补充页面细节和异常提示。
 
-当前已完成核心业务闭环、后台管理、统计分析、操作日志和规则配置。下一阶段应优先提升自动化回归和部署可靠性。
+当前已完成核心业务闭环、后台管理、统计分析、操作日志、规则配置、refresh token、验证码、找回密码和基础高并发体验优化。下一阶段应优先提升自动化回归和部署可靠性。

@@ -110,6 +110,28 @@ class AdminUserRoleHandler(BaseHandler):
         self.write_json(success(user))
 
 
+class AdminUserPasswordHandler(BaseHandler):
+    async def put(self, user_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        user = await admin_user_service.reset_user_password(
+            settings,
+            current_user=current_user,
+            user_id=int(user_id),
+            body=self.get_json_body(),
+        )
+        await _record_admin_log(
+            self,
+            current_user,
+            module="user",
+            action="update",
+            target_type="user",
+            target_id=user["id"],
+            detail={"username": user["username"], "field": "password"},
+        )
+        self.write_json(success(user, "密码已重置"))
+
+
 class AdminCourtsHandler(BaseHandler):
     async def get(self) -> None:
         await self.require_admin()
@@ -185,6 +207,10 @@ class AdminReservationsHandler(BaseHandler):
             page=page,
             page_size=page_size,
             offset=offset,
+            username_arg=self.get_argument("username", None),
+            court_id_arg=self.get_argument("court_id", None),
+            date_from_arg=self.get_argument("date_from", None),
+            date_to_arg=self.get_argument("date_to", None),
         )
         self.write_json(success(data))
 

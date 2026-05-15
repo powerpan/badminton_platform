@@ -7,7 +7,7 @@ const authStore = useAuthStore();
 const router = useRouter();
 
 async function logout() {
-  authStore.clearSession();
+  await authStore.logout();
   await router.push("/login");
 }
 </script>
@@ -37,6 +37,7 @@ async function logout() {
         <template v-if="authStore.user">
           <span>{{ authStore.user.nickname || authStore.user.username }}</span>
           <small>{{ authStore.user.role }}</small>
+          <small v-if="authStore.user.must_change_password" class="warning-line">默认密码待修改</small>
           <button type="button" @click="logout">退出登录</button>
         </template>
         <template v-else>

@@ -1,8 +1,9 @@
+import asyncio
 from typing import Any
 
 from config.settings import Settings
 from repositories import user_repository
-from services.auth_service import public_user
+from services.auth_service import public_user, revoke_user_refresh_tokens
 from utils.passwords import hash_password
 from utils.query import clean_text
 from utils.response import ApiError
@@ -81,7 +82,7 @@ async def create_user(settings: Settings, body: dict[str, Any]) -> dict[str, Any
     user_id = await user_repository.create_user(
         settings,
         username=username,
-        password_hash=hash_password(password),
+        password_hash=await asyncio.to_thread(hash_password, password),
         nickname=nickname,
         role=role or "user",
         contact=contact,
@@ -127,6 +128,28 @@ async def update_user_role(
     if user is None:
         raise ApiError(404, "用户不存在", 404)
     await user_repository.update_user_role(settings, user_id, role or "user")
+    updated = await user_repository.get_user_by_id(settings, user_id)
+    if updated is None:
+        raise ApiError(404, "用户不存在", 404)
+    return public_user(updated)
+
+
+async def reset_user_password(
+    settings: Settings,
+    *,
+    current_user: dict[str, Any],
+    user_id: int,
+    body: dict[str, Any],
+) -> dict[str, Any]:
+    if user_id == current_user["id"]:
+        raise ApiError(400, "不能在用户管理中重置当前登录账号密码", 400)
+    password = str(body.get("password") or "")
+    _validate_password(password)
+    user = await user_repository.get_user_by_id(settings, user_id)
+    if user is None:
+        raise ApiError(404, "用户不存在", 404)
+    await user_repository.update_password(settings, user_id, await asyncio.to_thread(hash_password, password))
+    await revoke_user_refresh_tokens(settings, user_id)
     updated = await user_repository.get_user_by_id(settings, user_id)
     if updated is None:
         raise ApiError(404, "用户不存在", 404)

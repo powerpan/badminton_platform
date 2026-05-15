@@ -78,7 +78,11 @@ async function submitReservation() {
     await loadSlots();
     message.value = "预约成功";
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "预约提交失败";
+    const text = error instanceof Error ? error.message : "预约提交失败";
+    errorMessage.value = text.includes("预约") || text.includes("占用")
+      ? "该时间段已被其他用户抢先预约，请重新选择"
+      : text;
+    await loadSlots();
   } finally {
     submitting.value = false;
   }
@@ -111,6 +115,7 @@ onMounted(async () => {
       </div>
 
       <div v-if="loading && courts.length === 0">正在加载场地...</div>
+      <div v-else-if="courts.length === 0" class="empty-state">暂无可预约场地</div>
       <div v-else class="court-list">
         <button
           v-for="court in courts"
@@ -136,7 +141,8 @@ onMounted(async () => {
         <span v-if="loading">刷新中...</span>
       </div>
 
-      <div class="slot-grid">
+      <div v-if="slots.length === 0" class="empty-state">暂无可显示时间段</div>
+      <div v-else class="slot-grid">
         <button
           v-for="slot in slots"
           :key="`${slot.start_time}-${slot.end_time}`"

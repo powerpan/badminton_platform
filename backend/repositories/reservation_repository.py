@@ -157,6 +157,10 @@ async def list_admin_reservations(
     settings: Settings,
     *,
     status: str | None,
+    username: str | None,
+    court_id: int | None,
+    date_from: date | None,
+    date_to: date | None,
     offset: int,
     limit: int,
 ) -> list[dict[str, Any]]:
@@ -165,6 +169,18 @@ async def list_admin_reservations(
     if status:
         where.append("r.status = %s")
         args.append(status)
+    if username:
+        where.append("(u.username LIKE %s OR u.nickname LIKE %s)")
+        args.extend([f"%{username}%", f"%{username}%"])
+    if court_id:
+        where.append("r.court_id = %s")
+        args.append(court_id)
+    if date_from:
+        where.append("r.reserve_date >= %s")
+        args.append(date_from)
+    if date_to:
+        where.append("r.reserve_date <= %s")
+        args.append(date_to)
     where_sql = "WHERE " + " AND ".join(where) if where else ""
     args.extend([offset, limit])
     return await fetch_all(
@@ -186,13 +202,53 @@ async def list_admin_reservations(
 
 
 async def count_admin_reservations(settings: Settings, *, status: str | None) -> int:
+    return await count_admin_reservations_filtered(
+        settings,
+        status=status,
+        username=None,
+        court_id=None,
+        date_from=None,
+        date_to=None,
+    )
+
+
+async def count_admin_reservations_filtered(
+    settings: Settings,
+    *,
+    status: str | None,
+    username: str | None,
+    court_id: int | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> int:
     where = []
     args: list[Any] = []
     if status:
-        where.append("status = %s")
+        where.append("r.status = %s")
         args.append(status)
+    if username:
+        where.append("(u.username LIKE %s OR u.nickname LIKE %s)")
+        args.extend([f"%{username}%", f"%{username}%"])
+    if court_id:
+        where.append("r.court_id = %s")
+        args.append(court_id)
+    if date_from:
+        where.append("r.reserve_date >= %s")
+        args.append(date_from)
+    if date_to:
+        where.append("r.reserve_date <= %s")
+        args.append(date_to)
     where_sql = "WHERE " + " AND ".join(where) if where else ""
-    row = await fetch_one(settings, f"SELECT COUNT(*) AS total FROM reservation {where_sql}", args)
+    row = await fetch_one(
+        settings,
+        f"""
+        SELECT COUNT(*) AS total
+        FROM reservation r
+        JOIN user u ON u.id = r.user_id
+        {where_sql}
+        """,
+        args,
+    )
     return int(row["total"]) if row else 0
 
 

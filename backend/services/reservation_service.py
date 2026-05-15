@@ -61,6 +61,28 @@ def _validate_status_filter(status: str | None) -> str | None:
     return status
 
 
+def _parse_optional_date(value: Any, field_name: str) -> date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ApiError(400, f"{field_name}格式应为 YYYY-MM-DD", 400) from exc
+
+
+def _parse_optional_int(value: Any, field_name: str) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ApiError(400, f"{field_name}格式错误", 400) from exc
+    if number <= 0:
+        raise ApiError(400, f"{field_name}格式错误", 400)
+    return number
+
+
 async def refresh_reservation_statuses(settings: Settings) -> int:
     return await reservation_repository.complete_finished_reservations(settings)
 
@@ -214,16 +236,37 @@ async def list_admin_reservations(
     page: int,
     page_size: int,
     offset: int,
+    username_arg: Any = None,
+    court_id_arg: Any = None,
+    date_from_arg: Any = None,
+    date_to_arg: Any = None,
 ) -> dict[str, Any]:
     await refresh_reservation_statuses(settings)
     status = _validate_status_filter(status_arg)
+    username = clean_text(username_arg)
+    court_id = _parse_optional_int(court_id_arg, "场地ID")
+    date_from = _parse_optional_date(date_from_arg, "开始日期")
+    date_to = _parse_optional_date(date_to_arg, "结束日期")
+    if date_from and date_to and date_from > date_to:
+        raise ApiError(400, "开始日期不能晚于结束日期", 400)
     rows = await reservation_repository.list_admin_reservations(
         settings,
         status=status,
+        username=username or None,
+        court_id=court_id,
+        date_from=date_from,
+        date_to=date_to,
         offset=offset,
         limit=page_size,
     )
-    total = await reservation_repository.count_admin_reservations(settings, status=status)
+    total = await reservation_repository.count_admin_reservations_filtered(
+        settings,
+        status=status,
+        username=username or None,
+        court_id=court_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
     return {"items": [_normalize_reservation(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 

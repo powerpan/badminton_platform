@@ -17,6 +17,7 @@ import {
   adminGetTimeSlotStatistics,
   adminGetUserStatistics,
   adminGetUsers,
+  adminResetUserPassword,
   adminUpdateAnnouncement,
   adminUpdateAnnouncementStatus,
   adminUpdateConfig,
@@ -36,6 +37,11 @@ import type { Court } from "../api/court";
 import type { Reservation } from "../api/reservation";
 
 type AdminTab = "statistics" | "users" | "courts" | "reservations" | "announcements" | "configs" | "logs";
+interface PageState {
+  page: number;
+  page_size: number;
+  total: number;
+}
 
 const tabs: Array<{ key: AdminTab; label: string }> = [
   { key: "statistics", label: "统计" },
@@ -75,6 +81,8 @@ const maxCourtActiveCount = computed(() => Math.max(0, ...courtStatistics.value.
 const maxTimeSlotCount = computed(() => Math.max(0, ...timeSlotStatistics.value.map((item) => item.reservation_count)));
 
 const users = ref<UserInfo[]>([]);
+const userPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const userFilters = ref({ role: "", status: "" });
 const userForm = ref({
   username: "",
   password: "",
@@ -85,6 +93,9 @@ const userForm = ref({
 });
 
 const courts = ref<Court[]>([]);
+const courtOptions = ref<Court[]>([]);
+const courtPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const courtStatus = ref("");
 const editingCourtId = ref<number | null>(null);
 const courtForm = ref({
   court_no: "",
@@ -94,9 +105,18 @@ const courtForm = ref({
 });
 
 const reservations = ref<Reservation[]>([]);
-const reservationStatus = ref("");
+const reservationPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const reservationFilters = ref({
+  status: "",
+  username: "",
+  court_id: "",
+  date_from: "",
+  date_to: "",
+});
 
 const announcements = ref<Announcement[]>([]);
+const announcementPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
+const announcementStatus = ref("");
 const editingAnnouncementId = ref<number | null>(null);
 const announcementForm = ref({
   title: "",
@@ -107,6 +127,7 @@ const announcementForm = ref({
 const configs = ref<ConfigItem[]>([]);
 
 const operationLogs = ref<OperationLog[]>([]);
+const logPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
 const logFilters = ref({
   module: "",
   action: "",
@@ -141,6 +162,19 @@ function operationDetail(detail: string) {
   }
 }
 
+function pageCount(pageState: PageState) {
+  return Math.max(1, Math.ceil(pageState.total / pageState.page_size));
+}
+
+async function changePage(pageState: PageState, nextPage: number, loader: () => Promise<void>) {
+  pageState.page = Math.min(Math.max(1, nextPage), pageCount(pageState));
+  await loader();
+}
+
+function resetPage(pageState: PageState) {
+  pageState.page = 1;
+}
+
 async function loadStatistics() {
   const params = {
     date_from: statsRange.value.date_from,
@@ -171,8 +205,26 @@ async function refreshStatistics() {
 }
 
 async function loadUsers() {
-  const response = await adminGetUsers({ page_size: 100 });
+  const response = await adminGetUsers({
+    role: userFilters.value.role || undefined,
+    status: userFilters.value.status || undefined,
+    page: userPage.value.page,
+    page_size: userPage.value.page_size,
+  });
   users.value = response.data.items;
+  userPage.value.total = response.data.total;
+}
+
+async function refreshUsers(reset = false) {
+  if (reset) resetPage(userPage.value);
+  loading.value = true;
+  try {
+    await loadUsers();
+  } catch (error) {
+    setError(error, "用户列表加载失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function submitUser() {
@@ -180,6 +232,7 @@ async function submitUser() {
   try {
     await adminCreateUser(userForm.value);
     userForm.value = { username: "", password: "", nickname: "", contact: "", role: "user", status: 1 };
+    resetPage(userPage.value);
     await loadUsers();
     setMessage("用户已创建");
   } catch (error) {
@@ -218,8 +271,31 @@ async function changeUserRole(user: UserInfo, event: Event) {
 }
 
 async function loadCourts() {
-  const response = await adminGetCourts({ page_size: 100 });
+  const response = await adminGetCourts({
+    status: courtStatus.value || undefined,
+    page: courtPage.value.page,
+    page_size: courtPage.value.page_size,
+  });
   courts.value = response.data.items;
+  courtPage.value.total = response.data.total;
+}
+
+async function loadCourtOptions() {
+  if (courtOptions.value.length > 0) return;
+  const response = await adminGetCourts({ page_size: 100 });
+  courtOptions.value = response.data.items;
+}
+
+async function refreshCourts(reset = false) {
+  if (reset) resetPage(courtPage.value);
+  loading.value = true;
+  try {
+    await loadCourts();
+  } catch (error) {
+    setError(error, "场地列表加载失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
 function editCourt(court: Court) {
@@ -248,6 +324,8 @@ async function submitCourt() {
       setMessage("场地已创建");
     }
     resetCourtForm();
+    resetPage(courtPage.value);
+    courtOptions.value = [];
     await loadCourts();
   } catch (error) {
     setError(error, "保存场地失败");
@@ -260,6 +338,7 @@ async function toggleCourtStatus(court: Court) {
   loading.value = true;
   try {
     await adminUpdateCourtStatus(court.id, court.status === 1 ? 0 : 1);
+    courtOptions.value = [];
     await loadCourts();
     setMessage("场地状态已更新");
   } catch (error) {
@@ -271,10 +350,28 @@ async function toggleCourtStatus(court: Court) {
 
 async function loadReservations() {
   const response = await adminGetReservations({
-    status: reservationStatus.value || undefined,
-    page_size: 100,
+    status: reservationFilters.value.status || undefined,
+    username: reservationFilters.value.username || undefined,
+    court_id: reservationFilters.value.court_id ? Number(reservationFilters.value.court_id) : undefined,
+    date_from: reservationFilters.value.date_from || undefined,
+    date_to: reservationFilters.value.date_to || undefined,
+    page: reservationPage.value.page,
+    page_size: reservationPage.value.page_size,
   });
   reservations.value = response.data.items;
+  reservationPage.value.total = response.data.total;
+}
+
+async function refreshReservations(reset = false) {
+  if (reset) resetPage(reservationPage.value);
+  loading.value = true;
+  try {
+    await loadReservations();
+  } catch (error) {
+    setError(error, "预约列表加载失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function cancelAdminReservation(reservation: Reservation) {
@@ -291,8 +388,25 @@ async function cancelAdminReservation(reservation: Reservation) {
 }
 
 async function loadAnnouncements() {
-  const response = await adminGetAnnouncements({ page_size: 100 });
+  const response = await adminGetAnnouncements({
+    status: announcementStatus.value || undefined,
+    page: announcementPage.value.page,
+    page_size: announcementPage.value.page_size,
+  });
   announcements.value = response.data.items;
+  announcementPage.value.total = response.data.total;
+}
+
+async function refreshAnnouncements(reset = false) {
+  if (reset) resetPage(announcementPage.value);
+  loading.value = true;
+  try {
+    await loadAnnouncements();
+  } catch (error) {
+    setError(error, "公告列表加载失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
 function editAnnouncement(announcement: Announcement) {
@@ -320,6 +434,7 @@ async function submitAnnouncement() {
       setMessage("公告已创建");
     }
     resetAnnouncementForm();
+    resetPage(announcementPage.value);
     await loadAnnouncements();
   } catch (error) {
     setError(error, "保存公告失败");
@@ -353,9 +468,25 @@ async function loadOperationLogs() {
     username: logFilters.value.username || undefined,
     date_from: logFilters.value.date_from || undefined,
     date_to: logFilters.value.date_to || undefined,
-    page_size: 100,
+    page: logPage.value.page,
+    page_size: logPage.value.page_size,
   });
   operationLogs.value = response.data.items;
+  logPage.value.total = response.data.total;
+}
+
+async function resetUserPassword(user: UserInfo) {
+  const password = window.prompt(`重置 ${user.username} 的密码，至少6位`);
+  if (!password) return;
+  loading.value = true;
+  try {
+    await adminResetUserPassword(user.id, password);
+    setMessage("用户密码已重置");
+  } catch (error) {
+    setError(error, "重置密码失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
 async function refreshOperationLogs() {
@@ -368,6 +499,11 @@ async function refreshOperationLogs() {
   } finally {
     loading.value = false;
   }
+}
+
+async function searchOperationLogs() {
+  resetPage(logPage.value);
+  await refreshOperationLogs();
 }
 
 async function saveConfig(config: ConfigItem) {
@@ -391,7 +527,10 @@ async function loadActiveTab() {
     if (activeTab.value === "statistics") await loadStatistics();
     if (activeTab.value === "users") await loadUsers();
     if (activeTab.value === "courts") await loadCourts();
-    if (activeTab.value === "reservations") await loadReservations();
+    if (activeTab.value === "reservations") {
+      await loadCourtOptions();
+      await loadReservations();
+    }
     if (activeTab.value === "announcements") await loadAnnouncements();
     if (activeTab.value === "configs") await loadConfigs();
     if (activeTab.value === "logs") await loadOperationLogs();
@@ -560,7 +699,27 @@ onMounted(loadActiveTab);
         <button class="primary-button" type="submit" :disabled="loading">新增用户</button>
       </form>
 
-      <div class="table-wrap">
+      <div class="toolbar-row">
+        <label>
+          角色
+          <select v-model="userFilters.role" @change="refreshUsers(true)">
+            <option value="">全部</option>
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+        </label>
+        <label>
+          状态
+          <select v-model="userFilters.status" @change="refreshUsers(true)">
+            <option value="">全部</option>
+            <option value="1">启用</option>
+            <option value="0">禁用</option>
+          </select>
+        </label>
+      </div>
+
+      <div v-if="users.length === 0" class="empty-state">暂无用户数据</div>
+      <div v-else class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -584,10 +743,18 @@ onMounted(loadActiveTab);
                 </select>
               </td>
               <td><span class="state-pill" :class="user.status === 1 ? 'confirmed' : 'canceled'">{{ user.status === 1 ? "启用" : "禁用" }}</span></td>
-              <td><button class="text-button" type="button" @click="toggleUserStatus(user)">{{ user.status === 1 ? "禁用" : "启用" }}</button></td>
+              <td>
+                <button class="text-button" type="button" @click="toggleUserStatus(user)">{{ user.status === 1 ? "禁用" : "启用" }}</button>
+                <button class="text-button" type="button" @click="resetUserPassword(user)">重置密码</button>
+              </td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="pagination-row">
+        <button class="text-button" type="button" :disabled="userPage.page <= 1" @click="changePage(userPage, userPage.page - 1, () => refreshUsers())">上一页</button>
+        <span>第 {{ userPage.page }} / {{ pageCount(userPage) }} 页，共 {{ userPage.total }} 条</span>
+        <button class="text-button" type="button" :disabled="userPage.page >= pageCount(userPage)" @click="changePage(userPage, userPage.page + 1, () => refreshUsers())">下一页</button>
       </div>
     </div>
 
@@ -604,7 +771,19 @@ onMounted(loadActiveTab);
         <button class="text-button" type="button" @click="resetCourtForm">清空</button>
       </form>
 
-      <div class="table-wrap">
+      <div class="toolbar-row">
+        <label>
+          状态
+          <select v-model="courtStatus" @change="refreshCourts(true)">
+            <option value="">全部</option>
+            <option value="1">启用</option>
+            <option value="0">停用</option>
+          </select>
+        </label>
+      </div>
+
+      <div v-if="courts.length === 0" class="empty-state">暂无场地数据</div>
+      <div v-else class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -629,13 +808,18 @@ onMounted(loadActiveTab);
           </tbody>
         </table>
       </div>
+      <div class="pagination-row">
+        <button class="text-button" type="button" :disabled="courtPage.page <= 1" @click="changePage(courtPage, courtPage.page - 1, () => refreshCourts())">上一页</button>
+        <span>第 {{ courtPage.page }} / {{ pageCount(courtPage) }} 页，共 {{ courtPage.total }} 条</span>
+        <button class="text-button" type="button" :disabled="courtPage.page >= pageCount(courtPage)" @click="changePage(courtPage, courtPage.page + 1, () => refreshCourts())">下一页</button>
+      </div>
     </div>
 
     <div v-if="activeTab === 'reservations'" class="admin-section">
       <div class="toolbar-row">
         <label>
           状态
-          <select v-model="reservationStatus" @change="loadReservations">
+          <select v-model="reservationFilters.status" @change="refreshReservations(true)">
             <option value="">全部</option>
             <option value="confirmed">confirmed</option>
             <option value="canceled">canceled</option>
@@ -643,9 +827,30 @@ onMounted(loadActiveTab);
             <option value="completed">completed</option>
           </select>
         </label>
+        <label>
+          用户
+          <input v-model="reservationFilters.username" placeholder="用户名或昵称" @keyup.enter="refreshReservations(true)" />
+        </label>
+        <label>
+          场地
+          <select v-model="reservationFilters.court_id" @change="refreshReservations(true)">
+            <option value="">全部</option>
+            <option v-for="court in courtOptions" :key="court.id" :value="String(court.id)">{{ court.court_no }} {{ court.court_name }}</option>
+          </select>
+        </label>
+        <label>
+          开始日期
+          <input v-model="reservationFilters.date_from" type="date" />
+        </label>
+        <label>
+          结束日期
+          <input v-model="reservationFilters.date_to" type="date" />
+        </label>
+        <button class="primary-button" type="button" :disabled="loading" @click="refreshReservations(true)">查询预约</button>
       </div>
 
-      <div class="table-wrap">
+      <div v-if="reservations.length === 0" class="empty-state">暂无预约数据</div>
+      <div v-else class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -680,6 +885,11 @@ onMounted(loadActiveTab);
           </tbody>
         </table>
       </div>
+      <div class="pagination-row">
+        <button class="text-button" type="button" :disabled="reservationPage.page <= 1" @click="changePage(reservationPage, reservationPage.page - 1, () => refreshReservations())">上一页</button>
+        <span>第 {{ reservationPage.page }} / {{ pageCount(reservationPage) }} 页，共 {{ reservationPage.total }} 条</span>
+        <button class="text-button" type="button" :disabled="reservationPage.page >= pageCount(reservationPage)" @click="changePage(reservationPage, reservationPage.page + 1, () => refreshReservations())">下一页</button>
+      </div>
     </div>
 
     <div v-if="activeTab === 'announcements'" class="admin-section">
@@ -696,7 +906,19 @@ onMounted(loadActiveTab);
         </div>
       </form>
 
-      <div class="table-wrap">
+      <div class="toolbar-row">
+        <label>
+          状态
+          <select v-model="announcementStatus" @change="refreshAnnouncements(true)">
+            <option value="">全部</option>
+            <option value="1">显示</option>
+            <option value="0">隐藏</option>
+          </select>
+        </label>
+      </div>
+
+      <div v-if="announcements.length === 0" class="empty-state">暂无公告数据</div>
+      <div v-else class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -718,6 +940,11 @@ onMounted(loadActiveTab);
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="pagination-row">
+        <button class="text-button" type="button" :disabled="announcementPage.page <= 1" @click="changePage(announcementPage, announcementPage.page - 1, () => refreshAnnouncements())">上一页</button>
+        <span>第 {{ announcementPage.page }} / {{ pageCount(announcementPage) }} 页，共 {{ announcementPage.total }} 条</span>
+        <button class="text-button" type="button" :disabled="announcementPage.page >= pageCount(announcementPage)" @click="changePage(announcementPage, announcementPage.page + 1, () => refreshAnnouncements())">下一页</button>
       </div>
     </div>
 
@@ -748,7 +975,7 @@ onMounted(loadActiveTab);
       <div class="toolbar-row">
         <label>
           模块
-          <select v-model="logFilters.module" @change="refreshOperationLogs">
+          <select v-model="logFilters.module" @change="searchOperationLogs">
             <option value="">全部</option>
             <option value="user">用户</option>
             <option value="court">场地</option>
@@ -759,7 +986,7 @@ onMounted(loadActiveTab);
         </label>
         <label>
           操作
-          <select v-model="logFilters.action" @change="refreshOperationLogs">
+          <select v-model="logFilters.action" @change="searchOperationLogs">
             <option value="">全部</option>
             <option value="create">create</option>
             <option value="update">update</option>
@@ -771,7 +998,7 @@ onMounted(loadActiveTab);
         </label>
         <label>
           操作人
-          <input v-model="logFilters.username" placeholder="用户名" @keyup.enter="refreshOperationLogs" />
+          <input v-model="logFilters.username" placeholder="用户名" @keyup.enter="searchOperationLogs" />
         </label>
         <label>
           开始日期
@@ -781,10 +1008,11 @@ onMounted(loadActiveTab);
           结束日期
           <input v-model="logFilters.date_to" type="date" />
         </label>
-        <button class="primary-button" type="button" :disabled="loading" @click="refreshOperationLogs">查询日志</button>
+        <button class="primary-button" type="button" :disabled="loading" @click="searchOperationLogs">查询日志</button>
       </div>
 
-      <div class="table-wrap">
+      <div v-if="operationLogs.length === 0" class="empty-state">暂无操作日志</div>
+      <div v-else class="table-wrap">
         <table>
           <thead>
             <tr>
@@ -809,6 +1037,11 @@ onMounted(loadActiveTab);
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="pagination-row">
+        <button class="text-button" type="button" :disabled="logPage.page <= 1" @click="changePage(logPage, logPage.page - 1, () => refreshOperationLogs())">上一页</button>
+        <span>第 {{ logPage.page }} / {{ pageCount(logPage) }} 页，共 {{ logPage.total }} 条</span>
+        <button class="text-button" type="button" :disabled="logPage.page >= pageCount(logPage)" @click="changePage(logPage, logPage.page + 1, () => refreshOperationLogs())">下一页</button>
       </div>
     </div>
   </section>

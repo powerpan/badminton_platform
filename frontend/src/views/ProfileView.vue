@@ -69,6 +69,11 @@ async function savePassword() {
   </section>
 
   <section class="module-grid">
+    <div v-if="currentUser?.must_change_password" class="panel warning-panel">
+      <h2>默认管理员密码提醒</h2>
+      <p>当前管理员账号仍在使用默认密码，请先完成密码修改，再继续用于演示或部署。</p>
+    </div>
+
     <form class="panel form-stack" @submit.prevent="saveProfile">
       <h2>基本信息</h2>
       <label>

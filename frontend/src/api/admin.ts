@@ -108,6 +108,10 @@ export function adminUpdateUserRole(userId: number, role: string) {
   return http.put<unknown, ApiResponse<UserInfo>>(`/admin/users/${userId}/role`, { role });
 }
 
+export function adminResetUserPassword(userId: number, password: string) {
+  return http.put<unknown, ApiResponse<UserInfo>>(`/admin/users/${userId}/password`, { password });
+}
+
 export function adminGetCourts(params: { status?: string; page?: number; page_size?: number } = {}) {
   return http.get<unknown, ApiResponse<PageResult<Court>>>("/admin/courts", { params });
 }
@@ -134,7 +138,15 @@ export function adminUpdateCourtStatus(courtId: number, status: number) {
   return http.put<unknown, ApiResponse<Court>>(`/admin/courts/${courtId}/status`, { status });
 }
 
-export function adminGetReservations(params: { status?: string; page?: number; page_size?: number } = {}) {
+export function adminGetReservations(params: {
+  status?: string;
+  username?: string;
+  court_id?: number;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  page_size?: number;
+} = {}) {
   return http.get<unknown, ApiResponse<PageResult<Reservation>>>("/admin/reservations", { params });
 }
 
