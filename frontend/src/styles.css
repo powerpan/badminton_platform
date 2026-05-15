@@ -1172,6 +1172,23 @@ th {
   font-size: 13px;
 }
 
+.court-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 24px;
+}
+
+.court-tags i {
+  padding: 3px 6px;
+  color: #365348;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+  background: var(--green-soft);
+  border-radius: 4px;
+}
+
 .court-price {
   color: var(--green);
   font-size: 17px;

@@ -157,7 +157,13 @@ class AdminCourtsHandler(BaseHandler):
             action="create",
             target_type="court",
             target_id=court["id"],
-            detail={"court_no": court["court_no"], "court_name": court["court_name"], "status": court["status"]},
+            detail={
+                "court_no": court["court_no"],
+                "court_name": court["court_name"],
+                "status": court["status"],
+                "price_per_hour_cents": court["price_per_hour_cents"],
+                "capacity": court["capacity"],
+            },
         )
         self.write_json(success(court))
 
@@ -174,7 +180,13 @@ class AdminCourtDetailHandler(BaseHandler):
             action="update",
             target_type="court",
             target_id=court["id"],
-            detail={"court_no": court["court_no"], "court_name": court["court_name"], "status": court["status"]},
+            detail={
+                "court_no": court["court_no"],
+                "court_name": court["court_name"],
+                "status": court["status"],
+                "price_per_hour_cents": court["price_per_hour_cents"],
+                "capacity": court["capacity"],
+            },
         )
         self.write_json(success(court))
 

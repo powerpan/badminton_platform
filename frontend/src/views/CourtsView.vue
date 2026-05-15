@@ -3,7 +3,8 @@ import { computed, onMounted, ref, watch } from "vue";
 
 import { getCourtSlots, getCourts, type Court, type SlotItem } from "../api/court";
 import { createReservation } from "../api/reservation";
-import courtHallImage from "../assets/court-hall.png";
+
+const DEFAULT_COURT_IMAGE_URL = "/courts/default-court.png";
 
 const courts = ref<Court[]>([]);
 const selectedCourtId = ref<number | null>(null);
@@ -31,18 +32,30 @@ const timelineRows = computed(() => {
   return Array.from(rows.values()).sort((left, right) => left.start_time.localeCompare(right.start_time));
 });
 
-const selectedDuration = computed(() => {
+const selectedDurationMinutes = computed(() => {
   if (!selectedSlot.value) {
     return 0;
   }
   const start = timeToMinutes(selectedSlot.value.start_time);
   const end = timeToMinutes(selectedSlot.value.end_time);
-  return Math.max(1, Math.round((end - start) / 60));
+  return Math.max(0, end - start);
 });
 
-const selectedFee = computed(() => selectedDuration.value * 120);
-const discount = computed(() => (selectedSlot.value ? 12 : 0));
-const payableFee = computed(() => Math.max(0, selectedFee.value - discount.value));
+const selectedDurationLabel = computed(() => {
+  if (!selectedDurationMinutes.value) {
+    return "0 小时";
+  }
+  const hours = selectedDurationMinutes.value / 60;
+  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} 小时`;
+});
+const selectedFeeCents = computed(() => {
+  if (!selectedCourt.value || !selectedDurationMinutes.value) {
+    return 0;
+  }
+  return Math.floor((selectedCourt.value.price_per_hour_cents * selectedDurationMinutes.value) / 60);
+});
+const discountCents = computed(() => 0);
+const payableFeeCents = computed(() => Math.max(0, selectedFeeCents.value - discountCents.value));
 const selectedDateLabel = computed(() => formatDisplayDate(selectedDate.value));
 
 const dateOptions = computed(() => {
@@ -83,8 +96,17 @@ function timeToMinutes(value: string) {
   return hour * 60 + minute;
 }
 
-function courtCapacity(index: number) {
-  return index % 2 === 0 ? "标准场地 · 6 人制" : "训练场地 · 4 人制";
+function formatMoney(cents: number | null | undefined) {
+  return `￥${((cents || 0) / 100).toFixed(0)}`;
+}
+
+function courtImage(court: Court | null) {
+  return court?.image_url || DEFAULT_COURT_IMAGE_URL;
+}
+
+function courtSummary(court: Court) {
+  const tags = court.tags?.length ? court.tags.join(" · ") : "标准场地";
+  return `${tags} · ${court.capacity} 人制`;
 }
 
 function statusText(status: SlotItem["status"]) {
@@ -244,20 +266,24 @@ onMounted(async () => {
       <div v-else-if="courts.length === 0" class="empty-state">暂无可预约场地</div>
       <div v-else class="court-gallery">
         <button
-          v-for="(court, index) in visibleCourts"
+          v-for="court in visibleCourts"
           :key="court.id"
           type="button"
           class="court-card"
           :class="{ active: selectedCourtId === court.id }"
           @click="selectCourt(court)"
         >
-          <span class="court-status">空调开放</span>
-          <img :src="courtHallImage" :alt="court.court_name" />
+          <span class="court-status">{{ court.tags?.[0] || "标准场地" }}</span>
+          <img :src="courtImage(court)" :alt="court.court_name" />
           <span v-if="selectedCourtId === court.id" class="selected-check"></span>
           <span class="court-card-body">
             <strong>{{ court.court_name }}</strong>
-            <small>{{ court.description || courtCapacity(index) }}</small>
-            <span class="court-price">￥120 <em>/ 小时</em></span>
+            <small>{{ court.description || courtSummary(court) }}</small>
+            <span class="court-tags">
+              <i v-for="tag in court.tags" :key="tag">{{ tag }}</i>
+              <i>{{ court.capacity }} 人制</i>
+            </span>
+            <span class="court-price">{{ formatMoney(court.price_per_hour_cents) }} <em>/ 小时</em></span>
           </span>
         </button>
       </div>
@@ -302,7 +328,7 @@ onMounted(async () => {
           >
             {{
               getSlot(court.id, row)?.status === "available"
-                ? "￥120"
+                ? formatMoney(court.price_per_hour_cents)
                 : statusText(getSlot(court.id, row)?.status || "disabled")
             }}
           </button>
@@ -319,11 +345,11 @@ onMounted(async () => {
       <section class="summary-block">
         <h3>已选场地</h3>
         <div v-if="selectedCourt" class="summary-court">
-          <img :src="courtHallImage" :alt="selectedCourt.court_name" />
+          <img :src="courtImage(selectedCourt)" :alt="selectedCourt.court_name" />
           <div>
             <strong>{{ selectedCourt.court_name }}</strong>
-            <span>{{ selectedCourt.description || "标准场地 · 6 人制" }}</span>
-            <b>￥120 <em>/ 小时</em></b>
+            <span>{{ selectedCourt.description || courtSummary(selectedCourt) }}</span>
+            <b>{{ formatMoney(selectedCourt.price_per_hour_cents) }} <em>/ 小时</em></b>
           </div>
         </div>
         <p v-else class="muted-text">请选择场地</p>
@@ -337,29 +363,29 @@ onMounted(async () => {
         <p v-if="selectedSlot" class="summary-time">
           {{ selectedDateLabel }}<br />
           {{ timeLabel(selectedSlot.start_time) }} - {{ timeLabel(selectedSlot.end_time) }}
-          <span>{{ selectedDuration }} 小时</span>
+          <span>{{ selectedDurationLabel }}</span>
         </p>
         <p v-else class="muted-text">请选择可预订时间段</p>
       </section>
 
       <section class="summary-block coupon-row">
         <h3>优惠券</h3>
-        <span>{{ selectedSlot ? "已使用会员折扣" : "未使用优惠券" }}</span>
+        <span>{{ selectedSlot ? "本阶段暂无折扣" : "未使用优惠券" }}</span>
       </section>
 
       <section class="summary-block">
         <h3>费用明细</h3>
         <div class="fee-row">
           <span>场地费</span>
-          <strong>￥{{ selectedFee }}</strong>
+          <strong>{{ formatMoney(selectedFeeCents) }}</strong>
         </div>
         <div class="fee-row">
           <span>会员折扣</span>
-          <strong>-￥{{ discount }}</strong>
+          <strong>-{{ formatMoney(discountCents) }}</strong>
         </div>
         <div class="fee-total">
           <span>合计</span>
-          <strong>￥{{ payableFee }}</strong>
+          <strong>{{ formatMoney(payableFeeCents) }}</strong>
         </div>
       </section>
 

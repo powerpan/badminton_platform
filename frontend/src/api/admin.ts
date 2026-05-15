@@ -121,6 +121,10 @@ export function adminCreateCourt(payload: {
   court_name: string;
   description: string;
   status: number;
+  price_per_hour_cents: number;
+  image_url: string;
+  tags: string[];
+  capacity: number;
 }) {
   return http.post<unknown, ApiResponse<Court>>("/admin/courts", payload);
 }
@@ -130,6 +134,10 @@ export function adminUpdateCourt(courtId: number, payload: {
   court_name: string;
   description: string;
   status: number;
+  price_per_hour_cents: number;
+  image_url: string;
+  tags: string[];
+  capacity: number;
 }) {
   return http.put<unknown, ApiResponse<Court>>(`/admin/courts/${courtId}`, payload);
 }

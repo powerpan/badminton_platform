@@ -101,6 +101,10 @@ const courtForm = ref({
   court_no: "",
   court_name: "",
   description: "",
+  price_per_hour_yuan: "120",
+  image_url: "/courts/default-court.png",
+  tags_text: "空调开放,标准场地",
+  capacity: 6,
   status: 1,
 });
 
@@ -153,6 +157,43 @@ function confirmAction(messageText: string) {
 function barWidth(value: number, max: number) {
   if (!max) return "0%";
   return `${Math.max(6, Math.round((value / max) * 100))}%`;
+}
+
+function formatMoney(cents: number | null | undefined) {
+  return `￥${((cents || 0) / 100).toFixed(0)}`;
+}
+
+function centsToYuanInput(cents: number | null | undefined) {
+  const value = (cents || 0) / 100;
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function yuanInputToCents(value: string) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
+    throw new Error("场地价格必须大于0");
+  }
+  return Math.round(number * 100);
+}
+
+function tagTextToArray(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function courtPayload() {
+  return {
+    court_no: courtForm.value.court_no,
+    court_name: courtForm.value.court_name,
+    description: courtForm.value.description,
+    status: courtForm.value.status,
+    price_per_hour_cents: yuanInputToCents(courtForm.value.price_per_hour_yuan),
+    image_url: courtForm.value.image_url,
+    tags: tagTextToArray(courtForm.value.tags_text),
+    capacity: courtForm.value.capacity,
+  };
 }
 
 function operationDetail(detail: string) {
@@ -314,13 +355,26 @@ function editCourt(court: Court) {
     court_no: court.court_no,
     court_name: court.court_name,
     description: court.description || "",
+    price_per_hour_yuan: centsToYuanInput(court.price_per_hour_cents),
+    image_url: court.image_url || "/courts/default-court.png",
+    tags_text: court.tags?.join(",") || "",
+    capacity: court.capacity || 6,
     status: court.status,
   };
 }
 
 function resetCourtForm() {
   editingCourtId.value = null;
-  courtForm.value = { court_no: "", court_name: "", description: "", status: 1 };
+  courtForm.value = {
+    court_no: "",
+    court_name: "",
+    description: "",
+    price_per_hour_yuan: "120",
+    image_url: "/courts/default-court.png",
+    tags_text: "空调开放,标准场地",
+    capacity: 6,
+    status: 1,
+  };
 }
 
 async function submitCourt() {
@@ -329,11 +383,12 @@ async function submitCourt() {
   }
   loading.value = true;
   try {
+    const payload = courtPayload();
     if (editingCourtId.value) {
-      await adminUpdateCourt(editingCourtId.value, courtForm.value);
+      await adminUpdateCourt(editingCourtId.value, payload);
       setMessage("场地已更新");
     } else {
-      await adminCreateCourt(courtForm.value);
+      await adminCreateCourt(payload);
       setMessage("场地已创建");
     }
     resetCourtForm();
@@ -783,6 +838,10 @@ onMounted(loadActiveTab);
         <input v-model="courtForm.court_no" placeholder="场地编号" />
         <input v-model="courtForm.court_name" placeholder="场地名称" />
         <input v-model="courtForm.description" placeholder="说明" />
+        <input v-model="courtForm.price_per_hour_yuan" placeholder="每小时价格（元）" />
+        <input v-model="courtForm.image_url" placeholder="图片路径，如 /courts/default-court.png" />
+        <input v-model="courtForm.tags_text" placeholder="标签，逗号分隔" />
+        <input v-model.number="courtForm.capacity" placeholder="容纳人数" type="number" min="1" max="50" />
         <select v-model.number="courtForm.status">
           <option :value="1">启用</option>
           <option :value="0">停用</option>
@@ -810,6 +869,9 @@ onMounted(loadActiveTab);
               <th>编号</th>
               <th>名称</th>
               <th>说明</th>
+              <th>价格</th>
+              <th>标签</th>
+              <th>人数</th>
               <th>状态</th>
               <th>操作</th>
             </tr>
@@ -819,6 +881,9 @@ onMounted(loadActiveTab);
               <td>{{ court.court_no }}</td>
               <td>{{ court.court_name }}</td>
               <td>{{ court.description || "-" }}</td>
+              <td>{{ formatMoney(court.price_per_hour_cents) }}/小时</td>
+              <td>{{ court.tags?.join("，") || "-" }}</td>
+              <td>{{ court.capacity }}</td>
               <td><span class="state-pill" :class="court.status === 1 ? 'confirmed' : 'canceled'">{{ court.status === 1 ? "启用" : "停用" }}</span></td>
               <td>
                 <button class="text-button" type="button" @click="editCourt(court)">编辑</button>
@@ -879,6 +944,7 @@ onMounted(loadActiveTab);
               <th>场地</th>
               <th>日期</th>
               <th>时间</th>
+              <th>应付金额</th>
               <th>状态</th>
               <th>操作</th>
             </tr>
@@ -890,6 +956,7 @@ onMounted(loadActiveTab);
               <td>{{ reservation.court_name }}</td>
               <td>{{ reservation.reserve_date }}</td>
               <td>{{ reservation.start_time }}-{{ reservation.end_time }}</td>
+              <td>{{ formatMoney(reservation.payable_amount_cents) }}</td>
               <td><span class="state-pill" :class="reservation.status">{{ reservation.status }}</span></td>
               <td>
                 <button

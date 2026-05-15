@@ -14,6 +14,10 @@ export interface Court {
   court_name: string;
   description: string;
   status: number;
+  price_per_hour_cents: number;
+  image_url: string;
+  tags: string[];
+  capacity: number;
   created_at: string;
   updated_at: string;
 }

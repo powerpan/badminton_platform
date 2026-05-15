@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS court (
   court_no VARCHAR(50) NOT NULL,
   description VARCHAR(255) NULL,
   status TINYINT NOT NULL DEFAULT 1,
+  price_per_hour_cents INT NOT NULL DEFAULT 12000,
+  image_url VARCHAR(500) NULL,
+  tags VARCHAR(255) NULL,
+  capacity INT NOT NULL DEFAULT 6,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_court_no (court_no),
@@ -43,6 +47,11 @@ CREATE TABLE IF NOT EXISTS reservation (
   time_slot VARCHAR(50) NOT NULL,
   status VARCHAR(20) NOT NULL,
   remark VARCHAR(255) NULL,
+  price_per_hour_cents INT NOT NULL DEFAULT 12000,
+  duration_minutes INT NOT NULL DEFAULT 60,
+  original_amount_cents INT NOT NULL DEFAULT 12000,
+  discount_amount_cents INT NOT NULL DEFAULT 0,
+  payable_amount_cents INT NOT NULL DEFAULT 12000,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   canceled_at DATETIME NULL,
@@ -108,15 +117,19 @@ ON DUPLICATE KEY UPDATE
   config_value = VALUES(config_value),
   description = VALUES(description);
 
-INSERT INTO court (court_no, court_name, description, status)
+INSERT INTO court (court_no, court_name, description, status, price_per_hour_cents, image_url, tags, capacity)
 VALUES
-  ('A01', '一号场', '靠近入口的标准羽毛球场地', 1),
-  ('A02', '二号场', '靠近休息区的标准羽毛球场地', 1),
-  ('B01', '三号场', '训练区场地', 1)
+  ('A01', '一号场', '靠近入口的标准羽毛球场地', 1, 12000, '/courts/default-court.png', '空调开放,标准场地', 6),
+  ('A02', '二号场', '靠近休息区的标准羽毛球场地', 1, 12000, '/courts/default-court.png', '空调开放,休息区近', 6),
+  ('B01', '三号场', '训练区场地', 1, 10000, '/courts/default-court.png', '训练区,轻量训练', 4)
 ON DUPLICATE KEY UPDATE
   court_name = VALUES(court_name),
   description = VALUES(description),
-  status = VALUES(status);
+  status = VALUES(status),
+  price_per_hour_cents = VALUES(price_per_hour_cents),
+  image_url = VALUES(image_url),
+  tags = VALUES(tags),
+  capacity = VALUES(capacity);
 
 INSERT INTO user (username, password_hash, nickname, role, contact, status)
 VALUES

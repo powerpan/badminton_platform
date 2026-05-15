@@ -10,6 +10,16 @@ from repositories.database import execute, fetch_all, fetch_one, get_pool
 ACTIVE_STATUSES = ("pending", "confirmed")
 
 
+RESERVATION_MONEY_COLUMNS = (
+    "r.price_per_hour_cents, r.duration_minutes, r.original_amount_cents, "
+    "r.discount_amount_cents, r.payable_amount_cents"
+)
+
+
+def _minutes(value: time) -> int:
+    return value.hour * 60 + value.minute
+
+
 async def list_reservations_for_court_date(
     settings: Settings,
     *,
@@ -126,7 +136,7 @@ async def create_confirmed_reservation_atomic(
                     return None, "user_disabled"
 
                 await cursor.execute(
-                    "SELECT id, status FROM court WHERE id = %s FOR UPDATE",
+                    "SELECT id, status, price_per_hour_cents FROM court WHERE id = %s FOR UPDATE",
                     (court_id,),
                 )
                 court = await cursor.fetchone()
@@ -136,6 +146,11 @@ async def create_confirmed_reservation_atomic(
                 if court["status"] != 1:
                     await connection.rollback()
                     return None, "court_disabled"
+                price_per_hour_cents = int(court.get("price_per_hour_cents") or 12000)
+                duration_minutes = _minutes(end_time) - _minutes(start_time)
+                original_amount_cents = price_per_hour_cents * duration_minutes // 60
+                discount_amount_cents = 0
+                payable_amount_cents = original_amount_cents
 
                 await cursor.execute(
                     """
@@ -175,10 +190,26 @@ async def create_confirmed_reservation_atomic(
                 await cursor.execute(
                     """
                     INSERT INTO reservation
-                      (reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, status, remark)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'confirmed', %s)
+                      (reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, status, remark,
+                       price_per_hour_cents, duration_minutes, original_amount_cents, discount_amount_cents,
+                       payable_amount_cents)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'confirmed', %s, %s, %s, %s, %s, %s)
                     """,
-                    (reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, remark),
+                    (
+                        reservation_no,
+                        user_id,
+                        court_id,
+                        reserve_date,
+                        start_time,
+                        end_time,
+                        time_slot,
+                        remark,
+                        price_per_hour_cents,
+                        duration_minutes,
+                        original_amount_cents,
+                        discount_amount_cents,
+                        payable_amount_cents,
+                    ),
                 )
                 reservation_id = int(cursor.lastrowid)
             await connection.commit()
@@ -197,12 +228,12 @@ async def get_reservation_detail(settings: Settings, reservation_id: int) -> dic
         SELECT r.id, r.reservation_no, r.user_id, u.username, u.nickname,
                r.court_id, c.court_no, c.court_name,
                r.reserve_date, r.start_time, r.end_time, r.time_slot,
-               r.status, r.remark, r.created_at, r.updated_at, r.canceled_at
+               r.status, r.remark, {money_columns}, r.created_at, r.updated_at, r.canceled_at
         FROM reservation r
         JOIN user u ON u.id = r.user_id
         JOIN court c ON c.id = r.court_id
         WHERE r.id = %s
-        """,
+        """.format(money_columns=RESERVATION_MONEY_COLUMNS),
         (reservation_id,),
     )
 
@@ -226,7 +257,7 @@ async def list_user_reservations(
         f"""
         SELECT r.id, r.reservation_no, r.court_id, c.court_no, c.court_name,
                r.reserve_date, r.start_time, r.end_time, r.time_slot,
-               r.status, r.remark, r.created_at, r.canceled_at
+               r.status, r.remark, {RESERVATION_MONEY_COLUMNS}, r.created_at, r.canceled_at
         FROM reservation r
         JOIN court c ON c.id = r.court_id
         WHERE {" AND ".join(where)}
@@ -323,7 +354,7 @@ async def list_admin_reservations(
         SELECT r.id, r.reservation_no, r.user_id, u.username, u.nickname,
                r.court_id, c.court_no, c.court_name,
                r.reserve_date, r.start_time, r.end_time, r.time_slot,
-               r.status, r.remark, r.created_at, r.canceled_at
+               r.status, r.remark, {RESERVATION_MONEY_COLUMNS}, r.created_at, r.canceled_at
         FROM reservation r
         JOIN user u ON u.id = r.user_id
         JOIN court c ON c.id = r.court_id

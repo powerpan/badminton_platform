@@ -19,6 +19,11 @@ export interface Reservation {
   time_slot: string;
   status: ReservationStatus;
   remark: string;
+  price_per_hour_cents: number;
+  duration_minutes: number;
+  original_amount_cents: number;
+  discount_amount_cents: number;
+  payable_amount_cents: number;
   created_at: string;
   updated_at?: string;
   canceled_at?: string | null;

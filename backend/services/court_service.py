@@ -9,6 +9,9 @@ from utils.query import clean_text
 from utils.response import ApiError
 
 
+DEFAULT_COURT_IMAGE_URL = "/courts/default-court.png"
+
+
 def _to_time_string(value: Any) -> str:
     if isinstance(value, timedelta):
         total_seconds = int(value.total_seconds())
@@ -40,6 +43,59 @@ def _parse_date(value: str) -> date:
         raise ApiError(400, "日期格式应为 YYYY-MM-DD", 400) from exc
 
 
+def _parse_positive_int(value: Any, field_name: str, default: int, *, min_value: int, max_value: int) -> int:
+    if value is None or value == "":
+        number = default
+    else:
+        try:
+            number = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ApiError(400, f"{field_name}格式错误", 400) from exc
+    if number < min_value or number > max_value:
+        raise ApiError(400, f"{field_name}范围应为 {min_value}-{max_value}", 400)
+    return number
+
+
+def _parse_image_url(value: Any, default: str = DEFAULT_COURT_IMAGE_URL) -> str:
+    image_url = clean_text(value, default)
+    if not image_url:
+        return default
+    if image_url.startswith(("http://", "https://", "/")):
+        return image_url
+    raise ApiError(400, "场地图片地址必须以 http://、https:// 或 / 开头", 400)
+
+
+def _parse_tags(value: Any) -> tuple[list[str], str]:
+    if value is None or value == "":
+        return [], ""
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = str(value).split(",")
+    tags = []
+    for item in raw_items:
+        tag = clean_text(item)
+        if not tag:
+            continue
+        if len(tag) > 20:
+            raise ApiError(400, "每个场地标签不能超过20个字符", 400)
+        if tag not in tags:
+            tags.append(tag)
+    if len(tags) > 6:
+        raise ApiError(400, "场地标签最多6个", 400)
+    return tags, ",".join(tags)
+
+
+def _normalize_court(row: dict[str, Any]) -> dict[str, Any]:
+    court = dict(row)
+    tags_text = clean_text(court.get("tags"))
+    court["tags"] = [item.strip() for item in tags_text.split(",") if item.strip()]
+    court["image_url"] = clean_text(court.get("image_url"), DEFAULT_COURT_IMAGE_URL) or DEFAULT_COURT_IMAGE_URL
+    court["price_per_hour_cents"] = int(court.get("price_per_hour_cents") or 12000)
+    court["capacity"] = int(court.get("capacity") or 6)
+    return court
+
+
 async def list_courts(
     settings: Settings,
     *,
@@ -51,7 +107,7 @@ async def list_courts(
     status = _parse_status(status_arg, default=1)
     rows = await court_repository.list_courts(settings, status=status, offset=offset, limit=page_size)
     total = await court_repository.count_courts(settings, status=status)
-    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+    return {"items": [_normalize_court(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
 async def list_admin_courts(
@@ -65,7 +121,7 @@ async def list_admin_courts(
     status = _parse_status(status_arg, default=None)
     rows = await court_repository.list_courts(settings, status=status, offset=offset, limit=page_size)
     total = await court_repository.count_courts(settings, status=status)
-    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+    return {"items": [_normalize_court(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
 async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict[str, Any]:
@@ -73,6 +129,7 @@ async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict
     court = await court_repository.get_court_by_id(settings, court_id)
     if court is None:
         raise ApiError(404, "场地不存在", 404)
+    normalized_court = _normalize_court(court)
 
     rules = await get_reservation_rules(settings)
     existing_reservations = await reservation_repository.list_reservations_for_court_date(
@@ -99,7 +156,7 @@ async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict
         start_text = current_dt.strftime("%H:%M")
         end_text = next_dt.strftime("%H:%M")
         status = "available"
-        if court["status"] != 1 or date_out_of_range or current_dt <= now:
+        if normalized_court["status"] != 1 or date_out_of_range or current_dt <= now:
             status = "disabled"
         elif (start_text, end_text) in reserved_slots:
             status = "reserved"
@@ -110,7 +167,7 @@ async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict
         slots.append({"start_time": start_text, "end_time": end_text, "status": status})
         current_dt = next_dt
 
-    return {"court_id": court_id, "court": court, "date": reserve_date.isoformat(), "slots": slots}
+    return {"court_id": court_id, "court": normalized_court, "date": reserve_date.isoformat(), "slots": slots}
 
 
 async def create_court(settings: Settings, body: dict[str, Any]) -> dict[str, Any]:
@@ -118,6 +175,16 @@ async def create_court(settings: Settings, body: dict[str, Any]) -> dict[str, An
     court_name = clean_text(body.get("court_name"))
     description = clean_text(body.get("description"))
     status = _parse_status(body.get("status"), default=1)
+    price_per_hour_cents = _parse_positive_int(
+        body.get("price_per_hour_cents"),
+        "场地价格",
+        12000,
+        min_value=1,
+        max_value=9999999,
+    )
+    image_url = _parse_image_url(body.get("image_url"))
+    tags, tags_text = _parse_tags(body.get("tags"))
+    capacity = _parse_positive_int(body.get("capacity"), "容纳人数", 6, min_value=1, max_value=50)
     if not court_no:
         raise ApiError(400, "场地编号不能为空", 400)
     if not court_name:
@@ -130,11 +197,17 @@ async def create_court(settings: Settings, body: dict[str, Any]) -> dict[str, An
         court_name=court_name,
         description=description,
         status=status if status is not None else 1,
+        price_per_hour_cents=price_per_hour_cents,
+        image_url=image_url,
+        tags=tags_text,
+        capacity=capacity,
     )
     court = await court_repository.get_court_by_id(settings, court_id)
     if court is None:
         raise ApiError(500, "创建场地后读取失败", 500)
-    return court
+    normalized = _normalize_court(court)
+    normalized["tags"] = tags
+    return normalized
 
 
 async def update_court(settings: Settings, court_id: int, body: dict[str, Any]) -> dict[str, Any]:
@@ -145,6 +218,22 @@ async def update_court(settings: Settings, court_id: int, body: dict[str, Any]) 
     court_name = clean_text(body.get("court_name"))
     description = clean_text(body.get("description"))
     status = _parse_status(body.get("status"), default=int(court["status"]))
+    price_per_hour_cents = _parse_positive_int(
+        body.get("price_per_hour_cents"),
+        "场地价格",
+        int(court.get("price_per_hour_cents") or 12000),
+        min_value=1,
+        max_value=9999999,
+    )
+    image_url = _parse_image_url(body.get("image_url"), clean_text(court.get("image_url"), DEFAULT_COURT_IMAGE_URL))
+    _tags, tags_text = _parse_tags(body.get("tags", court.get("tags")))
+    capacity = _parse_positive_int(
+        body.get("capacity"),
+        "容纳人数",
+        int(court.get("capacity") or 6),
+        min_value=1,
+        max_value=50,
+    )
     if not court_no:
         raise ApiError(400, "场地编号不能为空", 400)
     if not court_name:
@@ -163,11 +252,15 @@ async def update_court(settings: Settings, court_id: int, body: dict[str, Any]) 
         court_name=court_name,
         description=description,
         status=status or 0,
+        price_per_hour_cents=price_per_hour_cents,
+        image_url=image_url,
+        tags=tags_text,
+        capacity=capacity,
     )
     updated = await court_repository.get_court_by_id(settings, court_id)
     if updated is None:
         raise ApiError(404, "场地不存在", 404)
-    return updated
+    return _normalize_court(updated)
 
 
 async def update_court_status(settings: Settings, court_id: int, body: dict[str, Any]) -> dict[str, Any]:
@@ -184,4 +277,4 @@ async def update_court_status(settings: Settings, court_id: int, body: dict[str,
     updated = await court_repository.get_court_by_id(settings, court_id)
     if updated is None:
         raise ApiError(404, "场地不存在", 404)
-    return updated
+    return _normalize_court(updated)

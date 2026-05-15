@@ -30,6 +30,10 @@ function canCancel(reservation: Reservation) {
   return new Date(`${reservation.reserve_date}T${reservation.start_time}`) > new Date();
 }
 
+function formatMoney(cents: number | null | undefined) {
+  return `￥${((cents || 0) / 100).toFixed(0)}`;
+}
+
 async function loadReservations() {
   loading.value = true;
   errorMessage.value = "";
@@ -105,6 +109,7 @@ onMounted(loadReservations);
             <th>场地</th>
             <th>日期</th>
             <th>时间</th>
+            <th>应付金额</th>
             <th>状态</th>
             <th>操作</th>
           </tr>
@@ -115,6 +120,7 @@ onMounted(loadReservations);
             <td>{{ reservation.court_name }}</td>
             <td>{{ reservation.reserve_date }}</td>
             <td>{{ reservation.start_time }}-{{ reservation.end_time }}</td>
+            <td>{{ formatMoney(reservation.payable_amount_cents) }}</td>
             <td>
               <span class="state-pill" :class="reservation.status">{{ reservation.status }}</span>
             </td>

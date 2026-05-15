@@ -4,7 +4,10 @@ from config.settings import Settings
 from repositories.database import execute, fetch_all, fetch_one
 
 
-COURT_COLUMNS = "id, court_no, court_name, description, status, created_at, updated_at"
+COURT_COLUMNS = (
+    "id, court_no, court_name, description, status, price_per_hour_cents, image_url, tags, capacity, "
+    "created_at, updated_at"
+)
 
 
 async def list_courts(
@@ -60,14 +63,18 @@ async def create_court(
     court_name: str,
     description: str,
     status: int,
+    price_per_hour_cents: int,
+    image_url: str,
+    tags: str,
+    capacity: int,
 ) -> int:
     return await execute(
         settings,
         """
-        INSERT INTO court (court_no, court_name, description, status)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO court (court_no, court_name, description, status, price_per_hour_cents, image_url, tags, capacity)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (court_no, court_name, description, status),
+        (court_no, court_name, description, status, price_per_hour_cents, image_url, tags, capacity),
     )
 
 
@@ -79,15 +86,26 @@ async def update_court(
     court_name: str,
     description: str,
     status: int,
+    price_per_hour_cents: int,
+    image_url: str,
+    tags: str,
+    capacity: int,
 ) -> None:
     await execute(
         settings,
         """
         UPDATE court
-        SET court_no = %s, court_name = %s, description = %s, status = %s
+        SET court_no = %s,
+            court_name = %s,
+            description = %s,
+            status = %s,
+            price_per_hour_cents = %s,
+            image_url = %s,
+            tags = %s,
+            capacity = %s
         WHERE id = %s
         """,
-        (court_no, court_name, description, status, court_id),
+        (court_no, court_name, description, status, price_per_hour_cents, image_url, tags, capacity, court_id),
     )
 
 
