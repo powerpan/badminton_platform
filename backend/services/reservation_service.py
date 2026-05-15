@@ -132,14 +132,6 @@ async def create_reservation(
     if court["status"] != 1:
         raise ApiError(400, "场地已停用，不能预约", 400)
 
-    daily_count = await reservation_repository.count_user_daily_reservations(
-        settings,
-        user_id=current_user["id"],
-        reserve_date=reserve_date,
-    )
-    if daily_count >= rules.daily_reservation_limit:
-        raise ApiError(400, "当天预约次数已达上限", 400)
-
     start_text = start_time.strftime("%H:%M")
     end_text = end_time.strftime("%H:%M")
     lock_key = reservation_lock_key(court_id, reserve_date.isoformat(), start_text, end_text)
@@ -149,17 +141,7 @@ async def create_reservation(
         raise ApiError(409, "该时间段正在预约或已被占用", 409)
 
     try:
-        conflict = await reservation_repository.find_conflict(
-            settings,
-            court_id=court_id,
-            reserve_date=reserve_date,
-            start_time=start_time,
-            end_time=end_time,
-        )
-        if conflict:
-            raise ApiError(409, "该时间段已被预约", 409)
-
-        reservation_id = await reservation_repository.create_reservation(
+        reservation_id, failure_reason = await reservation_repository.create_confirmed_reservation_atomic(
             settings,
             reservation_no=_reservation_no(),
             user_id=current_user["id"],
@@ -168,9 +150,24 @@ async def create_reservation(
             start_time=start_time,
             end_time=end_time,
             time_slot=f"{start_text}-{end_text}",
-            status="confirmed",
             remark=remark,
+            daily_limit=rules.daily_reservation_limit,
         )
+        if failure_reason == "conflict":
+            raise ApiError(409, "该时间段已被预约", 409)
+        if failure_reason == "daily_limit":
+            raise ApiError(400, "当天预约次数已达上限", 400)
+        if failure_reason == "court_not_found":
+            raise ApiError(404, "场地不存在", 404)
+        if failure_reason == "court_disabled":
+            raise ApiError(400, "场地已停用，不能预约", 400)
+        if failure_reason == "user_not_found":
+            raise ApiError(401, "登录用户不存在，请重新登录", 401)
+        if failure_reason == "user_disabled":
+            raise ApiError(403, "账号已被禁用", 403)
+        if reservation_id is None:
+            raise ApiError(409, "预约提交失败，请重试", 409)
+
         detail = await reservation_repository.get_reservation_detail(settings, reservation_id)
         if detail is None:
             raise ApiError(500, "预约成功但读取记录失败", 500)

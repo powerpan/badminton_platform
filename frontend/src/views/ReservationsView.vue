@@ -54,6 +54,7 @@ async function switchStatus(status: "" | ReservationStatus) {
 }
 
 async function cancel(id: number) {
+  if (!window.confirm("确认取消该预约？")) return;
   actionId.value = id;
   message.value = "";
   errorMessage.value = "";

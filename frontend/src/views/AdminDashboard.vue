@@ -146,6 +146,10 @@ function setError(error: unknown, fallback: string) {
   message.value = "";
 }
 
+function confirmAction(messageText: string) {
+  return window.confirm(messageText);
+}
+
 function barWidth(value: number, max: number) {
   if (!max) return "0%";
   return `${Math.max(6, Math.round((value / max) * 100))}%`;
@@ -243,6 +247,8 @@ async function submitUser() {
 }
 
 async function toggleUserStatus(user: UserInfo) {
+  const nextStatusLabel = user.status === 1 ? "禁用" : "启用";
+  if (!confirmAction(`确认${nextStatusLabel}用户 ${user.username}？`)) return;
   loading.value = true;
   try {
     await adminUpdateUserStatus(user.id, user.status === 1 ? 0 : 1);
@@ -257,6 +263,10 @@ async function toggleUserStatus(user: UserInfo) {
 
 async function changeUserRole(user: UserInfo, event: Event) {
   const role = (event.target as HTMLSelectElement).value;
+  if (role !== user.role && !confirmAction(`确认将用户 ${user.username} 的角色修改为 ${role}？`)) {
+    (event.target as HTMLSelectElement).value = user.role;
+    return;
+  }
   loading.value = true;
   try {
     await adminUpdateUserRole(user.id, role);
@@ -314,6 +324,9 @@ function resetCourtForm() {
 }
 
 async function submitCourt() {
+  if (editingCourtId.value && courtForm.value.status === 0 && !confirmAction("确认停用该场地？如存在未来预约，后端会拒绝停用。")) {
+    return;
+  }
   loading.value = true;
   try {
     if (editingCourtId.value) {
@@ -335,6 +348,8 @@ async function submitCourt() {
 }
 
 async function toggleCourtStatus(court: Court) {
+  const nextStatusLabel = court.status === 1 ? "停用" : "启用";
+  if (!confirmAction(`确认${nextStatusLabel}场地 ${court.court_no} ${court.court_name}？`)) return;
   loading.value = true;
   try {
     await adminUpdateCourtStatus(court.id, court.status === 1 ? 0 : 1);
@@ -375,6 +390,7 @@ async function refreshReservations(reset = false) {
 }
 
 async function cancelAdminReservation(reservation: Reservation) {
+  if (!confirmAction(`确认取消预约 ${reservation.reservation_no}？`)) return;
   loading.value = true;
   try {
     await adminCancelReservation(reservation.id);
@@ -444,6 +460,8 @@ async function submitAnnouncement() {
 }
 
 async function toggleAnnouncementStatus(announcement: Announcement) {
+  const nextStatusLabel = announcement.status === 1 ? "隐藏" : "显示";
+  if (!confirmAction(`确认${nextStatusLabel}公告《${announcement.title}》？`)) return;
   loading.value = true;
   try {
     await adminUpdateAnnouncementStatus(announcement.id, announcement.status === 1 ? 0 : 1);
@@ -478,6 +496,7 @@ async function loadOperationLogs() {
 async function resetUserPassword(user: UserInfo) {
   const password = window.prompt(`重置 ${user.username} 的密码，至少6位`);
   if (!password) return;
+  if (!confirmAction(`确认重置用户 ${user.username} 的密码？该用户旧登录态会失效。`)) return;
   loading.value = true;
   try {
     await adminResetUserPassword(user.id, password);
@@ -507,6 +526,7 @@ async function searchOperationLogs() {
 }
 
 async function saveConfig(config: ConfigItem) {
+  if (!confirmAction(`确认保存规则 ${config.config_key} = ${config.config_value}？`)) return;
   loading.value = true;
   try {
     await adminUpdateConfig(config.config_key, config.config_value);

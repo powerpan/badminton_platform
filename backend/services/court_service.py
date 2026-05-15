@@ -152,6 +152,10 @@ async def update_court(settings: Settings, court_id: int, body: dict[str, Any]) 
     existing = await court_repository.get_court_by_no(settings, court_no)
     if existing and existing["id"] != court_id:
         raise ApiError(409, "场地编号已存在", 409)
+    if status == 0:
+        future_count = await reservation_repository.count_future_active_reservations_by_court(settings, court_id=court_id)
+        if future_count > 0:
+            raise ApiError(409, f"该场地还有 {future_count} 条未来预约，请先取消预约后再停用", 409)
     await court_repository.update_court(
         settings,
         court_id=court_id,
@@ -172,6 +176,10 @@ async def update_court_status(settings: Settings, court_id: int, body: dict[str,
         raise ApiError(400, "状态不能为空", 400)
     if await court_repository.get_court_by_id(settings, court_id) is None:
         raise ApiError(404, "场地不存在", 404)
+    if status == 0:
+        future_count = await reservation_repository.count_future_active_reservations_by_court(settings, court_id=court_id)
+        if future_count > 0:
+            raise ApiError(409, f"该场地还有 {future_count} 条未来预约，请先取消预约后再停用", 409)
     await court_repository.update_court_status(settings, court_id, status)
     updated = await court_repository.get_court_by_id(settings, court_id)
     if updated is None:

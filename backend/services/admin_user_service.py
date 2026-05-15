@@ -2,7 +2,7 @@ import asyncio
 from typing import Any
 
 from config.settings import Settings
-from repositories import user_repository
+from repositories import reservation_repository, user_repository
 from services.auth_service import public_user, revoke_user_refresh_tokens
 from utils.passwords import hash_password
 from utils.query import clean_text
@@ -107,6 +107,10 @@ async def update_user_status(
     user = await user_repository.get_user_by_id(settings, user_id)
     if user is None:
         raise ApiError(404, "用户不存在", 404)
+    if status == 0:
+        future_count = await reservation_repository.count_future_active_reservations_by_user(settings, user_id=user_id)
+        if future_count > 0:
+            raise ApiError(409, f"该用户还有 {future_count} 条未来预约，请先取消预约后再禁用", 409)
     await user_repository.update_user_status(settings, user_id, status if status is not None else 1)
     updated = await user_repository.get_user_by_id(settings, user_id)
     if updated is None:
