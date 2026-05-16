@@ -27,6 +27,14 @@ export interface Reservation {
   member_level_snapshot: string;
   discount_rate: number;
   points_awarded: number;
+  order_id?: number | null;
+  order_no?: string | null;
+  order_status?: "pending" | "paid" | "canceled" | "expired" | null;
+  order_amount_cents?: number | null;
+  order_pay_method?: string | null;
+  order_expires_at?: string | null;
+  order_paid_at?: string | null;
+  order_canceled_at?: string | null;
   created_at: string;
   updated_at?: string;
   canceled_at?: string | null;
@@ -48,4 +56,8 @@ export function getMyReservations(params: { status?: string; page?: number; page
 
 export function cancelReservation(reservationId: number) {
   return http.put<unknown, ApiResponse<Reservation>>(`/reservations/${reservationId}/cancel`);
+}
+
+export function payReservationOrder(orderId: number) {
+  return http.put<unknown, ApiResponse<Reservation>>(`/reservation-orders/${orderId}/pay`);
 }

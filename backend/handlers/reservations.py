@@ -42,3 +42,15 @@ class CancelReservationHandler(BaseHandler):
             reservation_id=int(reservation_id),
         )
         self.write_json(success(reservation))
+
+
+class ReservationOrderPayHandler(BaseHandler):
+    async def put(self, order_id: str) -> None:
+        settings = self.application.settings["app_settings"]
+        current_user = await self.require_current_user()
+        reservation = await reservation_service.pay_reservation_order(
+            settings,
+            current_user=current_user,
+            order_id=int(order_id),
+        )
+        self.write_json(success(reservation, "支付成功，预约已确认"))

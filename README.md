@@ -8,7 +8,7 @@
 - 缓存：Redis
 - 认证：JWT
 
-当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、场地预约闭环、站内通知、公告详情、帮助中心、活动赛事、球友圈、商城库存与余额支付、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以预约场地、查看通知和公告详情、报名活动、发布球友圈动态、使用会员余额购买商品并取消退款；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、活动、球友圈动态、商城商品和订单、预约规则配置、运营统计和操作日志。
+当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、场地预约待支付订单闭环、站内通知、公告详情、帮助中心、活动赛事、球友圈、商城库存与余额支付、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以预约场地、支付待支付预约、查看通知和公告详情、报名活动、发布球友圈动态、使用会员余额购买商品并取消退款；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、活动、球友圈动态、商城商品和订单、预约规则配置、运营统计和操作日志。
 
 ## 当前实现状态
 
@@ -24,8 +24,11 @@
 - 预约创建、Redis 临时锁、MySQL 时间重叠冲突校验。
 - 预约写入使用 MySQL 短事务再次锁定用户、会员账户、场地和有效预约记录，降低高并发下的重复预约风险。
 - 预约创建时写入价格、时长、会员等级、折扣、积分和金额快照，历史预约不受后续场地改价或会员等级变化影响。
-- 预约成功扣减会员余额并发放积分；用户或管理员取消预约会退回余额并扣回本次积分。
-- 我的预约列表和未开始预约取消。
+- 预约创建先生成 `pending` 预约和 `reservation_order` 待支付订单，不立即扣减会员余额。
+- 预约余额支付在单个 MySQL 事务内锁定订单、预约和会员账户，扣余额、发积分、订单改为已支付、预约改为已确认同成同败。
+- 待支付订单超时会自动标记为 `expired` 并释放场地占用。
+- 已支付预约取消会退回余额并扣回本次积分；待支付预约取消只释放场地占用。
+- 我的预约列表支持待支付预约继续支付和未开始预约取消。
 - 管理员用户新增、启用/禁用、角色修改。
 - 管理员会员账户调整，支持等级、有效期、余额增减、积分增减和调整原因。
 - 管理员场地新增、编辑、启停。
@@ -132,6 +135,7 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 - 会员账户流水表
 - 场地表
 - 预约表
+- 预约订单表
 - 活动表和活动报名表
 - 球友圈动态表
 - 商城商品表、订单表和订单明细表
@@ -151,9 +155,10 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase2_member_accounts.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase3_notifications.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase4_marketplace.sql
+mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase5_reservation_orders.sql
 ```
 
-升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水、预约会员快照、通知、活动、球友圈、商城商品、商城订单和商城订单明细。升级脚本按表或字段存在性判断，可重复执行。
+升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水、预约会员快照、通知、活动、球友圈、商城商品、商城订单、商城订单明细和预约待支付订单表。升级脚本按表或字段存在性判断，可重复执行。
 
 ## 认证接口
 
@@ -182,9 +187,10 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | PUT | `/api/notifications/read-all` | 标记全部通知已读 |
 | GET | `/api/courts` | 查询启用场地列表 |
 | GET | `/api/courts/{court_id}/slots?date=YYYY-MM-DD` | 查询场地时间段状态 |
-| POST | `/api/reservations` | 创建预约 |
+| POST | `/api/reservations` | 创建待支付预约订单 |
 | GET | `/api/reservations/my` | 查询我的预约 |
 | PUT | `/api/reservations/{id}/cancel` | 取消我的预约 |
+| PUT | `/api/reservation-orders/{id}/pay` | 使用会员余额支付预约订单 |
 | GET | `/api/events` | 查询显示中的活动 |
 | GET | `/api/events/{id}` | 查询活动详情 |
 | POST | `/api/events/{id}/register` | 报名活动 |
@@ -299,9 +305,10 @@ http://localhost:8000
 
 ## 下一步开发顺序
 
-第四阶段已补齐活动赛事、球友圈和商城库存与余额支付。下一阶段建议优先做：
+当前已补齐活动赛事、球友圈、商城库存与余额支付，以及预约待支付订单。下一阶段建议优先做：
 
-1. 自动化接口测试和关键业务回归脚本。
-2. Docker 部署、生产环境变量和初始化说明。
-3. 商城后续扩展：SKU、库存流水、真实第三方支付、售后申请。
-4. 球友圈后续扩展：评论、点赞、图片上传和内容审核。
+1. 继续观察预约待支付订单在高并发和超时场景下的业务表现。
+2. 自动化接口测试和关键业务回归脚本。
+3. Docker 部署、生产环境变量和初始化说明。
+4. 商城后续扩展：SKU、库存流水、真实第三方支付、售后申请。
+5. 球友圈后续扩展：评论、点赞、图片上传和内容审核。

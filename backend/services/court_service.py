@@ -126,6 +126,8 @@ async def list_admin_courts(
 
 async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict[str, Any]:
     reserve_date = _parse_date(date_arg)
+    await reservation_repository.expire_pending_reservation_orders(settings)
+    await reservation_repository.complete_finished_reservations(settings)
     court = await court_repository.get_court_by_id(settings, court_id)
     if court is None:
         raise ApiError(404, "场地不存在", 404)

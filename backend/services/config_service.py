@@ -16,6 +16,7 @@ DEFAULT_CONFIGS = {
     "daily_reservation_limit": "3",
     "max_reservation_hours": "2",
     "reservation_lock_ttl_seconds": "300",
+    "reservation_payment_timeout_minutes": "15",
 }
 
 INTEGER_KEYS = {
@@ -24,6 +25,7 @@ INTEGER_KEYS = {
     "daily_reservation_limit",
     "max_reservation_hours",
     "reservation_lock_ttl_seconds",
+    "reservation_payment_timeout_minutes",
 }
 
 TIME_KEYS = {"business_start_time", "business_end_time"}
@@ -38,6 +40,7 @@ class ReservationRules:
     daily_reservation_limit: int
     max_reservation_hours: int
     reservation_lock_ttl_seconds: int
+    reservation_payment_timeout_minutes: int
 
 
 def parse_time_value(value: str) -> time:
@@ -87,6 +90,7 @@ async def get_reservation_rules(settings: Settings) -> ReservationRules:
         daily_reservation_limit=int(config_map["daily_reservation_limit"]),
         max_reservation_hours=int(config_map["max_reservation_hours"]),
         reservation_lock_ttl_seconds=int(config_map["reservation_lock_ttl_seconds"]),
+        reservation_payment_timeout_minutes=int(config_map["reservation_payment_timeout_minutes"]),
     )
 
 

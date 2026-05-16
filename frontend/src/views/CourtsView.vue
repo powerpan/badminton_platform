@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { ElMessageBox } from "element-plus";
 
 import { getCourtSlots, getCourts, type Court, type SlotItem } from "../api/court";
-import { createReservation } from "../api/reservation";
+import { createReservation, payReservationOrder } from "../api/reservation";
 import { useAuthStore } from "../stores/auth";
 
 const DEFAULT_COURT_IMAGE_URL = "/courts/default-court.png";
@@ -107,6 +108,10 @@ function formatMoney(cents: number | null | undefined) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function formatOrderExpiry(value: string | null | undefined) {
+  return value || "系统设定时间";
 }
 
 function discountText(rate: number) {
@@ -219,20 +224,43 @@ async function submitReservation() {
   errorMessage.value = "";
   message.value = "";
   try {
-    await createReservation({
+    const response = await createReservation({
       court_id: selectedCourtId.value,
       reserve_date: selectedDate.value,
       start_time: selectedSlot.value.start_time,
       end_time: selectedSlot.value.end_time,
       remark: remark.value,
     });
+    const reservation = response.data;
     remark.value = "";
-    await authStore.fetchProfile();
     await loadSlots();
+    if (reservation.order_id && reservation.status === "pending") {
+      message.value = "待支付订单已创建，请在超时前完成余额支付";
+      try {
+        await ElMessageBox.confirm(
+          `待支付订单 ${reservation.order_no || ""} 已创建，需支付 ${formatMoney(reservation.order_amount_cents ?? reservation.payable_amount_cents)}。请在 ${formatOrderExpiry(reservation.order_expires_at)} 前完成支付，否则场地占用会自动释放。`,
+          "余额支付确认",
+          {
+            confirmButtonText: "立即支付",
+            cancelButtonText: "稍后支付",
+            type: "warning",
+          },
+        );
+      } catch {
+        message.value = "待支付订单已创建，可在“我的预约”中继续支付或取消";
+        return;
+      }
+      const paid = await payReservationOrder(reservation.order_id);
+      await authStore.fetchProfile();
+      await loadSlots();
+      message.value = `支付成功，预约 ${paid.data.reservation_no} 已确认`;
+      return;
+    }
+    await authStore.fetchProfile();
     message.value = "预约成功，已加入我的预约";
   } catch (error) {
     const text = error instanceof Error ? error.message : "预约提交失败";
-    errorMessage.value = text.includes("预约") || text.includes("占用")
+    errorMessage.value = text.includes("时间段") || text.includes("占用") || text.includes("已被预约")
       ? "该时间段已被其他用户抢先预约，请重新选择"
       : text;
     await loadSlots();

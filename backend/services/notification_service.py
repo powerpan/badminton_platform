@@ -249,13 +249,15 @@ async def notify_reservation_canceled(
     by_admin: bool,
     operator_id: int | None = None,
 ) -> None:
-    amount = int(reservation.get("payable_amount_cents") or 0) / 100
+    refund_cents = int(reservation.get("refund_cents") or 0)
+    amount = refund_cents / 100
     title = "管理员已取消预约" if by_admin else "预约已取消"
+    refund_text = f"已按规则退回 {amount:.2f} 元。" if refund_cents > 0 else "该预约尚未支付，无需退款。"
     content = (
         f"预约 {reservation.get('reservation_no')} 已取消，"
         f"场地为 {reservation.get('court_name')}，"
         f"时间为 {reservation.get('reserve_date')} {reservation.get('start_time')}-{reservation.get('end_time')}，"
-        f"已按规则退回 {amount:.2f} 元。"
+        f"{refund_text}"
     )
     await safe_create_user_notification(
         settings,

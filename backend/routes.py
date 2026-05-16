@@ -56,7 +56,12 @@ from handlers.notifications import (
     NotificationUnreadCountHandler,
     NotificationsHandler,
 )
-from handlers.reservations import CancelReservationHandler, MyReservationsHandler, ReservationsHandler
+from handlers.reservations import (
+    CancelReservationHandler,
+    MyReservationsHandler,
+    ReservationOrderPayHandler,
+    ReservationsHandler,
+)
 from handlers.shop import (
     MyShopOrdersHandler,
     ShopOrderCancelHandler,
@@ -103,6 +108,7 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/reservations", ReservationsHandler),
         (r"/api/reservations/my", MyReservationsHandler),
         (r"/api/reservations/([0-9]+)/cancel", CancelReservationHandler),
+        (r"/api/reservation-orders/([0-9]+)/pay", ReservationOrderPayHandler),
         (r"/api/admin/users", AdminUsersHandler),
         (r"/api/admin/users/([0-9]+)/status", AdminUserStatusHandler),
         (r"/api/admin/users/([0-9]+)/role", AdminUserRoleHandler),

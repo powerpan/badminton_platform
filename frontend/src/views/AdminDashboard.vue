@@ -180,6 +180,17 @@ function statusTagType(status: string) {
   return map[status] || "info";
 }
 
+function reservationStatusText(status: string) {
+  const map: Record<string, string> = {
+    pending: "待支付",
+    confirmed: "已确认",
+    completed: "已完成",
+    canceled: "已取消",
+    expired: "已过期",
+  };
+  return map[status] || status;
+}
+
 async function confirmAction(message: string, title = "确认操作") {
   try {
     await ElMessageBox.confirm(message, title, {
@@ -687,7 +698,10 @@ async function refreshReservations(reset = false) {
 }
 
 async function cancelAdminReservation(reservation: Reservation) {
-  if (!(await confirmAction(`确认取消预约 ${reservation.reservation_no}？`))) return;
+  const tip = reservation.status === "pending"
+    ? `确认取消待支付预约 ${reservation.reservation_no}？取消后会释放场地占用。`
+    : `确认取消预约 ${reservation.reservation_no}？`;
+  if (!(await confirmAction(tip))) return;
   loading.value = true;
   try {
     await adminCancelReservation(reservation.id);
@@ -1407,10 +1421,11 @@ onMounted(loadActiveTab);
       <el-form inline class="element-filter">
         <el-form-item label="状态">
           <el-select v-model="reservationFilters.status" clearable class="short-select" @change="refreshReservations(true)">
-            <el-option label="confirmed" value="confirmed" />
-            <el-option label="canceled" value="canceled" />
-            <el-option label="pending" value="pending" />
-            <el-option label="completed" value="completed" />
+            <el-option label="已确认" value="confirmed" />
+            <el-option label="已取消" value="canceled" />
+            <el-option label="待支付" value="pending" />
+            <el-option label="已完成" value="completed" />
+            <el-option label="已过期" value="expired" />
           </el-select>
         </el-form-item>
         <el-form-item label="用户"><el-input v-model="reservationFilters.username" placeholder="用户名或昵称" @keyup.enter="refreshReservations(true)" /></el-form-item>
@@ -1432,8 +1447,9 @@ onMounted(loadActiveTab);
         <el-table-column label="时间" min-width="130"><template #default="{ row }">{{ row.start_time }}-{{ row.end_time }}</template></el-table-column>
         <el-table-column label="会员" min-width="130"><template #default="{ row }">{{ row.member_level_snapshot }} / {{ discountText(row.discount_rate) }}</template></el-table-column>
         <el-table-column label="应付金额" min-width="120"><template #default="{ row }">{{ formatMoney(row.payable_amount_cents) }}</template></el-table-column>
-        <el-table-column label="状态" min-width="100"><template #default="{ row }"><el-tag :type="statusTagType(row.status)" effect="plain">{{ row.status }}</el-tag></template></el-table-column>
-        <el-table-column label="操作" fixed="right" width="100"><template #default="{ row }"><el-button link type="danger" :disabled="row.status !== 'confirmed'" @click="cancelAdminReservation(row)">取消</el-button></template></el-table-column>
+        <el-table-column label="状态" min-width="100"><template #default="{ row }"><el-tag :type="statusTagType(row.status)" effect="plain">{{ reservationStatusText(row.status) }}</el-tag></template></el-table-column>
+        <el-table-column label="支付截止" min-width="160"><template #default="{ row }">{{ row.status === "pending" ? row.order_expires_at || "-" : "-" }}</template></el-table-column>
+        <el-table-column label="操作" fixed="right" width="100"><template #default="{ row }"><el-button link type="danger" :disabled="!['pending', 'confirmed'].includes(row.status)" @click="cancelAdminReservation(row)">取消</el-button></template></el-table-column>
       </el-table>
       <el-pagination class="element-pagination" :current-page="reservationPage.page" :page-size="reservationPage.page_size" :total="reservationPage.total" layout="prev, pager, next, total" @current-change="changeReservationPage" />
     </section>

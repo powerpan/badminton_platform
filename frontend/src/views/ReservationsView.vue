@@ -5,6 +5,7 @@ import { ElMessageBox } from "element-plus";
 import {
   cancelReservation,
   getMyReservations,
+  payReservationOrder,
   type Reservation,
   type ReservationStatus,
 } from "../api/reservation";
@@ -14,8 +15,10 @@ const authStore = useAuthStore();
 
 const filters: Array<{ label: string; value: "" | ReservationStatus }> = [
   { label: "全部", value: "" },
+  { label: "待支付", value: "pending" },
   { label: "已确认", value: "confirmed" },
   { label: "已取消", value: "canceled" },
+  { label: "已过期", value: "expired" },
   { label: "已完成", value: "completed" },
 ];
 
@@ -28,10 +31,14 @@ const message = ref("");
 const errorMessage = ref("");
 
 function canCancel(reservation: Reservation) {
-  if (reservation.status !== "confirmed") {
+  if (!["pending", "confirmed"].includes(reservation.status)) {
     return false;
   }
   return new Date(`${reservation.reserve_date}T${reservation.start_time}`) > new Date();
+}
+
+function canPay(reservation: Reservation) {
+  return reservation.status === "pending" && reservation.order_status === "pending" && Boolean(reservation.order_id);
 }
 
 function formatMoney(cents: number | null | undefined) {
@@ -50,6 +57,21 @@ function statusType(status: ReservationStatus) {
     completed: "primary",
   };
   return map[status];
+}
+
+function statusText(status: ReservationStatus) {
+  const map: Record<ReservationStatus, string> = {
+    pending: "待支付",
+    confirmed: "已确认",
+    canceled: "已取消",
+    expired: "已过期",
+    completed: "已完成",
+  };
+  return map[status];
+}
+
+function orderExpiryText(reservation: Reservation) {
+  return reservation.order_expires_at || "-";
 }
 
 async function loadReservations() {
@@ -79,9 +101,43 @@ async function switchStatusValue(value: string | number | boolean) {
   await switchStatus(String(value) as "" | ReservationStatus);
 }
 
-async function cancel(id: number) {
+async function pay(reservation: Reservation) {
+  if (!reservation.order_id) return;
   try {
-    await ElMessageBox.confirm("确认取消该预约？取消后会退回余额并扣回对应积分。", "取消预约", {
+    await ElMessageBox.confirm(
+      `确认使用会员余额支付 ${formatMoney(reservation.order_amount_cents ?? reservation.payable_amount_cents)}？支付后预约将立即确认。`,
+      "支付待支付预约",
+      {
+        confirmButtonText: "确认支付",
+        cancelButtonText: "取消",
+        type: "warning",
+      },
+    );
+  } catch {
+    return;
+  }
+  actionId.value = reservation.id;
+  message.value = "";
+  errorMessage.value = "";
+  try {
+    await payReservationOrder(reservation.order_id);
+    await authStore.fetchProfile();
+    message.value = "支付成功，预约已确认";
+    await loadReservations();
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "支付失败";
+    await loadReservations();
+  } finally {
+    actionId.value = null;
+  }
+}
+
+async function cancel(reservation: Reservation) {
+  const tip = reservation.status === "pending"
+    ? "确认取消该待支付预约？取消后会释放场地占用，不涉及退款。"
+    : "确认取消该预约？取消后会退回余额并扣回对应积分。";
+  try {
+    await ElMessageBox.confirm(tip, "取消预约", {
       confirmButtonText: "确认取消",
       cancelButtonText: "再看看",
       type: "warning",
@@ -89,11 +145,11 @@ async function cancel(id: number) {
   } catch {
     return;
   }
-  actionId.value = id;
+  actionId.value = reservation.id;
   message.value = "";
   errorMessage.value = "";
   try {
-    await cancelReservation(id);
+    await cancelReservation(reservation.id);
     await authStore.fetchProfile();
     message.value = "预约已取消";
     await loadReservations();
@@ -111,7 +167,7 @@ onMounted(loadReservations);
   <section class="page-header">
     <p class="eyebrow">用户端</p>
     <h1>我的预约</h1>
-    <p>查看自己的预约记录，并取消尚未开始的已确认预约。</p>
+    <p>查看自己的预约记录，处理待支付订单，并取消尚未开始的预约。</p>
   </section>
 
   <el-card shadow="never" class="panel-card">
@@ -148,17 +204,30 @@ onMounted(loadReservations);
       </el-table-column>
       <el-table-column label="状态" min-width="100">
         <template #default="{ row }">
-          <el-tag :type="statusType(row.status)" effect="plain">{{ row.status }}</el-tag>
+          <el-tag :type="statusType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" fixed="right" width="110">
+      <el-table-column label="支付截止" min-width="160">
+        <template #default="{ row }">{{ row.status === "pending" ? orderExpiryText(row) : "-" }}</template>
+      </el-table-column>
+      <el-table-column label="操作" fixed="right" width="150">
         <template #default="{ row }">
+          <el-button
+            v-if="canPay(row)"
+            link
+            type="primary"
+            :disabled="actionId === row.id"
+            :loading="actionId === row.id"
+            @click="pay(row)"
+          >
+            支付
+          </el-button>
           <el-button
             link
             type="danger"
             :disabled="!canCancel(row) || actionId === row.id"
             :loading="actionId === row.id"
-            @click="cancel(row.id)"
+            @click="cancel(row)"
           >
             取消
           </el-button>
