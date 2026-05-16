@@ -2,16 +2,28 @@ from handlers.admin import (
     AdminAnnouncementDetailHandler,
     AdminAnnouncementStatusHandler,
     AdminAnnouncementsHandler,
+    AdminCommunityPostHideHandler,
+    AdminCommunityPostsHandler,
     AdminConfigDetailHandler,
     AdminConfigsHandler,
     AdminCourtDetailHandler,
     AdminCourtStatusHandler,
     AdminCourtsHandler,
+    AdminEventDetailHandler,
+    AdminEventStatusHandler,
+    AdminEventsHandler,
     AdminReservationCancelHandler,
     AdminReservationDetailHandler,
     AdminReservationsHandler,
     AdminOperationLogsHandler,
     AdminNotificationBroadcastHandler,
+    AdminShopOrderCancelHandler,
+    AdminShopOrderCompleteHandler,
+    AdminShopOrderDetailHandler,
+    AdminShopOrdersHandler,
+    AdminShopProductDetailHandler,
+    AdminShopProductStatusHandler,
+    AdminShopProductsHandler,
     AdminStatisticsCourtsHandler,
     AdminStatisticsOverviewHandler,
     AdminStatisticsTimeSlotsHandler,
@@ -34,7 +46,9 @@ from handlers.auth import (
     RefreshHandler,
     RegisterHandler,
 )
+from handlers.community import CommunityPostHideHandler, CommunityPostsHandler
 from handlers.courts import CourtsHandler, CourtSlotsHandler
+from handlers.events import EventCancelRegistrationHandler, EventDetailHandler, EventRegisterHandler, EventsHandler
 from handlers.health import HealthHandler
 from handlers.notifications import (
     NotificationReadAllHandler,
@@ -43,6 +57,14 @@ from handlers.notifications import (
     NotificationsHandler,
 )
 from handlers.reservations import CancelReservationHandler, MyReservationsHandler, ReservationsHandler
+from handlers.shop import (
+    MyShopOrdersHandler,
+    ShopOrderCancelHandler,
+    ShopOrderDetailHandler,
+    ShopOrdersHandler,
+    ShopProductDetailHandler,
+    ShopProductsHandler,
+)
 
 
 def build_routes() -> list[tuple[str, object]]:
@@ -64,6 +86,18 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/notifications/unread-count", NotificationUnreadCountHandler),
         (r"/api/notifications/read-all", NotificationReadAllHandler),
         (r"/api/notifications/([0-9]+)/read", NotificationReadHandler),
+        (r"/api/events", EventsHandler),
+        (r"/api/events/([0-9]+)", EventDetailHandler),
+        (r"/api/events/([0-9]+)/register", EventRegisterHandler),
+        (r"/api/events/([0-9]+)/cancel-registration", EventCancelRegistrationHandler),
+        (r"/api/community/posts", CommunityPostsHandler),
+        (r"/api/community/posts/([0-9]+)/hide", CommunityPostHideHandler),
+        (r"/api/shop/products", ShopProductsHandler),
+        (r"/api/shop/products/([0-9]+)", ShopProductDetailHandler),
+        (r"/api/shop/orders", ShopOrdersHandler),
+        (r"/api/shop/orders/my", MyShopOrdersHandler),
+        (r"/api/shop/orders/([0-9]+)", ShopOrderDetailHandler),
+        (r"/api/shop/orders/([0-9]+)/cancel", ShopOrderCancelHandler),
         (r"/api/courts", CourtsHandler),
         (r"/api/courts/([0-9]+)/slots", CourtSlotsHandler),
         (r"/api/reservations", ReservationsHandler),
@@ -89,6 +123,18 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/admin/announcements/([0-9]+)/status", AdminAnnouncementStatusHandler),
         (r"/api/admin/announcements/([0-9]+)", AdminAnnouncementDetailHandler),
         (r"/api/admin/notifications/broadcast", AdminNotificationBroadcastHandler),
+        (r"/api/admin/events", AdminEventsHandler),
+        (r"/api/admin/events/([0-9]+)/status", AdminEventStatusHandler),
+        (r"/api/admin/events/([0-9]+)", AdminEventDetailHandler),
+        (r"/api/admin/community/posts", AdminCommunityPostsHandler),
+        (r"/api/admin/community/posts/([0-9]+)/hide", AdminCommunityPostHideHandler),
+        (r"/api/admin/shop/products", AdminShopProductsHandler),
+        (r"/api/admin/shop/products/([0-9]+)/status", AdminShopProductStatusHandler),
+        (r"/api/admin/shop/products/([0-9]+)", AdminShopProductDetailHandler),
+        (r"/api/admin/shop/orders", AdminShopOrdersHandler),
+        (r"/api/admin/shop/orders/([0-9]+)/complete", AdminShopOrderCompleteHandler),
+        (r"/api/admin/shop/orders/([0-9]+)/cancel", AdminShopOrderCancelHandler),
+        (r"/api/admin/shop/orders/([0-9]+)", AdminShopOrderDetailHandler),
         (r"/api/admin/configs", AdminConfigsHandler),
         (r"/api/admin/configs/([A-Za-z0-9_]+)", AdminConfigDetailHandler),
     ]

@@ -2,11 +2,14 @@ from handlers.base import BaseHandler
 from services import (
     admin_user_service,
     announcement_service,
+    community_service,
     config_service,
     court_service,
+    event_service,
     notification_service,
     operation_log_service,
     reservation_service,
+    shop_service,
     statistics_service,
 )
 from utils.query import pagination
@@ -403,6 +406,239 @@ class AdminNotificationBroadcastHandler(BaseHandler):
             detail={"sent_count": data["sent_count"]},
         )
         self.write_json(success(data, "通知已发送"))
+
+
+class AdminEventsHandler(BaseHandler):
+    async def get(self) -> None:
+        await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        page, page_size, offset = pagination(self)
+        data = await event_service.list_admin_events(
+            settings,
+            status_arg=self.get_argument("status", None),
+            page=page,
+            page_size=page_size,
+            offset=offset,
+        )
+        self.write_json(success(data))
+
+    async def post(self) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        event = await event_service.create_event(
+            settings,
+            current_user=current_user,
+            body=self.get_json_body(),
+        )
+        await _record_admin_log(
+            self,
+            current_user,
+            module="event",
+            action="create",
+            target_type="event",
+            target_id=event["id"],
+            detail={"title": event["title"], "status": event["status"]},
+        )
+        self.write_json(success(event))
+
+
+class AdminEventDetailHandler(BaseHandler):
+    async def put(self, event_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        event = await event_service.update_event(settings, int(event_id), self.get_json_body())
+        await _record_admin_log(
+            self,
+            current_user,
+            module="event",
+            action="update",
+            target_type="event",
+            target_id=event["id"],
+            detail={"title": event["title"], "status": event["status"], "capacity": event["capacity"]},
+        )
+        self.write_json(success(event))
+
+
+class AdminEventStatusHandler(BaseHandler):
+    async def put(self, event_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        event = await event_service.update_event_status(
+            settings,
+            current_user=current_user,
+            event_id=int(event_id),
+            body=self.get_json_body(),
+        )
+        await _record_admin_log(
+            self,
+            current_user,
+            module="event",
+            action="status",
+            target_type="event",
+            target_id=event["id"],
+            detail={"title": event["title"], "status": event["status"]},
+        )
+        self.write_json(success(event))
+
+
+class AdminCommunityPostsHandler(BaseHandler):
+    async def get(self) -> None:
+        await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        page, page_size, offset = pagination(self)
+        data = await community_service.list_admin_posts(
+            settings,
+            status_arg=self.get_argument("status", None),
+            page=page,
+            page_size=page_size,
+            offset=offset,
+        )
+        self.write_json(success(data))
+
+
+class AdminCommunityPostHideHandler(BaseHandler):
+    async def put(self, post_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        post = await community_service.admin_hide_post(settings, int(post_id))
+        await _record_admin_log(
+            self,
+            current_user,
+            module="community",
+            action="hide",
+            target_type="community_post",
+            target_id=post["id"],
+            detail={"username": post.get("username"), "content": post.get("content")},
+        )
+        self.write_json(success(post, "动态已隐藏"))
+
+
+class AdminShopProductsHandler(BaseHandler):
+    async def get(self) -> None:
+        await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        page, page_size, offset = pagination(self)
+        data = await shop_service.list_products(
+            settings,
+            status_arg=self.get_argument("status", None),
+            keyword_arg=self.get_argument("keyword", None),
+            page=page,
+            page_size=page_size,
+            offset=offset,
+            public_only=False,
+        )
+        self.write_json(success(data))
+
+    async def post(self) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        product = await shop_service.create_product(settings, self.get_json_body())
+        await _record_admin_log(
+            self,
+            current_user,
+            module="shop",
+            action="create",
+            target_type="shop_product",
+            target_id=product["id"],
+            detail={"product_no": product["product_no"], "product_name": product["product_name"]},
+        )
+        self.write_json(success(product))
+
+
+class AdminShopProductDetailHandler(BaseHandler):
+    async def put(self, product_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        product = await shop_service.update_product(settings, int(product_id), self.get_json_body())
+        await _record_admin_log(
+            self,
+            current_user,
+            module="shop",
+            action="update",
+            target_type="shop_product",
+            target_id=product["id"],
+            detail={
+                "product_no": product["product_no"],
+                "product_name": product["product_name"],
+                "stock": product["stock"],
+            },
+        )
+        self.write_json(success(product))
+
+
+class AdminShopProductStatusHandler(BaseHandler):
+    async def put(self, product_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        product = await shop_service.update_product_status(settings, int(product_id), self.get_json_body())
+        await _record_admin_log(
+            self,
+            current_user,
+            module="shop",
+            action="status",
+            target_type="shop_product",
+            target_id=product["id"],
+            detail={"product_no": product["product_no"], "status": product["status"]},
+        )
+        self.write_json(success(product))
+
+
+class AdminShopOrdersHandler(BaseHandler):
+    async def get(self) -> None:
+        await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        page, page_size, offset = pagination(self)
+        data = await shop_service.list_admin_orders(
+            settings,
+            status_arg=self.get_argument("status", None),
+            username_arg=self.get_argument("username", None),
+            page=page,
+            page_size=page_size,
+            offset=offset,
+        )
+        self.write_json(success(data))
+
+
+class AdminShopOrderDetailHandler(BaseHandler):
+    async def get(self, order_id: str) -> None:
+        await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        order = await shop_service.get_admin_order(settings, int(order_id))
+        self.write_json(success(order))
+
+
+class AdminShopOrderCompleteHandler(BaseHandler):
+    async def put(self, order_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        order = await shop_service.complete_order(settings, current_user=current_user, order_id=int(order_id))
+        await _record_admin_log(
+            self,
+            current_user,
+            module="shop",
+            action="complete",
+            target_type="shop_order",
+            target_id=order["id"],
+            detail={"order_no": order["order_no"], "username": order.get("username")},
+        )
+        self.write_json(success(order, "订单已完成"))
+
+
+class AdminShopOrderCancelHandler(BaseHandler):
+    async def put(self, order_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        order = await shop_service.admin_cancel_order(settings, current_user=current_user, order_id=int(order_id))
+        await _record_admin_log(
+            self,
+            current_user,
+            module="shop",
+            action="cancel",
+            target_type="shop_order",
+            target_id=order["id"],
+            detail={"order_no": order["order_no"], "username": order.get("username")},
+        )
+        self.write_json(success(order, "订单已取消并退款"))
 
 
 class AdminConfigsHandler(BaseHandler):

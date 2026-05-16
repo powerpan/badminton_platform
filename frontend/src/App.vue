@@ -22,6 +22,11 @@ const routeTitleMap: Record<string, string> = {
   profile: "会员中心",
   notifications: "通知中心",
   help: "帮助中心",
+  events: "活动赛事",
+  "event-detail": "活动详情",
+  community: "球友圈",
+  shop: "商城",
+  "shop-orders": "商城订单",
   admin: "管理后台",
 };
 
@@ -33,18 +38,15 @@ const primaryNav = computed(() => [
   { label: "我的预订", to: "/reservations", icon: "ticket", visible: authStore.isLoggedIn },
   { label: "会员中心", to: "/profile", icon: "user", visible: authStore.isLoggedIn },
   { label: "管理后台", to: "/admin", icon: "admin", visible: authStore.isAdmin },
+  { label: "活动赛事", to: "/events", icon: "flag", visible: true },
+  { label: "球友圈", to: "/community", icon: "circle", visible: true },
+  { label: "商城", to: "/shop", icon: "cart", visible: true },
   { label: "帮助中心", to: "/help", icon: "help", visible: true },
 ]);
 
 const guestNav = [
   { label: "登录", to: "/login", icon: "login" },
   { label: "注册", to: "/register", icon: "register" },
-];
-
-const plannedNav = [
-  { label: "活动赛事", icon: "flag" },
-  { label: "球友圈", icon: "circle" },
-  { label: "商城", icon: "cart" },
 ];
 
 function formatMoney(cents: number | null | undefined) {
@@ -123,16 +125,6 @@ watch(
             <span>{{ item.label }}</span>
           </RouterLink>
         </template>
-        <button
-          v-for="item in plannedNav"
-          :key="item.label"
-          type="button"
-          class="nav-item nav-item-muted"
-          disabled
-        >
-          <span class="nav-icon" :class="`nav-icon-${item.icon}`"></span>
-          <span>{{ item.label }}</span>
-        </button>
       </nav>
 
       <div class="session-box">

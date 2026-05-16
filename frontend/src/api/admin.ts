@@ -1,8 +1,11 @@
 import { http } from "./http";
 import type { Announcement } from "./announcement";
 import type { ApiResponse, UserInfo } from "./auth";
+import type { CommunityPost } from "./community";
 import type { Court, PageResult } from "./court";
+import type { ClubEvent } from "./event";
 import type { Reservation } from "./reservation";
+import type { ShopOrder, ShopProduct } from "./shop";
 
 export interface ConfigItem {
   id: number;
@@ -199,6 +202,106 @@ export function adminUpdateAnnouncementStatus(announcementId: number, status: nu
 
 export function adminBroadcastNotification(payload: { title: string; content: string }) {
   return http.post<unknown, ApiResponse<BroadcastNotificationResult>>("/admin/notifications/broadcast", payload);
+}
+
+export function adminGetEvents(params: { status?: string; page?: number; page_size?: number } = {}) {
+  return http.get<unknown, ApiResponse<PageResult<ClubEvent>>>("/admin/events", { params });
+}
+
+export function adminCreateEvent(payload: {
+  title: string;
+  content: string;
+  location: string;
+  start_at: string;
+  end_at: string;
+  registration_deadline: string;
+  capacity: number;
+  status: number;
+}) {
+  return http.post<unknown, ApiResponse<ClubEvent>>("/admin/events", payload);
+}
+
+export function adminUpdateEvent(eventId: number, payload: {
+  title: string;
+  content: string;
+  location: string;
+  start_at: string;
+  end_at: string;
+  registration_deadline: string;
+  capacity: number;
+  status: number;
+}) {
+  return http.put<unknown, ApiResponse<ClubEvent>>(`/admin/events/${eventId}`, payload);
+}
+
+export function adminUpdateEventStatus(eventId: number, status: number) {
+  return http.put<unknown, ApiResponse<ClubEvent>>(`/admin/events/${eventId}/status`, { status });
+}
+
+export function adminGetCommunityPosts(params: { status?: string; page?: number; page_size?: number } = {}) {
+  return http.get<unknown, ApiResponse<PageResult<CommunityPost>>>("/admin/community/posts", { params });
+}
+
+export function adminHideCommunityPost(postId: number) {
+  return http.put<unknown, ApiResponse<CommunityPost>>(`/admin/community/posts/${postId}/hide`);
+}
+
+export function adminGetShopProducts(params: {
+  status?: string;
+  keyword?: string;
+  page?: number;
+  page_size?: number;
+} = {}) {
+  return http.get<unknown, ApiResponse<PageResult<ShopProduct>>>("/admin/shop/products", { params });
+}
+
+export function adminCreateShopProduct(payload: {
+  product_no: string;
+  product_name: string;
+  description: string;
+  image_url: string;
+  price_cents: number;
+  stock: number;
+  status: number;
+}) {
+  return http.post<unknown, ApiResponse<ShopProduct>>("/admin/shop/products", payload);
+}
+
+export function adminUpdateShopProduct(productId: number, payload: {
+  product_no: string;
+  product_name: string;
+  description: string;
+  image_url: string;
+  price_cents: number;
+  stock: number;
+  status: number;
+}) {
+  return http.put<unknown, ApiResponse<ShopProduct>>(`/admin/shop/products/${productId}`, payload);
+}
+
+export function adminUpdateShopProductStatus(productId: number, status: number) {
+  return http.put<unknown, ApiResponse<ShopProduct>>(`/admin/shop/products/${productId}/status`, { status });
+}
+
+export function adminGetShopOrders(params: {
+  status?: string;
+  username?: string;
+  page?: number;
+  page_size?: number;
+} = {}) {
+  return http.get<unknown, ApiResponse<PageResult<ShopOrder>>>("/admin/shop/orders", { params });
+}
+
+export function adminGetShopOrder(orderId: number) {
+  return http.get<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}`);
+}
+
+export function adminCompleteShopOrder(orderId: number) {
+  return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/complete`);
+}
+
+export function adminCancelShopOrder(orderId: number) {
+  return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/cancel`);
 }
 
 export function adminGetConfigs() {

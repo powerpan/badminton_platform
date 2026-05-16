@@ -7,7 +7,7 @@ from utils.query import clean_text
 from utils.response import ApiError
 
 
-VALID_CATEGORIES = {"system", "reservation", "member", "announcement"}
+VALID_CATEGORIES = {"system", "reservation", "member", "announcement", "shop", "event", "community"}
 
 
 def _parse_is_read(value: Any) -> int | None:
@@ -295,3 +295,98 @@ async def notify_member_adjusted(
         source_id=int(user["id"]),
         created_by=operator_id,
     )
+
+
+async def notify_shop_order_paid(settings: Settings, *, order: dict[str, Any]) -> None:
+    amount = int(order.get("total_amount_cents") or 0) / 100
+    await safe_create_user_notification(
+        settings,
+        user_id=int(order["user_id"]),
+        title="商城订单已支付",
+        content=f"订单 {order.get('order_no')} 已使用会员余额支付 {amount:.2f} 元，请到店领取或等待管理员处理。",
+        category="shop",
+        source_type="shop_order",
+        source_id=int(order["id"]),
+        created_by=int(order["user_id"]),
+    )
+
+
+async def notify_shop_order_canceled(
+    settings: Settings,
+    *,
+    order: dict[str, Any],
+    by_admin: bool,
+    operator_id: int | None,
+) -> None:
+    amount = int(order.get("total_amount_cents") or 0) / 100
+    title = "商城订单已退款" if by_admin else "商城订单已取消"
+    content = f"订单 {order.get('order_no')} 已取消，已退回会员余额 {amount:.2f} 元。"
+    await safe_create_user_notification(
+        settings,
+        user_id=int(order["user_id"]),
+        title=title,
+        content=content,
+        category="shop",
+        source_type="shop_order",
+        source_id=int(order["id"]),
+        created_by=operator_id,
+    )
+
+
+async def notify_shop_order_completed(settings: Settings, *, order: dict[str, Any], operator_id: int | None) -> None:
+    await safe_create_user_notification(
+        settings,
+        user_id=int(order["user_id"]),
+        title="商城订单已完成",
+        content=f"订单 {order.get('order_no')} 已确认完成。",
+        category="shop",
+        source_type="shop_order",
+        source_id=int(order["id"]),
+        created_by=operator_id,
+    )
+
+
+async def notify_event_registered(settings: Settings, *, event: dict[str, Any], user_id: int) -> None:
+    await safe_create_user_notification(
+        settings,
+        user_id=user_id,
+        title="活动报名成功",
+        content=f"您已报名活动《{event.get('title')}》，活动地点：{event.get('location')}。",
+        category="event",
+        source_type="event",
+        source_id=int(event["id"]),
+        created_by=user_id,
+    )
+
+
+async def notify_event_registration_canceled(settings: Settings, *, event: dict[str, Any], user_id: int) -> None:
+    await safe_create_user_notification(
+        settings,
+        user_id=user_id,
+        title="活动报名已取消",
+        content=f"您已取消活动《{event.get('title')}》的报名。",
+        category="event",
+        source_type="event",
+        source_id=int(event["id"]),
+        created_by=user_id,
+    )
+
+
+async def notify_event_hidden(
+    settings: Settings,
+    *,
+    event: dict[str, Any],
+    user_ids: list[int],
+    operator_id: int | None,
+) -> None:
+    for user_id in user_ids:
+        await safe_create_user_notification(
+            settings,
+            user_id=user_id,
+            title="活动状态变更",
+            content=f"活动《{event.get('title')}》已由管理员隐藏，请关注后续安排。",
+            category="event",
+            source_type="event",
+            source_id=int(event["id"]),
+            created_by=operator_id,
+        )

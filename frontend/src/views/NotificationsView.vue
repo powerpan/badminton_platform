@@ -18,6 +18,9 @@ function categoryLabel(category: string) {
     reservation: "预约",
     member: "会员",
     announcement: "公告",
+    shop: "商城",
+    event: "活动",
+    community: "球友圈",
   };
   return map[category] || "系统";
 }
@@ -28,12 +31,17 @@ function categoryTagType(category: string) {
     reservation: "success",
     member: "warning",
     announcement: "primary",
+    shop: "success",
+    event: "primary",
+    community: "info",
   };
   return map[category] || "info";
 }
 
 function sourceLink(notification: NotificationItem) {
   if (notification.source_type === "announcement" && notification.source_id) return `/announcements/${notification.source_id}`;
+  if (notification.source_type === "event" && notification.source_id) return `/events/${notification.source_id}`;
+  if (notification.source_type === "shop_order") return "/shop/orders";
   if (notification.source_type === "reservation") return "/reservations";
   if (notification.source_type === "member") return "/profile";
   return "";

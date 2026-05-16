@@ -64,6 +64,7 @@ async def insert_member_transaction_with_cursor(
     *,
     user_id: int,
     reservation_id: int | None,
+    shop_order_id: int | None = None,
     transaction_type: str,
     balance_change_cents: int,
     points_change: int,
@@ -78,14 +79,15 @@ async def insert_member_transaction_with_cursor(
     await cursor.execute(
         """
         INSERT INTO member_account_transaction
-          (user_id, reservation_id, transaction_type, balance_change_cents, points_change,
+          (user_id, reservation_id, shop_order_id, transaction_type, balance_change_cents, points_change,
            balance_before_cents, balance_after_cents, points_before, points_after,
            reason, operator_id, operator_username)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             user_id,
             reservation_id,
+            shop_order_id,
             transaction_type,
             balance_change_cents,
             points_change,

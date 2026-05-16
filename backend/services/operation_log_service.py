@@ -8,8 +8,8 @@ from utils.query import clean_text
 from utils.response import ApiError
 
 
-VALID_MODULES = {"user", "court", "reservation", "announcement", "notification", "config"}
-VALID_ACTIONS = {"create", "update", "status", "role", "member", "cancel", "hide", "broadcast"}
+VALID_MODULES = {"user", "court", "reservation", "announcement", "notification", "config", "shop", "event", "community"}
+VALID_ACTIONS = {"create", "update", "status", "role", "member", "cancel", "hide", "broadcast", "complete"}
 
 
 def _parse_date_arg(value: Any, field_name: str) -> datetime | None:

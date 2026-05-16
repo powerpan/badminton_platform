@@ -8,7 +8,7 @@
 - 缓存：Redis
 - 认证：JWT
 
-当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、场地预约闭环、站内通知、公告详情、帮助中心、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以查看场地、选择时间段、创建预约、查看和取消自己的预约、查看通知和公告详情；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、预约规则配置、运营统计和操作日志。
+当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、场地预约闭环、站内通知、公告详情、帮助中心、活动赛事、球友圈、商城库存与余额支付、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以预约场地、查看通知和公告详情、报名活动、发布球友圈动态、使用会员余额购买商品并取消退款；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、活动、球友圈动态、商城商品和订单、预约规则配置、运营统计和操作日志。
 
 ## 当前实现状态
 
@@ -36,6 +36,9 @@
 - 管理员支持向全部启用账号群发站内通知。
 - 公告中心和公告详情页已接入前端路由。
 - 帮助中心已提供预约、取消、会员和场地使用规则说明。
+- 活动赛事入口已启用，支持活动列表、详情、报名、取消报名和后台活动维护。
+- 球友圈入口已启用，支持文本动态发布、用户隐藏自己的动态和管理员隐藏动态。
+- 商城入口已启用，支持商品库存、购物车、会员余额支付、订单查看、用户取消退款、管理员完成订单和管理员取消退款。
 - 管理员规则配置查询和更新。
 - 后台统计接口和统计视图：预约总量、今日预约、活跃用户、场地使用率、热门时间段、用户活跃度。
 - 管理员关键操作日志写入和日志查询。
@@ -48,7 +51,7 @@
 - 后台会员调整、场地编辑、公告编辑和规则配置编辑已改为弹窗表单，避免旧数据回填到顶部新增表单。
 - 预约冲突、空状态和加载状态的前端提示优化。
 - Vue3 前端骨架、Axios 请求封装、Pinia 登录态保存。
-- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/notifications`、`/announcements`、`/announcements/:id`、`/help`、`/admin` 页面。
+- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/notifications`、`/announcements`、`/announcements/:id`、`/help`、`/events`、`/events/:id`、`/community`、`/shop`、`/shop/orders`、`/admin` 页面。
 - 路由守卫：未登录跳转登录页，普通用户不能访问管理后台。
 - 初始化 SQL：核心表、默认配置、测试场地、默认管理员账号。
 
@@ -129,6 +132,9 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 - 会员账户流水表
 - 场地表
 - 预约表
+- 活动表和活动报名表
+- 球友圈动态表
+- 商城商品表、订单表和订单明细表
 - 公告表
 - 站内通知表
 - 系统配置表
@@ -144,9 +150,10 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase1_court_assets.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase2_member_accounts.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase3_notifications.sql
+mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase4_marketplace.sql
 ```
 
-升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水和预约会员快照字段。两个升级脚本均按字段存在性判断，可重复执行。
+升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水、预约会员快照、通知、活动、球友圈、商城商品、商城订单和商城订单明细。升级脚本按表或字段存在性判断，可重复执行。
 
 ## 认证接口
 
@@ -178,6 +185,19 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | POST | `/api/reservations` | 创建预约 |
 | GET | `/api/reservations/my` | 查询我的预约 |
 | PUT | `/api/reservations/{id}/cancel` | 取消我的预约 |
+| GET | `/api/events` | 查询显示中的活动 |
+| GET | `/api/events/{id}` | 查询活动详情 |
+| POST | `/api/events/{id}/register` | 报名活动 |
+| PUT | `/api/events/{id}/cancel-registration` | 取消活动报名 |
+| GET | `/api/community/posts` | 查询球友圈动态 |
+| POST | `/api/community/posts` | 发布球友圈动态 |
+| PUT | `/api/community/posts/{id}/hide` | 隐藏我的动态 |
+| GET | `/api/shop/products` | 查询上架商品 |
+| GET | `/api/shop/products/{id}` | 查询商品详情 |
+| POST | `/api/shop/orders` | 使用会员余额创建并支付商城订单 |
+| GET | `/api/shop/orders/my` | 查询我的商城订单 |
+| GET | `/api/shop/orders/{id}` | 查询我的商城订单详情 |
+| PUT | `/api/shop/orders/{id}/cancel` | 取消商城订单并退款 |
 
 ## 管理员接口
 
@@ -198,6 +218,18 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | PUT | `/api/admin/announcements/{id}` | 编辑公告 |
 | PUT | `/api/admin/announcements/{id}/status` | 显示或隐藏公告 |
 | POST | `/api/admin/notifications/broadcast` | 向全部启用账号群发站内通知 |
+| GET/POST | `/api/admin/events` | 活动列表和新增活动 |
+| PUT | `/api/admin/events/{id}` | 编辑活动 |
+| PUT | `/api/admin/events/{id}/status` | 显示或隐藏活动 |
+| GET | `/api/admin/community/posts` | 查询球友圈动态 |
+| PUT | `/api/admin/community/posts/{id}/hide` | 管理员隐藏动态 |
+| GET/POST | `/api/admin/shop/products` | 商品列表和新增商品 |
+| PUT | `/api/admin/shop/products/{id}` | 编辑商品 |
+| PUT | `/api/admin/shop/products/{id}/status` | 上架或下架商品 |
+| GET | `/api/admin/shop/orders` | 查询商城订单 |
+| GET | `/api/admin/shop/orders/{id}` | 查询商城订单详情 |
+| PUT | `/api/admin/shop/orders/{id}/complete` | 完成商城订单 |
+| PUT | `/api/admin/shop/orders/{id}/cancel` | 管理员取消商城订单并退款 |
 | GET | `/api/admin/configs` | 查询规则配置 |
 | PUT | `/api/admin/configs/{config_key}` | 更新规则配置 |
 | GET | `/api/admin/statistics/overview` | 查询后台统计总览 |
@@ -267,12 +299,9 @@ http://localhost:8000
 
 ## 下一步开发顺序
 
-下一阶段建议优先推“活动赛事、球友圈和商城入口”：
+第四阶段已补齐活动赛事、球友圈和商城库存与余额支付。下一阶段建议优先做：
 
-1. 活动赛事先支持活动列表、详情和报名。
-2. 球友圈先支持简单动态列表和文本发布。
-3. 商城先支持商品展示和购买说明，不接入真实库存和支付。
-4. 管理端补齐活动和商品的基础维护能力。
-5. 同步更新数据库设计、接口设计和当前实现状态文档。
-
-当前第三阶段已完成站内通知、公告详情和帮助中心。下一阶段可以继续把侧栏中仍禁用的活动赛事、球友圈和商城入口逐步变成可访问页面。
+1. 自动化接口测试和关键业务回归脚本。
+2. Docker 部署、生产环境变量和初始化说明。
+3. 商城后续扩展：SKU、库存流水、真实第三方支付、售后申请。
+4. 球友圈后续扩展：评论、点赞、图片上传和内容审核。

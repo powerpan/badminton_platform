@@ -3,7 +3,10 @@ import { createRouter, createWebHistory } from "vue-router";
 import AdminDashboard from "../views/AdminDashboard.vue";
 import AnnouncementDetailView from "../views/AnnouncementDetailView.vue";
 import AnnouncementsView from "../views/AnnouncementsView.vue";
+import CommunityView from "../views/CommunityView.vue";
 import CourtsView from "../views/CourtsView.vue";
+import EventDetailView from "../views/EventDetailView.vue";
+import EventsView from "../views/EventsView.vue";
 import ForgotPasswordView from "../views/ForgotPasswordView.vue";
 import HelpCenterView from "../views/HelpCenterView.vue";
 import HomeView from "../views/HomeView.vue";
@@ -12,6 +15,8 @@ import NotificationsView from "../views/NotificationsView.vue";
 import ProfileView from "../views/ProfileView.vue";
 import ReservationsView from "../views/ReservationsView.vue";
 import RegisterView from "../views/RegisterView.vue";
+import ShopOrdersView from "../views/ShopOrdersView.vue";
+import ShopView from "../views/ShopView.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
@@ -21,6 +26,11 @@ const router = createRouter({
     { path: "/announcements", name: "announcements", component: AnnouncementsView },
     { path: "/announcements/:id", name: "announcement-detail", component: AnnouncementDetailView },
     { path: "/help", name: "help", component: HelpCenterView },
+    { path: "/events", name: "events", component: EventsView },
+    { path: "/events/:id", name: "event-detail", component: EventDetailView },
+    { path: "/community", name: "community", component: CommunityView },
+    { path: "/shop", name: "shop", component: ShopView },
+    { path: "/shop/orders", name: "shop-orders", component: ShopOrdersView, meta: { requiresAuth: true } },
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: RegisterView },
     { path: "/forgot-password", name: "forgot-password", component: ForgotPasswordView },
