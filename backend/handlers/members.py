@@ -12,7 +12,7 @@ class MemberTransactionsHandler(BaseHandler):
         data = await member_service.list_my_transactions(
             settings,
             current_user=current_user,
-            transaction_type_arg=self.get_argument("transaction_type", None),
+            type_arg=self.get_argument("transaction_type", None),
             page=page,
             page_size=page_size,
             offset=offset,

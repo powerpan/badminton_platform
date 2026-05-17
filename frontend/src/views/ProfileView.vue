@@ -13,13 +13,13 @@ const newPassword = ref("");
 const profileMessage = ref("");
 const passwordMessage = ref("");
 const errorMessage = ref("");
-const transactionErrorMessage = ref("");
+const ledgerError = ref("");
 const loadingProfile = ref(false);
 const loadingPassword = ref(false);
-const loadingTransactions = ref(false);
-const transactions = ref<MemberTransaction[]>([]);
-const transactionFilter = ref("");
-const transactionPage = ref({ page: 1, page_size: 8, total: 0 });
+const ledgerLoading = ref(false);
+const ledgerRows = ref<MemberTransaction[]>([]);
+const ledgerFilter = ref("");
+const ledgerPage = ref({ page: 1, page_size: 8, total: 0 });
 
 const currentUser = computed(() => authStore.user);
 const currentMember = computed(() => currentUser.value?.member);
@@ -106,31 +106,31 @@ async function savePassword() {
   }
 }
 
-async function loadTransactions(reset = false) {
-  if (reset) transactionPage.value.page = 1;
-  loadingTransactions.value = true;
-  transactionErrorMessage.value = "";
+async function loadLedger(reset = false) {
+  if (reset) ledgerPage.value.page = 1;
+  ledgerLoading.value = true;
+  ledgerError.value = "";
   try {
     const response = await getMemberTransactions({
-      transaction_type: transactionFilter.value || undefined,
-      page: transactionPage.value.page,
-      page_size: transactionPage.value.page_size,
+      transaction_type: ledgerFilter.value || undefined,
+      page: ledgerPage.value.page,
+      page_size: ledgerPage.value.page_size,
     });
-    transactions.value = response.data.items;
-    transactionPage.value.total = response.data.total;
+    ledgerRows.value = response.data.items;
+    ledgerPage.value.total = response.data.total;
   } catch (error) {
-    transactionErrorMessage.value = error instanceof Error ? error.message : "余额明细加载失败";
+    ledgerError.value = error instanceof Error ? error.message : "余额明细加载失败";
   } finally {
-    loadingTransactions.value = false;
+    ledgerLoading.value = false;
   }
 }
 
-async function changeTransactionPage(nextPage: number) {
-  transactionPage.value.page = nextPage;
-  await loadTransactions();
+async function changeLedgerPage(nextPage: number) {
+  ledgerPage.value.page = nextPage;
+  await loadLedger();
 }
 
-onMounted(() => loadTransactions());
+onMounted(() => loadLedger());
 </script>
 
 <template>
@@ -209,7 +209,7 @@ onMounted(() => loadTransactions());
     </el-col>
 
     <el-col :xs="24">
-      <el-card shadow="never" class="panel-card list-page-card member-transaction-card" v-loading="loadingTransactions">
+      <el-card shadow="never" class="panel-card list-page-card member-ledger-card" v-loading="ledgerLoading">
         <template #header>
           <div class="card-header-row">
             <strong>余额明细</strong>
@@ -218,16 +218,16 @@ onMounted(() => loadTransactions());
         </template>
 
         <el-alert
-          v-if="transactionErrorMessage"
+          v-if="ledgerError"
           class="page-alert"
-          :title="transactionErrorMessage"
+          :title="ledgerError"
           type="error"
           show-icon
           :closable="false"
         />
 
         <div class="list-toolbar">
-          <el-radio-group v-model="transactionFilter" @change="() => loadTransactions(true)">
+          <el-radio-group v-model="ledgerFilter" @change="() => loadLedger(true)">
             <el-radio-button :value="''">全部</el-radio-button>
             <el-radio-button :value="'reservation_charge'">预约扣款</el-radio-button>
             <el-radio-button :value="'reservation_refund'">预约退款</el-radio-button>
@@ -235,21 +235,21 @@ onMounted(() => loadTransactions());
             <el-radio-button :value="'shop_refund'">商城退款</el-radio-button>
             <el-radio-button :value="'admin_adjust'">后台调整</el-radio-button>
           </el-radio-group>
-          <el-button plain :loading="loadingTransactions" @click="loadTransactions()">刷新</el-button>
+          <el-button plain :loading="ledgerLoading" @click="loadLedger()">刷新</el-button>
         </div>
 
-        <el-empty v-if="transactions.length === 0 && !loadingTransactions" description="暂无余额明细" />
-        <div v-else class="member-transaction-list">
-          <article v-for="transaction in transactions" :key="transaction.id" class="member-transaction-item">
-            <div class="member-transaction-main">
-              <div class="member-transaction-title">
+        <el-empty v-if="ledgerRows.length === 0 && !ledgerLoading" description="暂无余额明细" />
+        <div v-else class="member-ledger-list">
+          <article v-for="transaction in ledgerRows" :key="transaction.id" class="member-ledger-item">
+            <div class="member-ledger-main">
+              <div class="member-ledger-title">
                 <el-tag effect="plain">{{ transaction.transaction_type_label }}</el-tag>
                 <strong>{{ transaction.reason || transaction.transaction_type_label }}</strong>
               </div>
               <p>{{ relatedText(transaction) }}</p>
               <span>{{ transaction.created_at }}</span>
             </div>
-            <div class="member-transaction-values">
+            <div class="member-ledger-values">
               <strong :class="changeClass(transaction.balance_change_cents)">
                 {{ formatSignedMoney(transaction.balance_change_cents) }}
               </strong>
@@ -263,11 +263,11 @@ onMounted(() => loadTransactions());
 
         <el-pagination
           class="element-pagination"
-          :current-page="transactionPage.page"
-          :page-size="transactionPage.page_size"
-          :total="transactionPage.total"
+          :current-page="ledgerPage.page"
+          :page-size="ledgerPage.page_size"
+          :total="ledgerPage.total"
           layout="prev, pager, next, total"
-          @current-change="changeTransactionPage"
+          @current-change="changeLedgerPage"
         />
       </el-card>
     </el-col>

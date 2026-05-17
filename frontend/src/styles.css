@@ -2852,28 +2852,28 @@ th {
   overflow-wrap: anywhere;
 }
 
-.member-transaction-card {
+.member-ledger-card {
   max-width: 980px;
 }
 
-.member-transaction-card .card-header-row span {
+.member-ledger-card .card-header-row span {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
 }
 
-.member-transaction-card .el-radio-group {
+.member-ledger-card .el-radio-group {
   max-width: 100%;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.member-transaction-list {
+.member-ledger-list {
   display: grid;
   gap: 12px;
 }
 
-.member-transaction-item {
+.member-ledger-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
   gap: 16px;
@@ -2884,55 +2884,55 @@ th {
   border-radius: 8px;
 }
 
-.member-transaction-main,
-.member-transaction-values {
+.member-ledger-main,
+.member-ledger-values {
   min-width: 0;
 }
 
-.member-transaction-title {
+.member-ledger-title {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 
-.member-transaction-title strong {
+.member-ledger-title strong {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.member-transaction-main p {
+.member-ledger-main p {
   margin: 8px 0 4px;
   color: #47564e;
 }
 
-.member-transaction-main span,
-.member-transaction-values span,
-.member-transaction-values small {
+.member-ledger-main span,
+.member-ledger-values span,
+.member-ledger-values small {
   color: var(--muted);
   font-size: 13px;
 }
 
-.member-transaction-values {
+.member-ledger-values {
   display: grid;
   gap: 4px;
   text-align: right;
 }
 
-.member-transaction-values strong {
+.member-ledger-values strong {
   font-size: 20px;
   overflow-wrap: anywhere;
 }
 
-.member-transaction-values .positive {
+.member-ledger-values .positive {
   color: #0a7c50;
 }
 
-.member-transaction-values .negative {
+.member-ledger-values .negative {
   color: #b42318;
 }
 
-.member-transaction-values .neutral {
+.member-ledger-values .neutral {
   color: var(--muted);
 }
 
@@ -2956,11 +2956,11 @@ th {
     padding-right: 16px;
   }
 
-  .member-transaction-item {
+  .member-ledger-item {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .member-transaction-values {
+  .member-ledger-values {
     text-align: left;
   }
 }

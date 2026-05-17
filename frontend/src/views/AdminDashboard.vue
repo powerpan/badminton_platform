@@ -309,7 +309,7 @@ const memberForm = ref({
   points_change: 0,
   reason: "",
 });
-const resettingPasswordUser = ref<UserInfo | null>(null);
+const resetUser = ref<UserInfo | null>(null);
 const resetPasswordForm = ref({ password: "" });
 
 const courts = ref<Court[]>([]);
@@ -564,18 +564,18 @@ async function submitMember() {
 }
 
 function resetUserPassword(user: UserInfo) {
-  resettingPasswordUser.value = user;
+  resetUser.value = user;
   resetPasswordForm.value = { password: "" };
 }
 
 function resetPasswordDialog() {
-  resettingPasswordUser.value = null;
+  resetUser.value = null;
   resetPasswordForm.value = { password: "" };
 }
 
 async function submitResetPassword() {
-  if (!resettingPasswordUser.value || !resetPasswordForm.value.password) return;
-  const user = resettingPasswordUser.value;
+  if (!resetUser.value || !resetPasswordForm.value.password) return;
+  const user = resetUser.value;
   if (!(await confirmAction(`确认重置用户 ${user.username} 的密码？该用户旧登录态会失效。`))) return;
   loading.value = true;
   try {
@@ -827,7 +827,7 @@ async function toggleAnnouncementStatus(announcement: Announcement) {
   }
 }
 
-async function submitBroadcastNotification() {
+async function submitBroadcast() {
   const title = broadcastForm.value.title.trim();
   const content = broadcastForm.value.content.trim();
   if (!title || !content) {
@@ -1161,7 +1161,7 @@ async function cancelAdminShopOrder(order: ShopOrder) {
   }
 }
 
-async function rejectAdminShopOrderRefund(order: ShopOrder) {
+async function rejectRefund(order: ShopOrder) {
   let reason = "管理员驳回商城订单退款申请";
   try {
     const result = await ElMessageBox.prompt(`请输入驳回订单 ${order.order_no} 退款申请的原因`, "驳回退款申请", {
@@ -1583,7 +1583,7 @@ watch(
       <el-card shadow="never" class="panel-card">
         <template #header><strong>全员通知</strong></template>
         <el-alert title="此处发送给全部启用账号。预约、取消、会员调整和公告发布会由系统自动发送通知。" type="info" show-icon :closable="false" />
-        <el-form label-position="top" class="element-form dialog-form" @submit.prevent="submitBroadcastNotification">
+        <el-form label-position="top" class="element-form dialog-form" @submit.prevent="submitBroadcast">
           <el-form-item label="通知标题">
             <el-input v-model="broadcastForm.title" maxlength="100" show-word-limit />
           </el-form-item>
@@ -1747,7 +1747,7 @@ watch(
                 v-if="row.status === 'refund_requested'"
                 link
                 type="danger"
-                @click="rejectAdminShopOrderRefund(row)"
+                @click="rejectRefund(row)"
               >
                 驳回申请
               </el-button>
@@ -1836,7 +1836,7 @@ watch(
     </el-form>
   </el-dialog>
 
-  <el-dialog :model-value="Boolean(resettingPasswordUser)" title="重置密码" width="460px" @close="resetPasswordDialog">
+  <el-dialog :model-value="Boolean(resetUser)" title="重置密码" width="460px" @close="resetPasswordDialog">
     <el-form label-position="top" class="element-form" @submit.prevent="submitResetPassword">
       <el-alert title="新密码至少 6 位。保存后该用户旧登录态会失效。" type="warning" show-icon :closable="false" />
       <el-form-item label="新密码"><el-input v-model="resetPasswordForm.password" type="password" show-password /></el-form-item>
@@ -2018,7 +2018,7 @@ watch(
           type="danger"
           plain
           :loading="loading"
-          @click="rejectAdminShopOrderRefund(selectedShopOrder)"
+          @click="rejectRefund(selectedShopOrder)"
         >
           驳回申请
         </el-button>
