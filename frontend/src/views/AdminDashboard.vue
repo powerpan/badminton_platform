@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import { useRoute } from "vue-router";
 
 import type { Announcement } from "../api/announcement";
 import {
@@ -20,9 +21,12 @@ import {
   adminGetCourts,
   adminGetEvents,
   adminGetOperationLogs,
+  adminGetReservation,
   adminGetReservations,
+  adminGetShopOrder,
   adminGetShopOrders,
   adminGetShopProducts,
+  adminRejectShopOrderRefund,
   adminGetStatisticsOverview,
   adminGetTimeSlotStatistics,
   adminGetUserStatistics,
@@ -65,7 +69,8 @@ type AdminTab =
   | "notifications"
   | "events"
   | "community"
-  | "shop"
+  | "shopProducts"
+  | "shopOrders"
   | "configs"
   | "logs";
 
@@ -76,22 +81,31 @@ interface PageState {
 }
 
 const authStore = useAuthStore();
-const activeTab = ref<AdminTab>("statistics");
+const route = useRoute();
 const loading = ref(false);
 
-const tabs: Array<{ key: AdminTab; label: string }> = [
-  { key: "statistics", label: "统计" },
-  { key: "users", label: "用户" },
-  { key: "courts", label: "场地" },
-  { key: "reservations", label: "预约" },
-  { key: "announcements", label: "公告" },
-  { key: "notifications", label: "通知" },
-  { key: "events", label: "活动" },
-  { key: "community", label: "球友圈" },
-  { key: "shop", label: "商城" },
-  { key: "configs", label: "规则" },
-  { key: "logs", label: "日志" },
-];
+const adminPages: Record<AdminTab, { eyebrow: string; title: string; description: string }> = {
+  statistics: { eyebrow: "管理端", title: "运营总览", description: "查看预约、场地、用户和使用率的核心运营数据。" },
+  users: { eyebrow: "管理端", title: "用户管理", description: "维护用户、角色、启用状态、会员等级、余额和积分。" },
+  courts: { eyebrow: "管理端", title: "场地管理", description: "维护场地资料、价格、标签、容量和启停状态。" },
+  reservations: { eyebrow: "管理端", title: "预约管理", description: "查询预约订单、查看详情，并处理管理员取消。" },
+  announcements: { eyebrow: "管理端", title: "公告管理", description: "发布公告并控制用户端展示状态。" },
+  notifications: { eyebrow: "管理端", title: "通知管理", description: "向全部启用账号发送站内通知。" },
+  events: { eyebrow: "管理端", title: "活动管理", description: "维护活动赛事内容、时间、容量和展示状态。" },
+  community: { eyebrow: "管理端", title: "球友圈管理", description: "查看用户动态并隐藏违规内容。" },
+  shopProducts: { eyebrow: "管理端", title: "商城商品", description: "维护商品、库存、价格和上下架状态。" },
+  shopOrders: { eyebrow: "管理端", title: "商城订单", description: "处理商城订单、退款申请、完成和管理员退款。" },
+  configs: { eyebrow: "管理端", title: "规则配置", description: "维护预约、会员和系统业务规则。" },
+  logs: { eyebrow: "管理端", title: "操作日志", description: "查看后台关键操作记录。" },
+};
+
+function routeTab() {
+  const value = route.meta.adminTab;
+  return typeof value === "string" && value in adminPages ? (value as AdminTab) : "statistics";
+}
+
+const activeTab = ref<AdminTab>(routeTab());
+const activePage = computed(() => adminPages[activeTab.value]);
 
 function formatDate(value: Date) {
   const local = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
@@ -189,6 +203,10 @@ function reservationStatusText(status: string) {
     expired: "已过期",
   };
   return map[status] || status;
+}
+
+function payMethodText(value: string | null | undefined) {
+  return value === "balance" ? "会员余额" : value || "-";
 }
 
 async function confirmAction(message: string, title = "确认操作") {
@@ -314,6 +332,8 @@ const editingCourt = ref<Court | null>(null);
 const courtEditForm = ref(emptyCourtForm());
 
 const reservations = ref<Reservation[]>([]);
+const selectedReservation = ref<Reservation | null>(null);
+const reservationDetailVisible = ref(false);
 const reservationPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
 const reservationFilters = ref({
   status: "",
@@ -375,6 +395,8 @@ const editingShopProductId = ref<number | null>(null);
 const editingShopProduct = ref<ShopProduct | null>(null);
 const shopProductEditForm = ref(emptyShopProductForm());
 const shopOrders = ref<ShopOrder[]>([]);
+const selectedShopOrder = ref<ShopOrder | null>(null);
+const shopOrderDetailVisible = ref(false);
 const shopOrderPage = ref<PageState>({ page: 1, page_size: 10, total: 0 });
 const shopOrderFilters = ref({ status: "", username: "" });
 
@@ -697,6 +719,19 @@ async function refreshReservations(reset = false) {
   }
 }
 
+async function openReservationDetail(reservation: Reservation) {
+  loading.value = true;
+  try {
+    const response = await adminGetReservation(reservation.id);
+    selectedReservation.value = response.data;
+    reservationDetailVisible.value = true;
+  } catch (error) {
+    setError(error, "预约详情加载失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
 async function cancelAdminReservation(reservation: Reservation) {
   const tip = reservation.status === "pending"
     ? `确认取消待支付预约 ${reservation.reservation_no}？取消后会释放场地占用。`
@@ -704,7 +739,10 @@ async function cancelAdminReservation(reservation: Reservation) {
   if (!(await confirmAction(tip))) return;
   loading.value = true;
   try {
-    await adminCancelReservation(reservation.id);
+    const response = await adminCancelReservation(reservation.id);
+    if (selectedReservation.value?.id === reservation.id) {
+      selectedReservation.value = response.data;
+    }
     await loadReservations();
     setSuccess("预约已取消");
   } catch (error) {
@@ -1033,8 +1071,9 @@ async function toggleShopProductStatus(product: ShopProduct) {
 }
 
 function shopOrderStatusType(status: string) {
-  const map: Record<string, "success" | "primary" | "info"> = {
+  const map: Record<string, "success" | "primary" | "info" | "warning"> = {
     paid: "success",
+    refund_requested: "warning",
     completed: "primary",
     canceled: "info",
   };
@@ -1044,6 +1083,7 @@ function shopOrderStatusType(status: string) {
 function shopOrderStatusText(status: string) {
   const map: Record<string, string> = {
     paid: "已支付",
+    refund_requested: "退款待审核",
     completed: "已完成",
     canceled: "已取消",
   };
@@ -1073,11 +1113,27 @@ async function refreshShopOrders(reset = false) {
   }
 }
 
-async function completeShopOrder(order: ShopOrder) {
-  if (!(await confirmAction(`确认完成订单 ${order.order_no}？完成后不能取消退款。`))) return;
+async function openShopOrderDetail(order: ShopOrder) {
   loading.value = true;
   try {
-    await adminCompleteShopOrder(order.id);
+    const response = await adminGetShopOrder(order.id);
+    selectedShopOrder.value = response.data;
+    shopOrderDetailVisible.value = true;
+  } catch (error) {
+    setError(error, "商城订单详情加载失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function completeShopOrder(order: ShopOrder) {
+  if (!(await confirmAction(`确认完成订单 ${order.order_no}？完成后不能再退款。`))) return;
+  loading.value = true;
+  try {
+    const response = await adminCompleteShopOrder(order.id);
+    if (selectedShopOrder.value?.id === order.id) {
+      selectedShopOrder.value = response.data;
+    }
     await loadShopOrders();
     setSuccess("订单已完成");
   } catch (error) {
@@ -1088,14 +1144,48 @@ async function completeShopOrder(order: ShopOrder) {
 }
 
 async function cancelAdminShopOrder(order: ShopOrder) {
-  if (!(await confirmAction(`确认取消订单 ${order.order_no} 并退回会员余额？`))) return;
+  const actionText = order.status === "refund_requested" ? "通过退款申请" : "取消订单并退回会员余额";
+  if (!(await confirmAction(`确认${actionText} ${order.order_no}？`))) return;
   loading.value = true;
   try {
-    await adminCancelShopOrder(order.id);
+    const response = await adminCancelShopOrder(order.id);
+    if (selectedShopOrder.value?.id === order.id) {
+      selectedShopOrder.value = response.data;
+    }
     await loadShopOrders();
     setSuccess("订单已取消并退款");
   } catch (error) {
     setError(error, "取消商城订单失败");
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function rejectAdminShopOrderRefund(order: ShopOrder) {
+  let reason = "管理员驳回商城订单退款申请";
+  try {
+    const result = await ElMessageBox.prompt(`请输入驳回订单 ${order.order_no} 退款申请的原因`, "驳回退款申请", {
+      confirmButtonText: "确认驳回",
+      cancelButtonText: "取消",
+      inputValue: reason,
+      inputPattern: /^.{1,255}$/,
+      inputErrorMessage: "驳回原因需填写且不能超过255个字符",
+      type: "warning",
+    });
+    reason = String(result.value || reason).trim();
+  } catch {
+    return;
+  }
+  loading.value = true;
+  try {
+    const response = await adminRejectShopOrderRefund(order.id, { reason });
+    if (selectedShopOrder.value?.id === order.id) {
+      selectedShopOrder.value = response.data;
+    }
+    await loadShopOrders();
+    setSuccess("退款申请已驳回");
+  } catch (error) {
+    setError(error, "驳回退款申请失败");
   } finally {
     loading.value = false;
   }
@@ -1177,9 +1267,8 @@ async function loadActiveTab() {
     if (activeTab.value === "notifications") return;
     if (activeTab.value === "events") await loadEvents();
     if (activeTab.value === "community") await loadCommunityPosts();
-    if (activeTab.value === "shop") {
-      await Promise.all([loadShopProducts(), loadShopOrders()]);
-    }
+    if (activeTab.value === "shopProducts") await loadShopProducts();
+    if (activeTab.value === "shopOrders") await loadShopOrders();
     if (activeTab.value === "configs") await loadConfigs();
     if (activeTab.value === "logs") await loadOperationLogs();
   } catch (error) {
@@ -1189,30 +1278,24 @@ async function loadActiveTab() {
   }
 }
 
-async function switchTab(tab: AdminTab) {
-  activeTab.value = tab;
-  await loadActiveTab();
-}
-
-async function switchTabByName(name: string | number) {
-  await switchTab(String(name) as AdminTab);
-}
-
-onMounted(loadActiveTab);
+watch(
+  () => route.name,
+  async () => {
+    activeTab.value = routeTab();
+    await loadActiveTab();
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">管理端</p>
-    <h1>后台管理</h1>
-    <p>集中管理统计、用户、场地、预约、公告、通知、活动、球友圈、商城、规则配置和操作日志。</p>
+    <p class="eyebrow">{{ activePage.eyebrow }}</p>
+    <h1>{{ activePage.title }}</h1>
+    <p>{{ activePage.description }}</p>
   </section>
 
   <el-card shadow="never" class="admin-shell element-admin">
-    <el-tabs :model-value="activeTab" @tab-change="switchTabByName">
-      <el-tab-pane v-for="tab in tabs" :key="tab.key" :label="tab.label" :name="tab.key" />
-    </el-tabs>
-
     <section v-if="activeTab === 'statistics'" v-loading="loading" class="admin-section">
       <el-form inline class="element-filter">
         <el-form-item label="开始日期">
@@ -1440,16 +1523,19 @@ onMounted(loadActiveTab);
       </el-form>
 
       <el-table :data="reservations" empty-text="暂无预约数据" stripe>
-        <el-table-column prop="reservation_no" label="预约号" min-width="160" />
-        <el-table-column label="用户" min-width="130"><template #default="{ row }">{{ row.nickname || row.username }}</template></el-table-column>
+        <el-table-column prop="reservation_no" label="预约号" min-width="150" />
+        <el-table-column label="用户" min-width="120"><template #default="{ row }">{{ row.nickname || row.username }}</template></el-table-column>
         <el-table-column prop="court_name" label="场地" min-width="110" />
         <el-table-column prop="reserve_date" label="日期" min-width="115" />
-        <el-table-column label="时间" min-width="130"><template #default="{ row }">{{ row.start_time }}-{{ row.end_time }}</template></el-table-column>
-        <el-table-column label="会员" min-width="130"><template #default="{ row }">{{ row.member_level_snapshot }} / {{ discountText(row.discount_rate) }}</template></el-table-column>
+        <el-table-column label="时间" min-width="120"><template #default="{ row }">{{ row.start_time }}-{{ row.end_time }}</template></el-table-column>
         <el-table-column label="应付金额" min-width="120"><template #default="{ row }">{{ formatMoney(row.payable_amount_cents) }}</template></el-table-column>
         <el-table-column label="状态" min-width="100"><template #default="{ row }"><el-tag :type="statusTagType(row.status)" effect="plain">{{ reservationStatusText(row.status) }}</el-tag></template></el-table-column>
-        <el-table-column label="支付截止" min-width="160"><template #default="{ row }">{{ row.status === "pending" ? row.order_expires_at || "-" : "-" }}</template></el-table-column>
-        <el-table-column label="操作" fixed="right" width="100"><template #default="{ row }"><el-button link type="danger" :disabled="!['pending', 'confirmed'].includes(row.status)" @click="cancelAdminReservation(row)">取消</el-button></template></el-table-column>
+        <el-table-column label="操作" fixed="right" width="132">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openReservationDetail(row)">详情</el-button>
+            <el-button link type="danger" :disabled="!['pending', 'confirmed'].includes(row.status)" @click="cancelAdminReservation(row)">取消</el-button>
+          </template>
+        </el-table-column>
       </el-table>
       <el-pagination class="element-pagination" :current-page="reservationPage.page" :page-size="reservationPage.page_size" :total="reservationPage.total" layout="prev, pager, next, total" @current-change="changeReservationPage" />
     </section>
@@ -1575,7 +1661,7 @@ onMounted(loadActiveTab);
       <el-pagination class="element-pagination" :current-page="communityPage.page" :page-size="communityPage.page_size" :total="communityPage.total" layout="prev, pager, next, total" @current-change="changeCommunityPage" />
     </section>
 
-    <section v-if="activeTab === 'shop'" v-loading="loading" class="admin-section">
+    <section v-if="activeTab === 'shopProducts'" v-loading="loading" class="admin-section">
       <el-card shadow="never" class="panel-card">
         <template #header><strong>新增商品</strong></template>
         <el-form inline class="element-filter" @submit.prevent="submitShopProduct">
@@ -1623,13 +1709,16 @@ onMounted(loadActiveTab);
         </el-table>
         <el-pagination class="element-pagination" :current-page="shopProductPage.page" :page-size="shopProductPage.page_size" :total="shopProductPage.total" layout="prev, pager, next, total" @current-change="changeShopProductPage" />
       </el-card>
+    </section>
 
+    <section v-if="activeTab === 'shopOrders'" v-loading="loading" class="admin-section">
       <el-card shadow="never" class="panel-card">
         <template #header><strong>订单管理</strong></template>
         <el-form inline class="element-filter">
           <el-form-item label="状态">
             <el-select v-model="shopOrderFilters.status" clearable class="short-select" @change="refreshShopOrders(true)">
               <el-option label="已支付" value="paid" />
+              <el-option label="退款待审核" value="refund_requested" />
               <el-option label="已完成" value="completed" />
               <el-option label="已取消" value="canceled" />
             </el-select>
@@ -1638,15 +1727,30 @@ onMounted(loadActiveTab);
           <el-form-item><el-button type="primary" @click="refreshShopOrders(true)">查询订单</el-button></el-form-item>
         </el-form>
         <el-table :data="shopOrders" empty-text="暂无商城订单" stripe>
-          <el-table-column prop="order_no" label="订单号" min-width="160" />
+          <el-table-column prop="order_no" label="订单号" min-width="150" />
           <el-table-column label="用户" min-width="120"><template #default="{ row }">{{ row.nickname || row.username }}</template></el-table-column>
           <el-table-column label="金额" width="120"><template #default="{ row }">{{ formatMoney(row.total_amount_cents) }}</template></el-table-column>
           <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="shopOrderStatusType(row.status)" effect="plain">{{ shopOrderStatusText(row.status) }}</el-tag></template></el-table-column>
-          <el-table-column prop="created_at" label="创建时间" min-width="170" />
-          <el-table-column label="操作" fixed="right" width="170">
+          <el-table-column label="操作" fixed="right" width="260">
             <template #default="{ row }">
+              <el-button link type="primary" @click="openShopOrderDetail(row)">详情</el-button>
               <el-button link type="primary" :disabled="row.status !== 'paid'" @click="completeShopOrder(row)">完成</el-button>
-              <el-button link type="warning" :disabled="row.status !== 'paid'" @click="cancelAdminShopOrder(row)">取消退款</el-button>
+              <el-button
+                link
+                type="warning"
+                :disabled="!['paid', 'refund_requested'].includes(row.status)"
+                @click="cancelAdminShopOrder(row)"
+              >
+                {{ row.status === "refund_requested" ? "通过退款" : "管理员退款" }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'refund_requested'"
+                link
+                type="danger"
+                @click="rejectAdminShopOrderRefund(row)"
+              >
+                驳回申请
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -1689,6 +1793,7 @@ onMounted(loadActiveTab);
             <el-option label="hide" value="hide" />
             <el-option label="broadcast" value="broadcast" />
             <el-option label="complete" value="complete" />
+            <el-option label="refund_reject" value="refund_reject" />
           </el-select>
         </el-form-item>
         <el-form-item label="操作人"><el-input v-model="logFilters.username" placeholder="用户名" @keyup.enter="refreshOperationLogs(true)" /></el-form-item>
@@ -1825,6 +1930,100 @@ onMounted(loadActiveTab);
         <el-button type="primary" :loading="loading" native-type="submit">保存商品</el-button>
       </div>
     </el-form>
+  </el-dialog>
+
+  <el-dialog v-model="reservationDetailVisible" title="预约详情" width="min(720px, 92vw)" class="detail-dialog">
+    <div v-if="selectedReservation" class="record-detail">
+      <el-descriptions :column="1" border class="compact-descriptions">
+        <el-descriptions-item label="预约号">{{ selectedReservation.reservation_no }}</el-descriptions-item>
+        <el-descriptions-item label="用户">{{ selectedReservation.nickname || selectedReservation.username }}</el-descriptions-item>
+        <el-descriptions-item label="场地">{{ selectedReservation.court_no }} {{ selectedReservation.court_name }}</el-descriptions-item>
+        <el-descriptions-item label="日期时间">
+          {{ selectedReservation.reserve_date }} {{ selectedReservation.start_time }}-{{ selectedReservation.end_time }}
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="statusTagType(selectedReservation.status)" effect="plain">{{ reservationStatusText(selectedReservation.status) }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="会员折扣">
+          {{ selectedReservation.member_level_snapshot || "-" }} / {{ discountText(selectedReservation.discount_rate) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="场地费">{{ formatMoney(selectedReservation.original_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="优惠金额">-{{ formatMoney(selectedReservation.discount_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="应付金额">{{ formatMoney(selectedReservation.payable_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="积分">+{{ selectedReservation.points_awarded || 0 }}</el-descriptions-item>
+        <el-descriptions-item label="订单号">{{ selectedReservation.order_no || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="订单状态">{{ selectedReservation.order_status || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="支付方式">{{ payMethodText(selectedReservation.order_pay_method) }}</el-descriptions-item>
+        <el-descriptions-item label="支付截止">{{ selectedReservation.order_expires_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="支付时间">{{ selectedReservation.order_paid_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="取消时间">{{ selectedReservation.canceled_at || selectedReservation.order_canceled_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="备注">{{ selectedReservation.remark || "-" }}</el-descriptions-item>
+      </el-descriptions>
+      <div class="dialog-actions">
+        <el-button @click="reservationDetailVisible = false">关闭</el-button>
+        <el-button
+          v-if="['pending', 'confirmed'].includes(selectedReservation.status)"
+          type="danger"
+          plain
+          :loading="loading"
+          @click="cancelAdminReservation(selectedReservation)"
+        >
+          取消预约
+        </el-button>
+      </div>
+    </div>
+  </el-dialog>
+
+  <el-dialog v-model="shopOrderDetailVisible" title="商城订单详情" width="min(720px, 92vw)" class="detail-dialog">
+    <div v-if="selectedShopOrder" class="order-detail">
+      <el-descriptions :column="1" border class="compact-descriptions">
+        <el-descriptions-item label="订单号">{{ selectedShopOrder.order_no }}</el-descriptions-item>
+        <el-descriptions-item label="用户">{{ selectedShopOrder.nickname || selectedShopOrder.username }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ shopOrderStatusText(selectedShopOrder.status) }}</el-descriptions-item>
+        <el-descriptions-item label="金额">{{ formatMoney(selectedShopOrder.total_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="支付方式">{{ payMethodText(selectedShopOrder.pay_method) }}</el-descriptions-item>
+        <el-descriptions-item label="支付时间">{{ selectedShopOrder.paid_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="完成时间">{{ selectedShopOrder.completed_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="取消时间">{{ selectedShopOrder.canceled_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="取消原因">{{ selectedShopOrder.cancel_reason || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款申请时间">{{ selectedShopOrder.refund_requested_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款申请原因">{{ selectedShopOrder.refund_request_reason || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款审核时间">{{ selectedShopOrder.refund_reviewed_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款驳回原因">{{ selectedShopOrder.refund_reject_reason || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="备注">{{ selectedShopOrder.remark || "-" }}</el-descriptions-item>
+      </el-descriptions>
+      <div class="cart-list detail-items">
+        <article v-for="item in selectedShopOrder.items || []" :key="item.id" class="cart-item">
+          <img :src="item.image_url_snapshot || '/courts/default-court.png'" :alt="item.product_name_snapshot" />
+          <div>
+            <strong>{{ item.product_name_snapshot }}</strong>
+            <span>{{ formatMoney(item.price_cents) }} x {{ item.quantity }}</span>
+          </div>
+          <b>{{ formatMoney(item.subtotal_cents) }}</b>
+        </article>
+      </div>
+      <div class="dialog-actions">
+        <el-button @click="shopOrderDetailVisible = false">关闭</el-button>
+        <el-button v-if="selectedShopOrder.status === 'paid'" type="primary" :loading="loading" @click="completeShopOrder(selectedShopOrder)">完成订单</el-button>
+        <el-button
+          v-if="['paid', 'refund_requested'].includes(selectedShopOrder.status)"
+          type="warning"
+          :loading="loading"
+          @click="cancelAdminShopOrder(selectedShopOrder)"
+        >
+          {{ selectedShopOrder.status === "refund_requested" ? "通过退款" : "管理员退款" }}
+        </el-button>
+        <el-button
+          v-if="selectedShopOrder.status === 'refund_requested'"
+          type="danger"
+          plain
+          :loading="loading"
+          @click="rejectAdminShopOrderRefund(selectedShopOrder)"
+        >
+          驳回申请
+        </el-button>
+      </div>
+    </div>
   </el-dialog>
 
   <el-dialog :model-value="Boolean(editingConfig)" :title="`编辑规则：${editingConfig?.config_key || ''}`" width="520px" @close="resetConfigForm">

@@ -145,15 +145,7 @@ async def update_user_status(
     updated = await user_repository.get_user_by_id(settings, user_id)
     if updated is None:
         raise ApiError(404, "用户不存在", 404)
-    result = public_user(updated)
-    await notification_service.notify_member_adjusted(
-        settings,
-        user=result,
-        balance_change_cents=balance_change_cents,
-        points_change=points_change,
-        operator_id=current_user.get("id"),
-    )
-    return result
+    return public_user(updated)
 
 
 async def update_user_member(
@@ -200,7 +192,15 @@ async def update_user_member(
     updated = await user_repository.get_user_by_id(settings, user_id)
     if updated is None:
         raise ApiError(404, "用户不存在", 404)
-    return public_user(updated)
+    result = public_user(updated)
+    await notification_service.notify_member_adjusted(
+        settings,
+        user=result,
+        balance_change_cents=balance_change_cents,
+        points_change=points_change,
+        operator_id=current_user.get("id"),
+    )
+    return result
 
 
 async def update_user_role(

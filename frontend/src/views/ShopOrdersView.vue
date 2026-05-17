@@ -3,14 +3,12 @@ import { onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import {
-  cancelShopOrder,
   getMyShopOrders,
   getShopOrder,
+  requestShopOrderRefund,
   type ShopOrder,
 } from "../api/shop";
-import { useAuthStore } from "../stores/auth";
 
-const authStore = useAuthStore();
 const orders = ref<ShopOrder[]>([]);
 const selectedOrder = ref<ShopOrder | null>(null);
 const detailVisible = ref(false);
@@ -29,6 +27,7 @@ function formatMoney(cents: number | null | undefined) {
 function statusText(status: string) {
   const map: Record<string, string> = {
     paid: "已支付",
+    refund_requested: "退款待审核",
     completed: "已完成",
     canceled: "已取消",
   };
@@ -36,12 +35,17 @@ function statusText(status: string) {
 }
 
 function statusTagType(status: string) {
-  const map: Record<string, "success" | "primary" | "info"> = {
+  const map: Record<string, "success" | "primary" | "info" | "warning"> = {
     paid: "success",
+    refund_requested: "warning",
     completed: "primary",
     canceled: "info",
   };
   return map[status] || "info";
+}
+
+function payMethodText(value: string | null | undefined) {
+  return value === "balance" ? "会员余额" : value || "-";
 }
 
 async function loadOrders(reset = false) {
@@ -76,28 +80,32 @@ async function openDetail(order: ShopOrder) {
   }
 }
 
-async function cancelOrder(order: ShopOrder) {
+async function requestRefund(order: ShopOrder) {
+  let reason = "用户申请商城订单退款";
   try {
-    await ElMessageBox.confirm(`确认取消订单 ${order.order_no} 并退回余额？`, "取消订单", {
-      confirmButtonText: "确认取消",
-      cancelButtonText: "关闭",
+    const result = await ElMessageBox.prompt(`请输入订单 ${order.order_no} 的退款原因`, "申请退款", {
+      confirmButtonText: "提交申请",
+      cancelButtonText: "取消",
+      inputValue: reason,
+      inputPattern: /^.{1,255}$/,
+      inputErrorMessage: "退款原因需填写且不能超过255个字符",
       type: "warning",
     });
+    reason = String(result.value || reason).trim();
   } catch {
     return;
   }
   loading.value = true;
   try {
-    await cancelShopOrder(order.id);
-    await authStore.fetchProfile();
+    await requestShopOrderRefund(order.id, { reason });
     await loadOrders();
     if (selectedOrder.value?.id === order.id) {
       const response = await getShopOrder(order.id);
       selectedOrder.value = response.data;
     }
-    ElMessage.success("订单已取消并退款");
+    ElMessage.success("退款申请已提交，等待管理员审核");
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "取消订单失败");
+    ElMessage.error(error instanceof Error ? error.message : "提交退款申请失败");
   } finally {
     loading.value = false;
   }
@@ -115,7 +123,7 @@ onMounted(() => loadOrders());
   <section class="page-header">
     <p class="eyebrow">商城订单</p>
     <h1>我的商城订单</h1>
-    <p>查看余额支付订单、领取状态和退款记录。</p>
+    <p>查看余额支付订单、领取状态和退款申请记录。</p>
   </section>
 
   <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
@@ -125,6 +133,7 @@ onMounted(() => loadOrders());
       <el-radio-group v-model="filter" @change="() => loadOrders(true)">
         <el-radio-button :value="''">全部</el-radio-button>
         <el-radio-button :value="'paid'">已支付</el-radio-button>
+        <el-radio-button :value="'refund_requested'">退款待审核</el-radio-button>
         <el-radio-button :value="'completed'">已完成</el-radio-button>
         <el-radio-button :value="'canceled'">已取消</el-radio-button>
       </el-radio-group>
@@ -134,7 +143,7 @@ onMounted(() => loadOrders());
     <el-empty v-if="orders.length === 0 && !loading" description="暂无商城订单" />
     <div v-else class="order-list">
       <article v-for="order in orders" :key="order.id" class="order-item">
-        <div>
+        <div class="order-main">
           <strong>{{ order.order_no }}</strong>
           <span>{{ order.created_at }}</span>
         </div>
@@ -144,7 +153,7 @@ onMounted(() => loadOrders());
         </div>
         <div class="order-actions">
           <el-button link type="primary" @click="openDetail(order)">详情</el-button>
-          <el-button v-if="order.status === 'paid'" link type="warning" @click="cancelOrder(order)">取消退款</el-button>
+          <el-button v-if="order.status === 'paid'" link type="warning" @click="requestRefund(order)">申请退款</el-button>
         </div>
       </article>
     </div>
@@ -159,12 +168,21 @@ onMounted(() => loadOrders());
     />
   </el-card>
 
-  <el-dialog v-model="detailVisible" title="订单详情" width="680px">
+  <el-dialog v-model="detailVisible" title="订单详情" width="min(680px, 92vw)" class="detail-dialog">
     <div v-if="selectedOrder" class="order-detail">
-      <el-descriptions :column="1" border>
+      <el-descriptions :column="1" border class="compact-descriptions">
         <el-descriptions-item label="订单号">{{ selectedOrder.order_no }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ statusText(selectedOrder.status) }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ formatMoney(selectedOrder.total_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="支付方式">{{ payMethodText(selectedOrder.pay_method) }}</el-descriptions-item>
+        <el-descriptions-item label="支付时间">{{ selectedOrder.paid_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="完成时间">{{ selectedOrder.completed_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="取消时间">{{ selectedOrder.canceled_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="取消原因">{{ selectedOrder.cancel_reason || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款申请时间">{{ selectedOrder.refund_requested_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款申请原因">{{ selectedOrder.refund_request_reason || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款审核时间">{{ selectedOrder.refund_reviewed_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="退款驳回原因">{{ selectedOrder.refund_reject_reason || "-" }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ selectedOrder.remark || "-" }}</el-descriptions-item>
       </el-descriptions>
       <div class="cart-list">
@@ -179,8 +197,8 @@ onMounted(() => loadOrders());
       </div>
       <div class="dialog-actions">
         <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button v-if="selectedOrder.status === 'paid'" type="warning" @click="cancelOrder(selectedOrder)">
-          取消退款
+        <el-button v-if="selectedOrder.status === 'paid'" type="warning" @click="requestRefund(selectedOrder)">
+          申请退款
         </el-button>
       </div>
     </div>

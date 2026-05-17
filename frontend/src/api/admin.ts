@@ -176,6 +176,10 @@ export function adminGetReservations(params: {
   return http.get<unknown, ApiResponse<PageResult<Reservation>>>("/admin/reservations", { params });
 }
 
+export function adminGetReservation(reservationId: number) {
+  return http.get<unknown, ApiResponse<Reservation>>(`/admin/reservations/${reservationId}`);
+}
+
 export function adminCancelReservation(reservationId: number) {
   return http.put<unknown, ApiResponse<Reservation>>(`/admin/reservations/${reservationId}/cancel`);
 }
@@ -302,6 +306,10 @@ export function adminCompleteShopOrder(orderId: number) {
 
 export function adminCancelShopOrder(orderId: number) {
   return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/cancel`);
+}
+
+export function adminRejectShopOrderRefund(orderId: number, payload: { reason: string }) {
+  return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/refund-reject`, payload);
 }
 
 export function adminGetConfigs() {

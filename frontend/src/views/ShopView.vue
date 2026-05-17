@@ -218,7 +218,7 @@ onMounted(() => loadProducts());
     />
   </el-card>
 
-  <el-drawer v-model="drawerVisible" title="购物车" size="420px" class="shop-cart-drawer">
+  <el-drawer v-model="drawerVisible" title="购物车" size="min(420px, 100vw)" class="shop-cart-drawer">
     <el-empty v-if="cartItems.length === 0" description="购物车为空" />
     <div v-else class="cart-list">
       <article v-for="item in cartItems" :key="item.product.id" class="cart-item">
@@ -236,7 +236,7 @@ onMounted(() => loadProducts());
         <el-button link type="danger" @click="removeCartItem(item.product.id)">移除</el-button>
       </article>
 
-      <el-descriptions :column="1" border>
+      <el-descriptions :column="1" border class="compact-descriptions">
         <el-descriptions-item label="当前余额">{{ formatMoney(balanceCents) }}</el-descriptions-item>
         <el-descriptions-item label="订单合计">{{ formatMoney(cartTotalCents) }}</el-descriptions-item>
       </el-descriptions>

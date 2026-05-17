@@ -52,6 +52,15 @@ class BaseHandler(tornado.web.RequestHandler):
             raise ApiError(400, "请求体必须是 JSON 对象", 400)
         return body
 
+    def path_int(self, value: Any, field_name: str = "ID") -> int:
+        try:
+            result = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ApiError(400, f"{field_name}格式错误", 400) from exc
+        if result <= 0:
+            raise ApiError(400, f"{field_name}必须为正整数", 400)
+        return result
+
     async def require_current_user(self) -> dict[str, Any]:
         if self._current_user_data is not None:
             return self._current_user_data

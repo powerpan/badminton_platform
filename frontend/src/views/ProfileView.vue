@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watchEffect } from "vue";
+import { computed, onMounted, ref, watchEffect } from "vue";
 
+import { getMemberTransactions, type MemberTransaction } from "../api/member";
 import { useAuthStore } from "../stores/auth";
 
 const authStore = useAuthStore();
@@ -12,8 +13,13 @@ const newPassword = ref("");
 const profileMessage = ref("");
 const passwordMessage = ref("");
 const errorMessage = ref("");
+const transactionErrorMessage = ref("");
 const loadingProfile = ref(false);
 const loadingPassword = ref(false);
+const loadingTransactions = ref(false);
+const transactions = ref<MemberTransaction[]>([]);
+const transactionFilter = ref("");
+const transactionPage = ref({ page: 1, page_size: 8, total: 0 });
 
 const currentUser = computed(() => authStore.user);
 const currentMember = computed(() => currentUser.value?.member);
@@ -25,12 +31,36 @@ function formatMoney(cents: number | null | undefined) {
   })}`;
 }
 
+function formatSignedMoney(cents: number) {
+  if (cents > 0) return `+${formatMoney(cents)}`;
+  if (cents < 0) return `-${formatMoney(Math.abs(cents))}`;
+  return formatMoney(0);
+}
+
+function formatSignedPoints(points: number) {
+  if (points > 0) return `+${points.toLocaleString("zh-CN")}`;
+  return points.toLocaleString("zh-CN");
+}
+
 function validityText(value: string | null | undefined) {
   return value ? `有效期至 ${value}` : "长期有效";
 }
 
 function discountText(rate: number) {
   return rate >= 100 ? "无折扣" : `${rate / 10} 折`;
+}
+
+function changeClass(value: number) {
+  if (value > 0) return "positive";
+  if (value < 0) return "negative";
+  return "neutral";
+}
+
+function relatedText(transaction: MemberTransaction) {
+  if (transaction.reservation_id) return `关联预约 #${transaction.reservation_id}`;
+  if (transaction.shop_order_id) return `关联商城订单 #${transaction.shop_order_id}`;
+  if (transaction.operator_username) return `操作人：${transaction.operator_username}`;
+  return "会员账户流水";
 }
 
 watchEffect(() => {
@@ -75,6 +105,32 @@ async function savePassword() {
     loadingPassword.value = false;
   }
 }
+
+async function loadTransactions(reset = false) {
+  if (reset) transactionPage.value.page = 1;
+  loadingTransactions.value = true;
+  transactionErrorMessage.value = "";
+  try {
+    const response = await getMemberTransactions({
+      transaction_type: transactionFilter.value || undefined,
+      page: transactionPage.value.page,
+      page_size: transactionPage.value.page_size,
+    });
+    transactions.value = response.data.items;
+    transactionPage.value.total = response.data.total;
+  } catch (error) {
+    transactionErrorMessage.value = error instanceof Error ? error.message : "余额明细加载失败";
+  } finally {
+    loadingTransactions.value = false;
+  }
+}
+
+async function changeTransactionPage(nextPage: number) {
+  transactionPage.value.page = nextPage;
+  await loadTransactions();
+}
+
+onMounted(() => loadTransactions());
 </script>
 
 <template>
@@ -149,6 +205,70 @@ async function savePassword() {
           <el-alert v-if="passwordMessage" :title="passwordMessage" type="success" show-icon :closable="false" />
           <el-button type="primary" :loading="loadingPassword" native-type="submit">修改密码</el-button>
         </el-form>
+      </el-card>
+    </el-col>
+
+    <el-col :xs="24">
+      <el-card shadow="never" class="panel-card list-page-card member-transaction-card" v-loading="loadingTransactions">
+        <template #header>
+          <div class="card-header-row">
+            <strong>余额明细</strong>
+            <span>展示余额和积分每一次变动</span>
+          </div>
+        </template>
+
+        <el-alert
+          v-if="transactionErrorMessage"
+          class="page-alert"
+          :title="transactionErrorMessage"
+          type="error"
+          show-icon
+          :closable="false"
+        />
+
+        <div class="list-toolbar">
+          <el-radio-group v-model="transactionFilter" @change="() => loadTransactions(true)">
+            <el-radio-button :value="''">全部</el-radio-button>
+            <el-radio-button :value="'reservation_charge'">预约扣款</el-radio-button>
+            <el-radio-button :value="'reservation_refund'">预约退款</el-radio-button>
+            <el-radio-button :value="'shop_purchase'">商城支付</el-radio-button>
+            <el-radio-button :value="'shop_refund'">商城退款</el-radio-button>
+            <el-radio-button :value="'admin_adjust'">后台调整</el-radio-button>
+          </el-radio-group>
+          <el-button plain :loading="loadingTransactions" @click="loadTransactions()">刷新</el-button>
+        </div>
+
+        <el-empty v-if="transactions.length === 0 && !loadingTransactions" description="暂无余额明细" />
+        <div v-else class="member-transaction-list">
+          <article v-for="transaction in transactions" :key="transaction.id" class="member-transaction-item">
+            <div class="member-transaction-main">
+              <div class="member-transaction-title">
+                <el-tag effect="plain">{{ transaction.transaction_type_label }}</el-tag>
+                <strong>{{ transaction.reason || transaction.transaction_type_label }}</strong>
+              </div>
+              <p>{{ relatedText(transaction) }}</p>
+              <span>{{ transaction.created_at }}</span>
+            </div>
+            <div class="member-transaction-values">
+              <strong :class="changeClass(transaction.balance_change_cents)">
+                {{ formatSignedMoney(transaction.balance_change_cents) }}
+              </strong>
+              <span>余额 {{ formatMoney(transaction.balance_before_cents) }} 至 {{ formatMoney(transaction.balance_after_cents) }}</span>
+              <small :class="changeClass(transaction.points_change)">
+                积分 {{ formatSignedPoints(transaction.points_change) }}
+              </small>
+            </div>
+          </article>
+        </div>
+
+        <el-pagination
+          class="element-pagination"
+          :current-page="transactionPage.page"
+          :page-size="transactionPage.page_size"
+          :total="transactionPage.total"
+          layout="prev, pager, next, total"
+          @current-change="changeTransactionPage"
+        />
       </el-card>
     </el-col>
   </el-row>

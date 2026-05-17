@@ -9,8 +9,8 @@ const authStore = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 
-const username = ref("admin");
-const password = ref("admin123456");
+const username = ref("");
+const password = ref("");
 const captchaId = ref("");
 const captchaCode = ref("");
 const captchaImage = ref("");
@@ -37,13 +37,25 @@ async function handleLogin() {
   loading.value = true;
   try {
     await authStore.login(username.value.trim(), password.value, captchaId.value, captchaCode.value.trim());
-    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/";
-    await router.push(redirect);
+    const redirect = safeRedirect(route.query.redirect);
+    await router.push(authStore.isAdmin && redirect === "/" ? "/admin/overview" : redirect);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "登录失败";
     await loadCaptcha();
   } finally {
     loading.value = false;
+  }
+}
+
+function safeRedirect(value: unknown) {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
+    return authStore.isAdmin ? "/admin/overview" : "/";
+  }
+  try {
+    const resolved = router.resolve(value);
+    return resolved.matched.length ? resolved.fullPath : authStore.isAdmin ? "/admin/overview" : "/";
+  } catch {
+    return authStore.isAdmin ? "/admin/overview" : "/";
   }
 }
 

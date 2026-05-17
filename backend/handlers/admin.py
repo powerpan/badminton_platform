@@ -77,7 +77,7 @@ class AdminUserStatusHandler(BaseHandler):
         user = await admin_user_service.update_user_status(
             settings,
             current_user=current_user,
-            user_id=int(user_id),
+            user_id=self.path_int(user_id, "用户ID"),
             body=self.get_json_body(),
         )
         await _record_admin_log(
@@ -99,7 +99,7 @@ class AdminUserRoleHandler(BaseHandler):
         user = await admin_user_service.update_user_role(
             settings,
             current_user=current_user,
-            user_id=int(user_id),
+            user_id=self.path_int(user_id, "用户ID"),
             body=self.get_json_body(),
         )
         await _record_admin_log(
@@ -121,7 +121,7 @@ class AdminUserMemberHandler(BaseHandler):
         user = await admin_user_service.update_user_member(
             settings,
             current_user=current_user,
-            user_id=int(user_id),
+            user_id=self.path_int(user_id, "用户ID"),
             body=self.get_json_body(),
         )
         await _record_admin_log(
@@ -149,7 +149,7 @@ class AdminUserPasswordHandler(BaseHandler):
         user = await admin_user_service.reset_user_password(
             settings,
             current_user=current_user,
-            user_id=int(user_id),
+            user_id=self.path_int(user_id, "用户ID"),
             body=self.get_json_body(),
         )
         await _record_admin_log(
@@ -204,7 +204,7 @@ class AdminCourtDetailHandler(BaseHandler):
     async def put(self, court_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        court = await court_service.update_court(settings, int(court_id), self.get_json_body())
+        court = await court_service.update_court(settings, self.path_int(court_id, "场地ID"), self.get_json_body())
         await _record_admin_log(
             self,
             current_user,
@@ -227,7 +227,7 @@ class AdminCourtStatusHandler(BaseHandler):
     async def put(self, court_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        court = await court_service.update_court_status(settings, int(court_id), self.get_json_body())
+        court = await court_service.update_court_status(settings, self.path_int(court_id, "场地ID"), self.get_json_body())
         await _record_admin_log(
             self,
             current_user,
@@ -263,7 +263,7 @@ class AdminReservationDetailHandler(BaseHandler):
     async def get(self, reservation_id: str) -> None:
         await self.require_admin()
         settings = self.application.settings["app_settings"]
-        reservation = await reservation_service.get_admin_reservation(settings, int(reservation_id))
+        reservation = await reservation_service.get_admin_reservation(settings, self.path_int(reservation_id, "预约ID"))
         self.write_json(success(reservation))
 
 
@@ -273,7 +273,7 @@ class AdminReservationCancelHandler(BaseHandler):
         settings = self.application.settings["app_settings"]
         reservation = await reservation_service.admin_cancel_reservation(
             settings,
-            int(reservation_id),
+            self.path_int(reservation_id, "预约ID"),
             current_user=current_user,
         )
         await _record_admin_log(
@@ -332,7 +332,7 @@ class AdminAnnouncementDetailHandler(BaseHandler):
         settings = self.application.settings["app_settings"]
         announcement = await announcement_service.update_announcement(
             settings,
-            int(announcement_id),
+            self.path_int(announcement_id, "公告ID"),
             self.get_json_body(),
         )
         await _record_admin_log(
@@ -351,7 +351,7 @@ class AdminAnnouncementDetailHandler(BaseHandler):
         settings = self.application.settings["app_settings"]
         announcement = await announcement_service.update_announcement_status(
             settings,
-            int(announcement_id),
+            self.path_int(announcement_id, "公告ID"),
             {"status": 0},
         )
         await _record_admin_log(
@@ -372,7 +372,7 @@ class AdminAnnouncementStatusHandler(BaseHandler):
         settings = self.application.settings["app_settings"]
         announcement = await announcement_service.update_announcement_status(
             settings,
-            int(announcement_id),
+            self.path_int(announcement_id, "公告ID"),
             self.get_json_body(),
         )
         await _record_admin_log(
@@ -446,7 +446,7 @@ class AdminEventDetailHandler(BaseHandler):
     async def put(self, event_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        event = await event_service.update_event(settings, int(event_id), self.get_json_body())
+        event = await event_service.update_event(settings, self.path_int(event_id, "活动ID"), self.get_json_body())
         await _record_admin_log(
             self,
             current_user,
@@ -466,7 +466,7 @@ class AdminEventStatusHandler(BaseHandler):
         event = await event_service.update_event_status(
             settings,
             current_user=current_user,
-            event_id=int(event_id),
+            event_id=self.path_int(event_id, "活动ID"),
             body=self.get_json_body(),
         )
         await _record_admin_log(
@@ -500,7 +500,7 @@ class AdminCommunityPostHideHandler(BaseHandler):
     async def put(self, post_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        post = await community_service.admin_hide_post(settings, int(post_id))
+        post = await community_service.admin_hide_post(settings, self.path_int(post_id, "动态ID"))
         await _record_admin_log(
             self,
             current_user,
@@ -549,7 +549,7 @@ class AdminShopProductDetailHandler(BaseHandler):
     async def put(self, product_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        product = await shop_service.update_product(settings, int(product_id), self.get_json_body())
+        product = await shop_service.update_product(settings, self.path_int(product_id, "商品ID"), self.get_json_body())
         await _record_admin_log(
             self,
             current_user,
@@ -570,7 +570,7 @@ class AdminShopProductStatusHandler(BaseHandler):
     async def put(self, product_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        product = await shop_service.update_product_status(settings, int(product_id), self.get_json_body())
+        product = await shop_service.update_product_status(settings, self.path_int(product_id, "商品ID"), self.get_json_body())
         await _record_admin_log(
             self,
             current_user,
@@ -603,7 +603,7 @@ class AdminShopOrderDetailHandler(BaseHandler):
     async def get(self, order_id: str) -> None:
         await self.require_admin()
         settings = self.application.settings["app_settings"]
-        order = await shop_service.get_admin_order(settings, int(order_id))
+        order = await shop_service.get_admin_order(settings, self.path_int(order_id, "订单ID"))
         self.write_json(success(order))
 
 
@@ -611,7 +611,11 @@ class AdminShopOrderCompleteHandler(BaseHandler):
     async def put(self, order_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        order = await shop_service.complete_order(settings, current_user=current_user, order_id=int(order_id))
+        order = await shop_service.complete_order(
+            settings,
+            current_user=current_user,
+            order_id=self.path_int(order_id, "订单ID"),
+        )
         await _record_admin_log(
             self,
             current_user,
@@ -628,7 +632,11 @@ class AdminShopOrderCancelHandler(BaseHandler):
     async def put(self, order_id: str) -> None:
         current_user = await self.require_admin()
         settings = self.application.settings["app_settings"]
-        order = await shop_service.admin_cancel_order(settings, current_user=current_user, order_id=int(order_id))
+        order = await shop_service.admin_cancel_order(
+            settings,
+            current_user=current_user,
+            order_id=self.path_int(order_id, "订单ID"),
+        )
         await _record_admin_log(
             self,
             current_user,
@@ -639,6 +647,28 @@ class AdminShopOrderCancelHandler(BaseHandler):
             detail={"order_no": order["order_no"], "username": order.get("username")},
         )
         self.write_json(success(order, "订单已取消并退款"))
+
+
+class AdminShopOrderRefundRejectHandler(BaseHandler):
+    async def put(self, order_id: str) -> None:
+        current_user = await self.require_admin()
+        settings = self.application.settings["app_settings"]
+        order = await shop_service.reject_refund_request(
+            settings,
+            current_user=current_user,
+            order_id=self.path_int(order_id, "订单ID"),
+            body=self.get_json_body(),
+        )
+        await _record_admin_log(
+            self,
+            current_user,
+            module="shop",
+            action="refund_reject",
+            target_type="shop_order",
+            target_id=order["id"],
+            detail={"order_no": order["order_no"], "username": order.get("username"), "reason": order.get("refund_reject_reason")},
+        )
+        self.write_json(success(order, "退款申请已驳回"))
 
 
 class AdminConfigsHandler(BaseHandler):

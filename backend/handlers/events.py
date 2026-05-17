@@ -34,7 +34,7 @@ class EventDetailHandler(BaseHandler):
         current_user = await _optional_user(self)
         event = await event_service.get_public_event(
             settings,
-            int(event_id),
+            self.path_int(event_id, "活动ID"),
             user_id=current_user["id"] if current_user else None,
         )
         self.write_json(success(event))
@@ -44,7 +44,11 @@ class EventRegisterHandler(BaseHandler):
     async def post(self, event_id: str) -> None:
         settings = self.application.settings["app_settings"]
         current_user = await self.require_current_user()
-        event = await event_service.register_event(settings, current_user=current_user, event_id=int(event_id))
+        event = await event_service.register_event(
+            settings,
+            current_user=current_user,
+            event_id=self.path_int(event_id, "活动ID"),
+        )
         self.write_json(success(event, "报名成功"))
 
 
@@ -52,5 +56,9 @@ class EventCancelRegistrationHandler(BaseHandler):
     async def put(self, event_id: str) -> None:
         settings = self.application.settings["app_settings"]
         current_user = await self.require_current_user()
-        event = await event_service.cancel_registration(settings, current_user=current_user, event_id=int(event_id))
+        event = await event_service.cancel_registration(
+            settings,
+            current_user=current_user,
+            event_id=self.path_int(event_id, "活动ID"),
+        )
         self.write_json(success(event, "报名已取消"))

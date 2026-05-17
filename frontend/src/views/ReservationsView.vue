@@ -24,6 +24,8 @@ const filters: Array<{ label: string; value: "" | ReservationStatus }> = [
 
 const activeStatus = ref<"" | ReservationStatus>("");
 const reservations = ref<Reservation[]>([]);
+const selectedReservation = ref<Reservation | null>(null);
+const detailVisible = ref(false);
 const loading = ref(false);
 const actionId = ref<number | null>(null);
 const total = ref(0);
@@ -46,6 +48,11 @@ function formatMoney(cents: number | null | undefined) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function discountText(rate: number | null | undefined) {
+  const value = rate || 100;
+  return value >= 100 ? "无折扣" : `${value / 10} 折`;
 }
 
 function statusType(status: ReservationStatus) {
@@ -72,6 +79,15 @@ function statusText(status: ReservationStatus) {
 
 function orderExpiryText(reservation: Reservation) {
   return reservation.order_expires_at || "-";
+}
+
+function payMethodText(value: string | null | undefined) {
+  return value === "balance" ? "会员余额" : value || "-";
+}
+
+function openReservationDetail(reservation: Reservation) {
+  selectedReservation.value = reservation;
+  detailVisible.value = true;
 }
 
 async function loadReservations() {
@@ -120,7 +136,10 @@ async function pay(reservation: Reservation) {
   message.value = "";
   errorMessage.value = "";
   try {
-    await payReservationOrder(reservation.order_id);
+    const response = await payReservationOrder(reservation.order_id);
+    if (selectedReservation.value?.id === reservation.id) {
+      selectedReservation.value = response.data;
+    }
     await authStore.fetchProfile();
     message.value = "支付成功，预约已确认";
     await loadReservations();
@@ -149,7 +168,10 @@ async function cancel(reservation: Reservation) {
   message.value = "";
   errorMessage.value = "";
   try {
-    await cancelReservation(reservation.id);
+    const response = await cancelReservation(reservation.id);
+    if (selectedReservation.value?.id === reservation.id) {
+      selectedReservation.value = response.data;
+    }
     await authStore.fetchProfile();
     message.value = "预约已取消";
     await loadReservations();
@@ -184,34 +206,23 @@ onMounted(loadReservations);
     <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
 
     <el-table v-loading="loading" :data="reservations" empty-text="暂无预约记录" stripe>
-      <el-table-column prop="reservation_no" label="预约号" min-width="160" />
-      <el-table-column prop="court_name" label="场地" min-width="110" />
+      <el-table-column prop="reservation_no" label="预约号" min-width="150" />
+      <el-table-column prop="court_name" label="场地" min-width="120" />
       <el-table-column prop="reserve_date" label="日期" min-width="115" />
-      <el-table-column label="时间" min-width="130">
+      <el-table-column label="时间" min-width="120">
         <template #default="{ row }">{{ row.start_time }}-{{ row.end_time }}</template>
-      </el-table-column>
-      <el-table-column label="原价" min-width="110">
-        <template #default="{ row }">{{ formatMoney(row.original_amount_cents) }}</template>
-      </el-table-column>
-      <el-table-column label="折扣" min-width="110">
-        <template #default="{ row }">-{{ formatMoney(row.discount_amount_cents) }}</template>
       </el-table-column>
       <el-table-column label="应付金额" min-width="120">
         <template #default="{ row }">{{ formatMoney(row.payable_amount_cents) }}</template>
-      </el-table-column>
-      <el-table-column label="积分" min-width="90">
-        <template #default="{ row }">+{{ row.points_awarded }}</template>
       </el-table-column>
       <el-table-column label="状态" min-width="100">
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="支付截止" min-width="160">
-        <template #default="{ row }">{{ row.status === "pending" ? orderExpiryText(row) : "-" }}</template>
-      </el-table-column>
-      <el-table-column label="操作" fixed="right" width="150">
+      <el-table-column label="操作" fixed="right" width="178">
         <template #default="{ row }">
+          <el-button link type="primary" @click="openReservationDetail(row)">详情</el-button>
           <el-button
             v-if="canPay(row)"
             link
@@ -235,4 +246,37 @@ onMounted(loadReservations);
       </el-table-column>
     </el-table>
   </el-card>
+
+  <el-dialog v-model="detailVisible" title="预约详情" width="min(680px, 92vw)" class="detail-dialog">
+    <div v-if="selectedReservation" class="record-detail">
+      <el-descriptions :column="1" border class="compact-descriptions">
+        <el-descriptions-item label="预约号">{{ selectedReservation.reservation_no }}</el-descriptions-item>
+        <el-descriptions-item label="场地">{{ selectedReservation.court_no }} {{ selectedReservation.court_name }}</el-descriptions-item>
+        <el-descriptions-item label="日期时间">
+          {{ selectedReservation.reserve_date }} {{ selectedReservation.start_time }}-{{ selectedReservation.end_time }}
+        </el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="statusType(selectedReservation.status)" effect="plain">{{ statusText(selectedReservation.status) }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="会员折扣">
+          {{ selectedReservation.member_level_snapshot || "-" }} / {{ discountText(selectedReservation.discount_rate) }}
+        </el-descriptions-item>
+        <el-descriptions-item label="场地费">{{ formatMoney(selectedReservation.original_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="优惠金额">-{{ formatMoney(selectedReservation.discount_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="应付金额">{{ formatMoney(selectedReservation.payable_amount_cents) }}</el-descriptions-item>
+        <el-descriptions-item label="积分">+{{ selectedReservation.points_awarded || 0 }}</el-descriptions-item>
+        <el-descriptions-item label="订单号">{{ selectedReservation.order_no || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="支付方式">{{ payMethodText(selectedReservation.order_pay_method) }}</el-descriptions-item>
+        <el-descriptions-item label="支付截止">{{ selectedReservation.order_expires_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="支付时间">{{ selectedReservation.order_paid_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="取消时间">{{ selectedReservation.canceled_at || selectedReservation.order_canceled_at || "-" }}</el-descriptions-item>
+        <el-descriptions-item label="备注">{{ selectedReservation.remark || "-" }}</el-descriptions-item>
+      </el-descriptions>
+      <div class="dialog-actions">
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button v-if="canPay(selectedReservation)" type="primary" :loading="actionId === selectedReservation.id" @click="pay(selectedReservation)">支付</el-button>
+        <el-button v-if="canCancel(selectedReservation)" type="danger" plain :loading="actionId === selectedReservation.id" @click="cancel(selectedReservation)">取消预约</el-button>
+      </div>
+    </div>
+  </el-dialog>
 </template>

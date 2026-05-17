@@ -88,6 +88,11 @@ http.interceptors.response.use(
       if (window.location.pathname !== "/login") {
         window.location.assign("/login");
       }
+    } else if (status === 403 && message.includes("账号已被禁用")) {
+      clearLocalSession();
+      if (window.location.pathname !== "/login") {
+        window.location.assign("/login");
+      }
     } else if (status === 403 && window.location.pathname.startsWith("/admin")) {
       window.location.assign("/");
     }

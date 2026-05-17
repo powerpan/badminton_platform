@@ -335,6 +335,33 @@ async def notify_shop_order_canceled(
     )
 
 
+async def notify_shop_refund_requested(settings: Settings, *, order: dict[str, Any], operator_id: int | None) -> None:
+    await safe_create_user_notification(
+        settings,
+        user_id=int(order["user_id"]),
+        title="商城退款申请已提交",
+        content=f"订单 {order.get('order_no')} 的退款申请已提交，请等待管理员审核。",
+        category="shop",
+        source_type="shop_order",
+        source_id=int(order["id"]),
+        created_by=operator_id,
+    )
+
+
+async def notify_shop_refund_rejected(settings: Settings, *, order: dict[str, Any], operator_id: int | None) -> None:
+    reason = order.get("refund_reject_reason") or "管理员驳回退款申请"
+    await safe_create_user_notification(
+        settings,
+        user_id=int(order["user_id"]),
+        title="商城退款申请未通过",
+        content=f"订单 {order.get('order_no')} 的退款申请未通过。原因：{reason}",
+        category="shop",
+        source_type="shop_order",
+        source_id=int(order["id"]),
+        created_by=operator_id,
+    )
+
+
 async def notify_shop_order_completed(settings: Settings, *, order: dict[str, Any], operator_id: int | None) -> None:
     await safe_create_user_notification(
         settings,

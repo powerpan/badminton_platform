@@ -15,6 +15,7 @@ PRODUCT_COLUMNS = (
 ORDER_COLUMNS = (
     "o.id, o.order_no, o.user_id, u.username, u.nickname, o.status, o.total_amount_cents, "
     "o.pay_method, o.paid_at, o.completed_at, o.canceled_at, o.cancel_reason, o.remark, "
+    "o.refund_requested_at, o.refund_request_reason, o.refund_reviewed_at, o.refund_reject_reason, "
     "o.created_at, o.updated_at"
 )
 
@@ -369,6 +370,104 @@ async def list_order_items(settings: Settings, order_id: int) -> list[dict[str, 
     )
 
 
+async def request_refund_atomic(
+    settings: Settings,
+    *,
+    order_id: int,
+    current_user_id: int,
+    reason: str,
+) -> tuple[int | None, str | None]:
+    pool = await get_pool(settings)
+    async with pool.acquire() as connection:
+        await connection.autocommit(False)
+        try:
+            await connection.begin()
+            async with connection.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    """
+                    SELECT id, user_id, status
+                    FROM shop_order
+                    WHERE id = %s
+                    FOR UPDATE
+                    """,
+                    (order_id,),
+                )
+                order = await cursor.fetchone()
+                if order is None:
+                    await connection.rollback()
+                    return None, "not_found"
+                if int(order["user_id"]) != current_user_id:
+                    await connection.rollback()
+                    return None, "not_found"
+                if order["status"] == "refund_requested":
+                    await connection.rollback()
+                    return None, "already_requested"
+                if order["status"] != "paid":
+                    await connection.rollback()
+                    return None, "not_paid"
+                await cursor.execute(
+                    """
+                    UPDATE shop_order
+                    SET status = 'refund_requested',
+                        refund_requested_at = NOW(),
+                        refund_request_reason = %s,
+                        refund_reviewed_at = NULL,
+                        refund_reject_reason = NULL
+                    WHERE id = %s
+                    """,
+                    (reason, order_id),
+                )
+            await connection.commit()
+            return order_id, None
+        except Exception:
+            await connection.rollback()
+            raise
+        finally:
+            await connection.autocommit(True)
+
+
+async def reject_refund_request_atomic(
+    settings: Settings,
+    *,
+    order_id: int,
+    reason: str,
+) -> tuple[int | None, str | None]:
+    pool = await get_pool(settings)
+    async with pool.acquire() as connection:
+        await connection.autocommit(False)
+        try:
+            await connection.begin()
+            async with connection.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    "SELECT id, status FROM shop_order WHERE id = %s FOR UPDATE",
+                    (order_id,),
+                )
+                order = await cursor.fetchone()
+                if order is None:
+                    await connection.rollback()
+                    return None, "not_found"
+                if order["status"] != "refund_requested":
+                    await connection.rollback()
+                    return None, "not_refund_requested"
+                await cursor.execute(
+                    """
+                    UPDATE shop_order
+                    SET status = 'paid',
+                        refund_reviewed_at = NOW(),
+                        refund_reject_reason = %s
+                    WHERE id = %s
+                    """,
+                    (reason, order_id),
+                )
+            await connection.commit()
+            return order_id, None
+        except Exception:
+            await connection.rollback()
+            raise
+        finally:
+            await connection.autocommit(True)
+
+
 async def cancel_order_atomic(
     settings: Settings,
     *,
@@ -400,7 +499,7 @@ async def cancel_order_atomic(
                 if current_user_id is not None and int(order["user_id"]) != current_user_id:
                     await connection.rollback()
                     return None, "not_found"
-                if order["status"] != "paid":
+                if order["status"] not in {"paid", "refund_requested"}:
                     await connection.rollback()
                     return None, "not_paid"
 
@@ -455,7 +554,11 @@ async def cancel_order_atomic(
                     UPDATE shop_order
                     SET status = 'canceled',
                         canceled_at = NOW(),
-                        cancel_reason = %s
+                        cancel_reason = %s,
+                        refund_reviewed_at = CASE
+                          WHEN refund_requested_at IS NOT NULL AND refund_reviewed_at IS NULL THEN NOW()
+                          ELSE refund_reviewed_at
+                        END
                     WHERE id = %s
                     """,
                     (reason, order_id),

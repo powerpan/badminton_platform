@@ -131,6 +131,10 @@ CREATE TABLE IF NOT EXISTS shop_order (
   completed_at DATETIME NULL,
   canceled_at DATETIME NULL,
   cancel_reason VARCHAR(255) NULL,
+  refund_requested_at DATETIME NULL,
+  refund_request_reason VARCHAR(255) NULL,
+  refund_reviewed_at DATETIME NULL,
+  refund_reject_reason VARCHAR(255) NULL,
   remark VARCHAR(255) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -299,8 +303,7 @@ VALUES
   ('advance_reservation_days', '7', '可提前预约天数'),
   ('daily_reservation_limit', '3', '用户每日最大预约次数')
 ON DUPLICATE KEY UPDATE
-  config_value = VALUES(config_value),
-  description = VALUES(description);
+  config_key = VALUES(config_key);
 
 INSERT INTO court (court_no, court_name, description, status, price_per_hour_cents, image_url, tags, capacity)
 VALUES
@@ -308,32 +311,20 @@ VALUES
   ('A02', '二号场', '靠近休息区的标准羽毛球场地', 1, 12000, '/courts/default-court.png', '空调开放,休息区近', 6),
   ('B01', '三号场', '训练区场地', 1, 10000, '/courts/default-court.png', '训练区,轻量训练', 4)
 ON DUPLICATE KEY UPDATE
-  court_name = VALUES(court_name),
-  description = VALUES(description),
-  status = VALUES(status),
-  price_per_hour_cents = VALUES(price_per_hour_cents),
-  image_url = VALUES(image_url),
-  tags = VALUES(tags),
-  capacity = VALUES(capacity);
+  court_no = VALUES(court_no);
 
 INSERT INTO user (username, password_hash, nickname, role, contact, status)
 VALUES
   ('admin', '$2b$12$OeO2WdhDYO81lfFsEPMNle//zNjiWq5LuTAFbkK8RPLmv4wVTEAdu', '系统管理员', 'admin', 'admin', 1)
 ON DUPLICATE KEY UPDATE
-  password_hash = VALUES(password_hash),
-  nickname = VALUES(nickname),
-  role = VALUES(role),
-  contact = VALUES(contact),
-  status = VALUES(status);
+  username = VALUES(username);
 
 INSERT INTO member_account (user_id, member_level, balance_cents, points, expires_at)
 SELECT id, 'diamond', 200000, 0, '2026-12-31'
 FROM user
 WHERE username = 'admin'
 ON DUPLICATE KEY UPDATE
-  member_level = VALUES(member_level),
-  balance_cents = VALUES(balance_cents),
-  expires_at = VALUES(expires_at);
+  user_id = VALUES(user_id);
 
 INSERT INTO shop_product (product_no, product_name, description, image_url, price_cents, stock, sold_count, status)
 VALUES
@@ -341,9 +332,4 @@ VALUES
   ('P002', '吸汗手胶', '防滑吸汗手胶，到店领取。', '/courts/default-court.png', 1800, 80, 0, 1),
   ('P003', '场馆饮用水', '运动补水饮品，前台自提。', '/courts/default-court.png', 500, 120, 0, 1)
 ON DUPLICATE KEY UPDATE
-  product_name = VALUES(product_name),
-  description = VALUES(description),
-  image_url = VALUES(image_url),
-  price_cents = VALUES(price_cents),
-  stock = VALUES(stock),
-  status = VALUES(status);
+  product_no = VALUES(product_no);

@@ -35,7 +35,7 @@ class NotificationReadHandler(BaseHandler):
         data = await notification_service.mark_notification_read(
             settings,
             current_user=current_user,
-            notification_id=int(notification_id),
+            notification_id=self.path_int(notification_id, "通知ID"),
         )
         self.write_json(success(data))
 

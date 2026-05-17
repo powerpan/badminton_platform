@@ -22,5 +22,9 @@ class CommunityPostHideHandler(BaseHandler):
     async def put(self, post_id: str) -> None:
         settings = self.application.settings["app_settings"]
         current_user = await self.require_current_user()
-        post = await community_service.hide_own_post(settings, current_user=current_user, post_id=int(post_id))
+        post = await community_service.hide_own_post(
+            settings,
+            current_user=current_user,
+            post_id=self.path_int(post_id, "动态ID"),
+        )
         self.write_json(success(post, "动态已隐藏"))

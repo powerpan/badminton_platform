@@ -20,5 +20,5 @@ class AnnouncementsHandler(BaseHandler):
 class AnnouncementDetailHandler(BaseHandler):
     async def get(self, announcement_id: str) -> None:
         settings = self.application.settings["app_settings"]
-        data = await announcement_service.get_public_announcement(settings, int(announcement_id))
+        data = await announcement_service.get_public_announcement(settings, self.path_int(announcement_id, "公告ID"))
         self.write_json(success(data))

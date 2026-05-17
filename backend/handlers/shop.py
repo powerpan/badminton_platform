@@ -23,7 +23,7 @@ class ShopProductsHandler(BaseHandler):
 class ShopProductDetailHandler(BaseHandler):
     async def get(self, product_id: str) -> None:
         settings = self.application.settings["app_settings"]
-        product = await shop_service.get_public_product(settings, int(product_id))
+        product = await shop_service.get_public_product(settings, self.path_int(product_id, "商品ID"))
         self.write_json(success(product))
 
 
@@ -55,13 +55,31 @@ class ShopOrderDetailHandler(BaseHandler):
     async def get(self, order_id: str) -> None:
         settings = self.application.settings["app_settings"]
         current_user = await self.require_current_user()
-        order = await shop_service.get_my_order(settings, current_user=current_user, order_id=int(order_id))
+        order = await shop_service.get_my_order(settings, current_user=current_user, order_id=self.path_int(order_id, "订单ID"))
         self.write_json(success(order))
+
+
+class ShopOrderRefundRequestHandler(BaseHandler):
+    async def put(self, order_id: str) -> None:
+        settings = self.application.settings["app_settings"]
+        current_user = await self.require_current_user()
+        order = await shop_service.request_my_refund(
+            settings,
+            current_user=current_user,
+            order_id=self.path_int(order_id, "订单ID"),
+            body=self.get_json_body(),
+        )
+        self.write_json(success(order, "退款申请已提交，等待管理员审核"))
 
 
 class ShopOrderCancelHandler(BaseHandler):
     async def put(self, order_id: str) -> None:
         settings = self.application.settings["app_settings"]
         current_user = await self.require_current_user()
-        order = await shop_service.cancel_my_order(settings, current_user=current_user, order_id=int(order_id))
-        self.write_json(success(order, "订单已取消并退款"))
+        order = await shop_service.request_my_refund(
+            settings,
+            current_user=current_user,
+            order_id=self.path_int(order_id, "订单ID"),
+            body=self.get_json_body(),
+        )
+        self.write_json(success(order, "退款申请已提交，等待管理员审核"))

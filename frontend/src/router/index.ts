@@ -45,10 +45,26 @@ const router = createRouter({
     { path: "/notifications", name: "notifications", component: NotificationsView, meta: { requiresAuth: true } },
     {
       path: "/admin",
-      name: "admin",
-      component: AdminDashboard,
+      redirect: "/admin/overview",
       meta: { requiresAuth: true, requiresAdmin: true },
     },
+    {
+      path: "/admin/overview",
+      name: "admin-overview",
+      component: AdminDashboard,
+      meta: { requiresAuth: true, requiresAdmin: true, adminTab: "statistics", title: "运营总览" },
+    },
+    { path: "/admin/users", name: "admin-users", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "users", title: "用户管理" } },
+    { path: "/admin/courts", name: "admin-courts", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "courts", title: "场地管理" } },
+    { path: "/admin/reservations", name: "admin-reservations", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "reservations", title: "预约管理" } },
+    { path: "/admin/announcements", name: "admin-announcements", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "announcements", title: "公告管理" } },
+    { path: "/admin/notifications", name: "admin-notifications", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "notifications", title: "通知管理" } },
+    { path: "/admin/events", name: "admin-events", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "events", title: "活动管理" } },
+    { path: "/admin/community", name: "admin-community", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "community", title: "球友圈管理" } },
+    { path: "/admin/shop/products", name: "admin-shop-products", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "shopProducts", title: "商城商品" } },
+    { path: "/admin/shop/orders", name: "admin-shop-orders", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "shopOrders", title: "商城订单" } },
+    { path: "/admin/configs", name: "admin-configs", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "configs", title: "规则配置" } },
+    { path: "/admin/logs", name: "admin-logs", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "logs", title: "操作日志" } },
   ],
 });
 
@@ -72,7 +88,7 @@ router.beforeEach(async (to) => {
   }
 
   if ((to.name === "login" || to.name === "register" || to.name === "forgot-password") && authStore.isLoggedIn) {
-    return { name: "home" };
+    return { name: authStore.isAdmin ? "admin-overview" : "home" };
   }
 
   return true;

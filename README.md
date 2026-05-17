@@ -8,7 +8,7 @@
 - 缓存：Redis
 - 认证：JWT
 
-当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、场地预约待支付订单闭环、站内通知、公告详情、帮助中心、活动赛事、球友圈、商城库存与余额支付、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以预约场地、支付待支付预约、查看通知和公告详情、报名活动、发布球友圈动态、使用会员余额购买商品并取消退款；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、活动、球友圈动态、商城商品和订单、预约规则配置、运营统计和操作日志。
+当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、会员余额明细、场地预约待支付订单闭环、站内通知、公告详情、帮助中心、活动赛事、球友圈、商城库存与余额支付、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以预约场地、支付待支付预约、查看余额和积分流水、查看通知和公告详情、报名活动、发布球友圈动态、使用会员余额购买商品并提交退款申请；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、活动、球友圈动态、商城商品和订单、审核商城退款、预约规则配置、运营统计和操作日志。
 
 ## 当前实现状态
 
@@ -18,7 +18,7 @@
 - MySQL 连接池和用户数据访问封装。
 - Redis / MySQL / API 健康检查。
 - 用户注册、登录、验证码、JWT 鉴权、个人资料、修改密码、找回密码。
-- 会员账户查询，包含等级、有效期、余额、积分、固定折扣和当前实际折扣。
+- 会员账户查询，包含等级、有效期、余额、积分、固定折扣、当前实际折扣和余额明细。
 - 场地列表、按规则生成时间段、时间段状态查询。
 - 场地资产和价格已接入数据库，支持场地图片、标签、容纳人数和每小时价格展示。
 - 预约创建、Redis 临时锁、MySQL 时间重叠冲突校验。
@@ -41,7 +41,7 @@
 - 帮助中心已提供预约、取消、会员和场地使用规则说明。
 - 活动赛事入口已启用，支持活动列表、详情、报名、取消报名和后台活动维护。
 - 球友圈入口已启用，支持文本动态发布、用户隐藏自己的动态和管理员隐藏动态。
-- 商城入口已启用，支持商品库存、购物车、会员余额支付、订单查看、用户取消退款、管理员完成订单和管理员取消退款。
+- 商城入口已启用，支持商品库存、购物车、会员余额支付、订单查看、用户申请退款、管理员审核退款、管理员完成订单和管理员主动退款。
 - 管理员规则配置查询和更新。
 - 后台统计接口和统计视图：预约总量、今日预约、活跃用户、场地使用率、热门时间段、用户活跃度。
 - 管理员关键操作日志写入和日志查询。
@@ -54,9 +54,9 @@
 - 后台会员调整、场地编辑、公告编辑和规则配置编辑已改为弹窗表单，避免旧数据回填到顶部新增表单。
 - 预约冲突、空状态和加载状态的前端提示优化。
 - Vue3 前端骨架、Axios 请求封装、Pinia 登录态保存。
-- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/notifications`、`/announcements`、`/announcements/:id`、`/help`、`/events`、`/events/:id`、`/community`、`/shop`、`/shop/orders`、`/admin` 页面。
+- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/notifications`、`/announcements`、`/announcements/:id`、`/help`、`/events`、`/events/:id`、`/community`、`/shop`、`/shop/orders`、`/admin/overview` 及各后台子菜单页面。
 - 路由守卫：未登录跳转登录页，普通用户不能访问管理后台。
-- 初始化 SQL：核心表、默认配置、测试场地、默认管理员账号。
+- 初始化 SQL：核心表、默认配置、测试场地、本地演示管理员账号。
 
 待开发：
 
@@ -144,9 +144,9 @@ mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
 - 系统配置表
 - 操作日志表
 - 默认系统配置和测试场地
-- 默认管理员账号：`admin / admin123456`
+- 本地演示管理员账号
 
-默认账号仅用于本地开发和演示，正式部署前应修改密码和 `JWT_SECRET`。
+默认账号仅用于本地开发和演示，前端登录页不再回显默认口令。正式部署前应修改初始化密码和 `JWT_SECRET`，不要在公开页面或交付文档中暴露默认口令。
 
 已有本地库升级到当前版本时，按顺序执行：
 
@@ -156,9 +156,10 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase3_notifications.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase4_marketplace.sql
 mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase5_reservation_orders.sql
+mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase6_admin_refund_flow.sql
 ```
 
-升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水、预约会员快照、通知、活动、球友圈、商城商品、商城订单、商城订单明细和预约待支付订单表。升级脚本按表或字段存在性判断，可重复执行。
+升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水、预约会员快照、通知、活动、球友圈、商城商品、商城订单、商城订单明细和预约待支付订单表；第六阶段脚本会为商城订单补充退款申请和审核字段。升级脚本按表或字段存在性判断，可重复执行。
 
 ## 认证接口
 
@@ -185,6 +186,7 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | GET | `/api/notifications/unread-count` | 查询未读通知数量 |
 | PUT | `/api/notifications/{id}/read` | 标记单条通知已读 |
 | PUT | `/api/notifications/read-all` | 标记全部通知已读 |
+| GET | `/api/member/transactions` | 查询我的会员余额和积分流水 |
 | GET | `/api/courts` | 查询启用场地列表 |
 | GET | `/api/courts/{court_id}/slots?date=YYYY-MM-DD` | 查询场地时间段状态 |
 | POST | `/api/reservations` | 创建待支付预约订单 |
@@ -203,7 +205,8 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | POST | `/api/shop/orders` | 使用会员余额创建并支付商城订单 |
 | GET | `/api/shop/orders/my` | 查询我的商城订单 |
 | GET | `/api/shop/orders/{id}` | 查询我的商城订单详情 |
-| PUT | `/api/shop/orders/{id}/cancel` | 取消商城订单并退款 |
+| PUT | `/api/shop/orders/{id}/refund-request` | 提交商城订单退款申请 |
+| PUT | `/api/shop/orders/{id}/cancel` | 兼容入口，提交商城订单退款申请 |
 
 ## 管理员接口
 
@@ -236,6 +239,7 @@ mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platf
 | GET | `/api/admin/shop/orders/{id}` | 查询商城订单详情 |
 | PUT | `/api/admin/shop/orders/{id}/complete` | 完成商城订单 |
 | PUT | `/api/admin/shop/orders/{id}/cancel` | 管理员取消商城订单并退款 |
+| PUT | `/api/admin/shop/orders/{id}/refund-reject` | 管理员驳回退款申请 |
 | GET | `/api/admin/configs` | 查询规则配置 |
 | PUT | `/api/admin/configs/{config_key}` | 更新规则配置 |
 | GET | `/api/admin/statistics/overview` | 查询后台统计总览 |
@@ -310,5 +314,5 @@ http://localhost:8000
 1. 继续观察预约待支付订单在高并发和超时场景下的业务表现。
 2. 自动化接口测试和关键业务回归脚本。
 3. Docker 部署、生产环境变量和初始化说明。
-4. 商城后续扩展：SKU、库存流水、真实第三方支付、售后申请。
+4. 商城后续扩展：SKU、库存流水、真实第三方支付、完整售后工单。
 5. 球友圈后续扩展：评论、点赞、图片上传和内容审核。

@@ -9,7 +9,7 @@ from utils.response import ApiError
 
 
 DEFAULT_PRODUCT_IMAGE_URL = "/courts/default-court.png"
-ORDER_STATUSES = {"paid", "completed", "canceled"}
+ORDER_STATUSES = {"paid", "refund_requested", "completed", "canceled"}
 
 
 def _order_no() -> str:
@@ -35,6 +35,13 @@ def _parse_order_status(value: Any) -> str | None:
     if status not in ORDER_STATUSES:
         raise ApiError(400, "订单状态参数不合法", 400)
     return status
+
+
+def _parse_refund_reason(body: dict[str, Any], *, default: str) -> str:
+    reason = clean_text(body.get("reason"), default) or default
+    if len(reason) > 255:
+        raise ApiError(400, "退款原因不能超过255个字符", 400)
+    return reason
 
 
 def _parse_positive_int(value: Any, field_name: str, default: int, *, min_value: int, max_value: int) -> int:
@@ -290,26 +297,36 @@ async def get_my_order(settings: Settings, *, current_user: dict[str, Any], orde
 
 
 async def cancel_my_order(settings: Settings, *, current_user: dict[str, Any], order_id: int) -> dict[str, Any]:
-    canceled_id, failure = await shop_repository.cancel_order_atomic(
+    return await request_my_refund(settings, current_user=current_user, order_id=order_id, body={})
+
+
+async def request_my_refund(
+    settings: Settings,
+    *,
+    current_user: dict[str, Any],
+    order_id: int,
+    body: dict[str, Any],
+) -> dict[str, Any]:
+    reason = _parse_refund_reason(body, default="用户申请商城订单退款")
+    requested_id, failure = await shop_repository.request_refund_atomic(
         settings,
         order_id=order_id,
-        current_user_id=current_user["id"],
-        operator_id=current_user["id"],
-        operator_username=current_user.get("username"),
-        reason="用户取消商城订单退款",
+        current_user_id=int(current_user["id"]),
+        reason=reason,
     )
     if failure == "not_found":
         raise ApiError(404, "订单不存在", 404)
+    if failure == "already_requested":
+        raise ApiError(400, "该订单已提交退款申请，请等待管理员审核", 400)
     if failure == "not_paid":
-        raise ApiError(400, "当前订单状态不能取消退款", 400)
-    if canceled_id is None:
-        raise ApiError(500, "取消订单失败，请重试", 500)
-    order = await _order_detail(settings, canceled_id)
-    await notification_service.notify_shop_order_canceled(
+        raise ApiError(400, "当前订单状态不能申请退款", 400)
+    if requested_id is None:
+        raise ApiError(500, "提交退款申请失败，请重试", 500)
+    order = await _order_detail(settings, requested_id)
+    await notification_service.notify_shop_refund_requested(
         settings,
         order=order,
-        by_admin=False,
-        operator_id=current_user["id"],
+        operator_id=int(current_user["id"]),
     )
     return order
 
@@ -358,7 +375,7 @@ async def admin_cancel_order(
     if failure == "not_found":
         raise ApiError(404, "订单不存在", 404)
     if failure == "not_paid":
-        raise ApiError(400, "当前订单状态不能取消退款", 400)
+        raise ApiError(400, "只有已支付或退款待审核订单可以取消退款", 400)
     if canceled_id is None:
         raise ApiError(500, "取消订单失败，请重试", 500)
     order = await _order_detail(settings, canceled_id)
@@ -367,6 +384,34 @@ async def admin_cancel_order(
         order=order,
         by_admin=True,
         operator_id=current_user["id"],
+    )
+    return order
+
+
+async def reject_refund_request(
+    settings: Settings,
+    *,
+    current_user: dict[str, Any],
+    order_id: int,
+    body: dict[str, Any],
+) -> dict[str, Any]:
+    reason = _parse_refund_reason(body, default="管理员驳回商城订单退款申请")
+    rejected_id, failure = await shop_repository.reject_refund_request_atomic(
+        settings,
+        order_id=order_id,
+        reason=reason,
+    )
+    if failure == "not_found":
+        raise ApiError(404, "订单不存在", 404)
+    if failure == "not_refund_requested":
+        raise ApiError(400, "只有退款待审核订单可以驳回申请", 400)
+    if rejected_id is None:
+        raise ApiError(500, "驳回退款申请失败，请重试", 500)
+    order = await _order_detail(settings, rejected_id)
+    await notification_service.notify_shop_refund_rejected(
+        settings,
+        order=order,
+        operator_id=int(current_user["id"]),
     )
     return order
 
@@ -381,7 +426,7 @@ async def complete_order(
     if failure == "not_found":
         raise ApiError(404, "订单不存在", 404)
     if failure == "not_paid":
-        raise ApiError(400, "只有已支付待处理订单可以完成", 400)
+        raise ApiError(400, "只有已支付且未申请退款的订单可以完成", 400)
     if completed_id is None:
         raise ApiError(500, "完成订单失败，请重试", 500)
     order = await _order_detail(settings, completed_id)

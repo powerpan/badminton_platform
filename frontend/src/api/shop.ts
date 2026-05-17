@@ -35,13 +35,17 @@ export interface ShopOrder {
   user_id: number;
   username: string;
   nickname: string | null;
-  status: "paid" | "completed" | "canceled";
+  status: "paid" | "refund_requested" | "completed" | "canceled";
   total_amount_cents: number;
   pay_method: string;
   paid_at: string | null;
   completed_at: string | null;
   canceled_at: string | null;
   cancel_reason: string | null;
+  refund_requested_at: string | null;
+  refund_request_reason: string | null;
+  refund_reviewed_at: string | null;
+  refund_reject_reason: string | null;
   remark: string | null;
   created_at: string;
   updated_at: string;
@@ -73,4 +77,8 @@ export function getShopOrder(orderId: number) {
 
 export function cancelShopOrder(orderId: number) {
   return http.put<unknown, ApiResponse<ShopOrder>>(`/shop/orders/${orderId}/cancel`);
+}
+
+export function requestShopOrderRefund(orderId: number, payload: { reason: string }) {
+  return http.put<unknown, ApiResponse<ShopOrder>>(`/shop/orders/${orderId}/refund-request`, payload);
 }

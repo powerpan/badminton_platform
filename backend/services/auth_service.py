@@ -13,7 +13,7 @@ from utils.tokens import create_access_token, create_refresh_token, decode_refre
 
 
 DEFAULT_ADMIN_USERNAME = "admin"
-DEFAULT_ADMIN_PASSWORD = "admin123456"
+DEFAULT_ADMIN_PASSWORD_HASH = "$2b$12$OeO2WdhDYO81lfFsEPMNle//zNjiWq5LuTAFbkK8RPLmv4wVTEAdu"
 
 
 def _login_fail_key(username: str) -> str:
@@ -63,7 +63,7 @@ async def public_current_user(user: dict[str, Any]) -> dict[str, Any]:
 async def is_default_admin_password(user: dict[str, Any]) -> bool:
     if user.get("username") != DEFAULT_ADMIN_USERNAME or user.get("role") != "admin":
         return False
-    return await _verify_password(DEFAULT_ADMIN_PASSWORD, user["password_hash"])
+    return user.get("password_hash") == DEFAULT_ADMIN_PASSWORD_HASH
 
 
 async def _hash_password(password: str) -> str:

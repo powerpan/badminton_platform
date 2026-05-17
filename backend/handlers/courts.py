@@ -26,5 +26,5 @@ class CourtSlotsHandler(BaseHandler):
         if not date_arg:
             raise ApiError(400, "预约日期不能为空", 400)
         settings = self.application.settings["app_settings"]
-        data = await court_service.get_slots(settings, court_id=int(court_id), date_arg=date_arg)
+        data = await court_service.get_slots(settings, court_id=self.path_int(court_id, "场地ID"), date_arg=date_arg)
         self.write_json(success(data))

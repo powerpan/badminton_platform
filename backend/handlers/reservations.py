@@ -39,7 +39,7 @@ class CancelReservationHandler(BaseHandler):
         reservation = await reservation_service.cancel_my_reservation(
             settings,
             current_user=current_user,
-            reservation_id=int(reservation_id),
+            reservation_id=self.path_int(reservation_id, "预约ID"),
         )
         self.write_json(success(reservation))
 
@@ -51,6 +51,6 @@ class ReservationOrderPayHandler(BaseHandler):
         reservation = await reservation_service.pay_reservation_order(
             settings,
             current_user=current_user,
-            order_id=int(order_id),
+            order_id=self.path_int(order_id, "订单ID"),
         )
         self.write_json(success(reservation, "支付成功，预约已确认"))

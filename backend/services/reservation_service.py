@@ -170,8 +170,8 @@ async def create_reservation(
             raise ApiError(409, "该时间段已被预约", 409)
         if failure_reason == "daily_limit":
             raise ApiError(400, "当天预约次数已达上限", 400)
-        if failure_reason == "insufficient_balance":
-            raise ApiError(400, "会员余额不足，请联系管理员充值或调整余额", 400)
+        if failure_reason in {"insufficient_balance", "insufficient_available_balance"}:
+            raise ApiError(400, "会员可用余额不足，请先支付或取消其它待支付预约", 400)
         if failure_reason == "court_not_found":
             raise ApiError(404, "场地不存在", 404)
         if failure_reason == "court_disabled":

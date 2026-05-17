@@ -63,7 +63,12 @@ async def get_reservation_status_counts(
 async def count_today_reservations(settings: Settings) -> int:
     row = await fetch_one(
         settings,
-        "SELECT COUNT(*) AS total FROM reservation WHERE reserve_date = CURDATE()",
+        """
+        SELECT COUNT(*) AS total
+        FROM reservation
+        WHERE reserve_date = CURDATE()
+          AND status IN ('pending', 'confirmed', 'completed')
+        """,
     )
     return int(row["total"] or 0) if row else 0
 

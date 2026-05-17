@@ -4,12 +4,20 @@ from typing import Any
 import aiomysql
 
 from config.settings import Settings
-from repositories.database import execute, fetch_one, get_pool
+from repositories.database import execute, fetch_all, fetch_one, get_pool
 from utils.member_levels import DEFAULT_MEMBER_LEVEL
 
 
 MEMBER_ACCOUNT_COLUMNS = """
     user_id, member_level, balance_cents, points, expires_at, created_at, updated_at
+"""
+
+MEMBER_TRANSACTION_COLUMNS = """
+    id, user_id, reservation_id, shop_order_id, transaction_type,
+    balance_change_cents, points_change,
+    balance_before_cents, balance_after_cents,
+    points_before, points_after,
+    reason, operator_id, operator_username, created_at
 """
 
 
@@ -31,6 +39,56 @@ async def get_member_account(settings: Settings, user_id: int) -> dict[str, Any]
         f"SELECT {MEMBER_ACCOUNT_COLUMNS} FROM member_account WHERE user_id = %s",
         (user_id,),
     )
+
+
+async def list_member_transactions(
+    settings: Settings,
+    *,
+    user_id: int,
+    transaction_type: str | None,
+    offset: int,
+    limit: int,
+) -> list[dict[str, Any]]:
+    where = ["user_id = %s"]
+    args: list[Any] = [user_id]
+    if transaction_type:
+        where.append("transaction_type = %s")
+        args.append(transaction_type)
+    args.extend([limit, offset])
+    return await fetch_all(
+        settings,
+        f"""
+        SELECT {MEMBER_TRANSACTION_COLUMNS}
+        FROM member_account_transaction
+        WHERE {" AND ".join(where)}
+        ORDER BY created_at DESC, id DESC
+        LIMIT %s OFFSET %s
+        """,
+        args,
+    )
+
+
+async def count_member_transactions(
+    settings: Settings,
+    *,
+    user_id: int,
+    transaction_type: str | None,
+) -> int:
+    where = ["user_id = %s"]
+    args: list[Any] = [user_id]
+    if transaction_type:
+        where.append("transaction_type = %s")
+        args.append(transaction_type)
+    row = await fetch_one(
+        settings,
+        f"""
+        SELECT COUNT(*) AS total
+        FROM member_account_transaction
+        WHERE {" AND ".join(where)}
+        """,
+        args,
+    )
+    return int(row["total"] if row else 0)
 
 
 async def get_or_create_account_for_update(cursor: aiomysql.DictCursor, user_id: int) -> dict[str, Any]:

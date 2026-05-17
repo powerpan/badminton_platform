@@ -27,22 +27,38 @@ const routeTitleMap: Record<string, string> = {
   community: "球友圈",
   shop: "商城",
   "shop-orders": "商城订单",
-  admin: "管理后台",
+  "admin-overview": "运营总览",
 };
 
-const routeTitle = computed(() => routeTitleMap[String(route.name || "")] || "羽毛球平台");
+const routeTitle = computed(() => String(route.meta.title || routeTitleMap[String(route.name || "")] || "羽毛球平台"));
 
-const primaryNav = computed(() => [
+const userNav = computed(() => [
   { label: "首页", to: "/", icon: "home", visible: true },
   { label: "场地预订", to: "/courts", icon: "grid", visible: authStore.isLoggedIn },
   { label: "我的预订", to: "/reservations", icon: "ticket", visible: authStore.isLoggedIn },
   { label: "会员中心", to: "/profile", icon: "user", visible: authStore.isLoggedIn },
-  { label: "管理后台", to: "/admin", icon: "admin", visible: authStore.isAdmin },
   { label: "活动赛事", to: "/events", icon: "flag", visible: true },
   { label: "球友圈", to: "/community", icon: "circle", visible: true },
   { label: "商城", to: "/shop", icon: "cart", visible: true },
   { label: "帮助中心", to: "/help", icon: "help", visible: true },
 ]);
+
+const adminNav = [
+  { label: "运营总览", to: "/admin/overview", icon: "home", visible: true },
+  { label: "用户管理", to: "/admin/users", icon: "user", visible: true },
+  { label: "场地管理", to: "/admin/courts", icon: "grid", visible: true },
+  { label: "预约管理", to: "/admin/reservations", icon: "ticket", visible: true },
+  { label: "公告管理", to: "/admin/announcements", icon: "help", visible: true },
+  { label: "通知管理", to: "/admin/notifications", icon: "circle", visible: true },
+  { label: "活动管理", to: "/admin/events", icon: "flag", visible: true },
+  { label: "球友圈管理", to: "/admin/community", icon: "circle", visible: true },
+  { label: "商城商品", to: "/admin/shop/products", icon: "cart", visible: true },
+  { label: "商城订单", to: "/admin/shop/orders", icon: "ticket", visible: true },
+  { label: "规则配置", to: "/admin/configs", icon: "admin", visible: true },
+  { label: "操作日志", to: "/admin/logs", icon: "help", visible: true },
+];
+
+const primaryNav = computed(() => (authStore.isAdmin ? adminNav : userNav.value));
 
 const guestNav = [
   { label: "登录", to: "/login", icon: "login" },
@@ -128,7 +144,19 @@ watch(
       </nav>
 
       <div class="session-box">
-        <template v-if="authStore.user">
+        <template v-if="authStore.user?.role === 'admin'">
+          <div class="session-title">
+            <span>系统管理员</span>
+            <small>后台管理端</small>
+          </div>
+          <div class="session-balance">
+            <small>当前账号</small>
+            <strong>{{ authStore.user.nickname || authStore.user.username }}</strong>
+          </div>
+          <small v-if="authStore.user.must_change_password" class="warning-line">默认密码待修改</small>
+          <RouterLink class="session-link" to="/admin/overview">管理总览</RouterLink>
+        </template>
+        <template v-else-if="authStore.user">
           <div class="session-title">
             <span>{{ authStore.user.member.level_label }}</span>
             <small>{{ validityText(authStore.user.member.expires_at) }}</small>

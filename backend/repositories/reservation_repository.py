@@ -169,9 +169,22 @@ async def create_pending_reservation_order_atomic(
                 discount_amount_cents = original_amount_cents - payable_amount_cents
                 points_awarded = payable_amount_cents // 100
                 balance_before = int(member_account.get("balance_cents") or 0)
-                if balance_before < payable_amount_cents:
+                await cursor.execute(
+                    """
+                    SELECT COALESCE(SUM(amount_cents), 0) AS pending_amount_cents
+                    FROM reservation_order
+                    WHERE user_id = %s
+                      AND status = 'pending'
+                      AND expires_at > NOW()
+                    """,
+                    (user_id,),
+                )
+                pending_order_total = await cursor.fetchone()
+                pending_amount_cents = int((pending_order_total or {}).get("pending_amount_cents") or 0)
+                available_balance_cents = balance_before - pending_amount_cents
+                if available_balance_cents < payable_amount_cents:
                     await connection.rollback()
-                    return None, None, "insufficient_balance"
+                    return None, None, "insufficient_available_balance"
 
                 await cursor.execute(
                     """

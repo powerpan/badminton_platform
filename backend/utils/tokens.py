@@ -19,6 +19,7 @@ def create_access_token(
         "user_id": user_id,
         "username": username,
         "role": role,
+        "token_type": "access",
         "iat": now,
         "exp": now + timedelta(seconds=expire_seconds),
     }
@@ -57,6 +58,9 @@ def decode_access_token(token: str, secret: str) -> dict[str, Any]:
 
     user_id = payload.get("user_id")
     if not isinstance(user_id, int):
+        raise ApiError(401, "登录状态无效，请重新登录", 401)
+    token_type = payload.get("token_type")
+    if token_type not in (None, "access"):
         raise ApiError(401, "登录状态无效，请重新登录", 401)
     return payload
 

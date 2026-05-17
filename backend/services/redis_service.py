@@ -3,6 +3,14 @@ import redis.asyncio as redis
 from config.settings import Settings
 
 
+RELEASE_LOCK_SCRIPT = """
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+end
+return 0
+"""
+
+
 def get_redis_client(settings: Settings) -> redis.Redis:
     return redis.Redis(
         host=settings.redis_host,
@@ -27,9 +35,7 @@ async def acquire_lock(settings: Settings, key: str, value: str, ttl_seconds: in
 async def release_lock(settings: Settings, key: str, value: str) -> None:
     client = get_redis_client(settings)
     try:
-        current_value = await client.get(key)
-        if current_value == value:
-            await client.delete(key)
+        await client.eval(RELEASE_LOCK_SCRIPT, 1, key, value)
     finally:
         await client.aclose()
 
