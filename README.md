@@ -1,106 +1,131 @@
-# BF羽毛球馆管理平台
+# BF羽毛球馆管理平台部署说明
 
-本项目是基于 Tornado 的 BF 羽毛球馆管理平台，采用前后端分离架构：
+这份说明只保留部署和启动步骤。拿到仓库后，按下面流程准备 MySQL、Redis、后端和前端即可运行。
 
-- 前端：Vue3、Vue Router、Pinia、Axios、Element Plus、Vite
-- 后端：Python Tornado
-- 数据库：MySQL
-- 缓存：Redis
-- 认证：JWT
+## 1. 环境要求
 
-当前阶段已完成开发框架骨架、用户认证闭环、会员账户闭环、会员余额明细、场地预约待支付订单闭环、站内通知、公告详情、帮助中心、活动赛事、球友圈、商城库存与余额支付、后台基础管理、统计分析、操作日志、预约状态自动处理、验证码、找回密码、基础安全增强和 Element Plus 前端重构。普通用户可以预约场地、支付待支付预约、查看余额和积分流水、查看通知和公告详情、报名活动、发布球友圈动态、使用会员余额购买商品并提交退款申请；管理员可以管理用户、会员账户、场地、预约、公告、全员通知、活动、球友圈动态、商城商品和订单、审核商城退款、预约规则配置、运营统计和操作日志。
+- Python 3.10+
+- Node.js 18+ 和 npm
+- MySQL 8.0+
+- Redis 6.0+
+- Git
 
-## 当前实现状态
+建议先确认版本：
 
-已完成：
-
-- Tornado 后端基础应用、路由和统一 JSON 响应。
-- MySQL 连接池和用户数据访问封装。
-- Redis / MySQL / API 健康检查。
-- 用户注册、登录、验证码、JWT 鉴权、个人资料、修改密码、找回密码。
-- 会员账户查询，包含等级、有效期、余额、积分、固定折扣、当前实际折扣和余额明细。
-- 场地列表、按规则生成时间段、时间段状态查询。
-- 场地资产和价格已接入数据库，支持场地图片、标签、容纳人数和每小时价格展示。
-- 预约创建、Redis 临时锁、MySQL 时间重叠冲突校验。
-- 预约写入使用 MySQL 短事务再次锁定用户、会员账户、场地和有效预约记录，降低高并发下的重复预约风险。
-- 预约创建时写入价格、时长、会员等级、折扣、积分和金额快照，历史预约不受后续场地改价或会员等级变化影响。
-- 预约创建先生成 `pending` 预约和 `reservation_order` 待支付订单，不立即扣减会员余额。
-- 预约余额支付在单个 MySQL 事务内锁定订单、预约和会员账户，扣余额、发积分、订单改为已支付、预约改为已确认同成同败。
-- 待支付订单超时会自动标记为 `expired` 并释放场地占用。
-- 已支付预约取消会退回余额并扣回本次积分；待支付预约取消只释放场地占用。
-- 我的预约列表支持待支付预约继续支付和未开始预约取消。
-- 管理员用户新增、启用/禁用、角色修改。
-- 管理员会员账户调整，支持等级、有效期、余额增减、积分增减和调整原因。
-- 管理员场地新增、编辑、启停。
-- 管理员预约列表、详情和取消。
-- 管理员公告发布、编辑、隐藏。
-- 站内通知列表、未读数、单条已读和全部已读。
-- 预约成功、取消预约、会员账户调整和公告发布会自动生成站内通知。
-- 管理员支持向全部启用账号群发站内通知。
-- 公告中心和公告详情页已接入前端路由。
-- 帮助中心已提供预约、取消、会员和场地使用规则说明。
-- 活动赛事入口已启用，支持活动列表、详情、报名、取消报名和后台活动维护。
-- 球友圈入口已启用，支持文本动态发布、用户隐藏自己的动态和管理员隐藏动态。
-- 商城入口已启用，支持商品库存、购物车、会员余额支付、订单查看、用户申请退款、管理员审核退款、管理员完成订单和管理员主动退款。
-- 管理员规则配置查询和更新。
-- 后台统计接口和统计视图：预约总量、今日预约、活跃用户、场地使用率、热门时间段、用户活跃度。
-- 管理员关键操作日志写入和日志查询。
-- 预约状态自动处理：已结束的 `confirmed` 预约自动转为 `completed`。
-- Refresh token、退出登录、登录失败锁定和默认管理员改密提醒。
-- 密码重置会清理对应用户的 refresh token，降低旧登录态继续使用的风险。
-- 后台用户、场地、预约、公告、日志分页与筛选。
-- 禁用用户、停用场地前会检查未来有效预约，存在预约时拒绝操作。
-- 用户取消预约、管理员取消预约、禁用用户、停用场地、重置密码、修改角色、会员调整、隐藏公告和保存规则等敏感操作已加入二次确认。
-- 后台会员调整、场地编辑、公告编辑和规则配置编辑已改为弹窗表单，避免旧数据回填到顶部新增表单。
-- 预约冲突、空状态和加载状态的前端提示优化。
-- Vue3 前端骨架、Axios 请求封装、Pinia 登录态保存。
-- `/login`、`/register`、`/forgot-password`、`/profile`、`/courts`、`/reservations`、`/notifications`、`/announcements`、`/announcements/:id`、`/help`、`/events`、`/events/:id`、`/community`、`/shop`、`/shop/orders`、`/admin/overview` 及各后台子菜单页面。
-- 路由守卫：未登录跳转登录页，普通用户不能访问管理后台。
-- 初始化 SQL：核心表、默认配置、测试场地、本地演示管理员账号。
-
-待开发：
-
-- 后端自动化接口测试。
-- Docker 部署和生产环境配置。
-
-## 目录结构
-
-```text
-badminton_platform/
-  backend/        Tornado 后端
-  frontend/       Vue3 前端
-  sql/            数据库初始化脚本
-  docs/           软件工程文档
-  scripts/        启动和数据库升级脚本
+```bash
+python3 --version
+node --version
+npm --version
+mysql --version
+redis-server --version
 ```
 
-本地开发也可以直接使用根目录的一键脚本：
+## 2. 获取代码
+
+```bash
+git clone <仓库地址> badminton_platform
+cd badminton_platform
+```
+
+## 3. 配置后端环境变量
+
+复制示例配置：
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+按实际环境修改 `backend/.env`：
+
+```dotenv
+APP_ENV=dev
+APP_PORT=8000
+JWT_SECRET=请替换为足够长的随机字符串
+
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=root
+MYSQL_DATABASE=badminton_platform
+
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_DB=0
+```
+
+生产环境必须修改 `JWT_SECRET`、数据库账号和数据库密码，不要使用示例值。
+
+## 4. 初始化数据库
+
+确认 MySQL 已启动后执行：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -p < sql/init.sql
+```
+
+`sql/init.sql` 会创建 `badminton_platform` 数据库、业务表、基础配置和初始管理员。
+
+初始管理员：
 
 ```text
-cd /Users/ericpan/game_project/badminton_platform
+用户名：admin
+密码：admin123
+```
+
+首次登录后请立即修改管理员密码。
+
+如果是从旧版本数据库升级到当前版本，按顺序执行迁移脚本：
+
+```bash
+mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase1_court_assets.sql
+mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase2_member_accounts.sql
+mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase3_notifications.sql
+mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase4_marketplace.sql
+mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase5_reservation_orders.sql
+mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase6_admin_refund_flow.sql
+```
+
+新库只需要执行 `sql/init.sql`。
+
+## 5. 本地一键启动
+
+启动前确认 MySQL 和 Redis 已经运行。
+
+```bash
+chmod +x start-dev.command stop-dev.command scripts/*.sh
 ./start-dev.command
+```
+
+启动成功后访问：
+
+```text
+前端：http://localhost:5188
+后端：http://localhost:8000/api/health
+```
+
+停止服务：
+
+```bash
 ./stop-dev.command
 ```
 
-## 后端启动
-
-推荐直接使用脚本：
+日志位置：
 
 ```text
-cd /Users/ericpan/game_project/badminton_platform
-./scripts/start_backend.sh
+logs/backend.log
+logs/frontend.log
 ```
 
-也可以手动启动：
+## 6. 手动启动后端
 
-```text
-cd /Users/ericpan/game_project/badminton_platform/backend
-python -m venv .venv
+```bash
+cd backend
+python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python app.py
 ```
 
-后端默认地址：
+后端默认监听：
 
 ```text
 http://localhost:8000
@@ -108,211 +133,107 @@ http://localhost:8000
 
 健康检查：
 
-```text
+```bash
 curl http://localhost:8000/api/health
 ```
 
-管理员健康检查需要登录后携带管理员 token：
+## 7. 手动启动前端
 
-```text
-GET /api/admin/health
-Authorization: Bearer <admin-token>
-```
+另开一个终端：
 
-## 数据库初始化
-
-先确认 MySQL 已启动，然后执行：
-
-```text
-mysql -uroot -p < /Users/ericpan/game_project/badminton_platform/sql/init.sql
-```
-
-初始化脚本会创建：
-
-- `badminton_platform` 数据库
-- 用户表
-- 会员账户表
-- 会员账户流水表
-- 场地表
-- 预约表
-- 预约订单表
-- 活动表和活动报名表
-- 球友圈动态表
-- 商城商品表、订单表和订单明细表
-- 公告表
-- 站内通知表
-- 系统配置表
-- 操作日志表
-- 默认系统配置和测试场地
-- 本地演示管理员账号
-
-默认账号仅用于本地开发和演示，前端登录页不再回显默认口令。正式部署前应修改初始化密码和 `JWT_SECRET`，不要在公开页面或交付文档中暴露默认口令。
-
-已有本地库升级到当前版本时，按顺序执行：
-
-```text
-mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase1_court_assets.sql
-mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase2_member_accounts.sql
-mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase3_notifications.sql
-mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase4_marketplace.sql
-mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase5_reservation_orders.sql
-mysql -uroot -p badminton_platform < /Users/ericpan/game_project/badminton_platform/scripts/upgrade_phase6_admin_refund_flow.sql
-```
-
-升级脚本会为场地补充价格、图片、标签、容纳人数，为历史预约补齐费用快照字段，并创建会员账户、会员流水、预约会员快照、通知、活动、球友圈、商城商品、商城订单、商城订单明细和预约待支付订单表；第六阶段脚本会为商城订单补充退款申请和审核字段。升级脚本按表或字段存在性判断，可重复执行。
-
-## 认证接口
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| POST | `/api/auth/register` | 注册普通用户 |
-| POST | `/api/auth/login` | 登录并返回 JWT |
-| GET | `/api/auth/captcha` | 获取图形验证码 |
-| POST | `/api/auth/refresh` | 使用 refresh token 刷新登录态 |
-| POST | `/api/auth/logout` | 退出登录并删除 refresh token |
-| POST | `/api/auth/password-reset/request` | 校验用户名、联系方式和验证码，申请重置密码 |
-| POST | `/api/auth/password-reset/confirm` | 使用重置凭证提交新密码 |
-| GET | `/api/auth/profile` | 获取当前用户信息 |
-| PUT | `/api/auth/profile` | 修改昵称和联系方式 |
-| PUT | `/api/auth/password` | 修改密码 |
-
-## 业务接口
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET | `/api/announcements` | 查询显示中的公告 |
-| GET | `/api/announcements/{id}` | 查询公告详情 |
-| GET | `/api/notifications` | 查询我的站内通知 |
-| GET | `/api/notifications/unread-count` | 查询未读通知数量 |
-| PUT | `/api/notifications/{id}/read` | 标记单条通知已读 |
-| PUT | `/api/notifications/read-all` | 标记全部通知已读 |
-| GET | `/api/member/transactions` | 查询我的会员余额和积分流水 |
-| GET | `/api/courts` | 查询启用场地列表 |
-| GET | `/api/courts/{court_id}/slots?date=YYYY-MM-DD` | 查询场地时间段状态 |
-| POST | `/api/reservations` | 创建待支付预约订单 |
-| GET | `/api/reservations/my` | 查询我的预约 |
-| PUT | `/api/reservations/{id}/cancel` | 取消我的预约 |
-| PUT | `/api/reservation-orders/{id}/pay` | 使用会员余额支付预约订单 |
-| GET | `/api/events` | 查询显示中的活动 |
-| GET | `/api/events/{id}` | 查询活动详情 |
-| POST | `/api/events/{id}/register` | 报名活动 |
-| PUT | `/api/events/{id}/cancel-registration` | 取消活动报名 |
-| GET | `/api/community/posts` | 查询球友圈动态 |
-| POST | `/api/community/posts` | 发布球友圈动态 |
-| PUT | `/api/community/posts/{id}/hide` | 隐藏我的动态 |
-| GET | `/api/shop/products` | 查询上架商品 |
-| GET | `/api/shop/products/{id}` | 查询商品详情 |
-| POST | `/api/shop/orders` | 使用会员余额创建并支付商城订单 |
-| GET | `/api/shop/orders/my` | 查询我的商城订单 |
-| GET | `/api/shop/orders/{id}` | 查询我的商城订单详情 |
-| PUT | `/api/shop/orders/{id}/refund-request` | 提交商城订单退款申请 |
-| PUT | `/api/shop/orders/{id}/cancel` | 兼容入口，提交商城订单退款申请 |
-
-## 管理员接口
-
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| GET/POST | `/api/admin/users` | 用户列表和新增用户 |
-| PUT | `/api/admin/users/{id}/status` | 启用或禁用用户 |
-| PUT | `/api/admin/users/{id}/role` | 修改用户角色 |
-| PUT | `/api/admin/users/{id}/member` | 调整会员账户 |
-| PUT | `/api/admin/users/{id}/password` | 管理员重置用户密码 |
-| GET/POST | `/api/admin/courts` | 场地列表和新增场地 |
-| PUT | `/api/admin/courts/{id}` | 编辑场地 |
-| PUT | `/api/admin/courts/{id}/status` | 启用或停用场地 |
-| GET | `/api/admin/reservations` | 查询全部预约 |
-| GET | `/api/admin/reservations/{id}` | 查询预约详情 |
-| PUT | `/api/admin/reservations/{id}/cancel` | 管理员取消预约 |
-| GET/POST | `/api/admin/announcements` | 公告列表和发布公告 |
-| PUT | `/api/admin/announcements/{id}` | 编辑公告 |
-| PUT | `/api/admin/announcements/{id}/status` | 显示或隐藏公告 |
-| POST | `/api/admin/notifications/broadcast` | 向全部启用账号群发站内通知 |
-| GET/POST | `/api/admin/events` | 活动列表和新增活动 |
-| PUT | `/api/admin/events/{id}` | 编辑活动 |
-| PUT | `/api/admin/events/{id}/status` | 显示或隐藏活动 |
-| GET | `/api/admin/community/posts` | 查询球友圈动态 |
-| PUT | `/api/admin/community/posts/{id}/hide` | 管理员隐藏动态 |
-| GET/POST | `/api/admin/shop/products` | 商品列表和新增商品 |
-| PUT | `/api/admin/shop/products/{id}` | 编辑商品 |
-| PUT | `/api/admin/shop/products/{id}/status` | 上架或下架商品 |
-| GET | `/api/admin/shop/orders` | 查询商城订单 |
-| GET | `/api/admin/shop/orders/{id}` | 查询商城订单详情 |
-| PUT | `/api/admin/shop/orders/{id}/complete` | 完成商城订单 |
-| PUT | `/api/admin/shop/orders/{id}/cancel` | 管理员取消商城订单并退款 |
-| PUT | `/api/admin/shop/orders/{id}/refund-reject` | 管理员驳回退款申请 |
-| GET | `/api/admin/configs` | 查询规则配置 |
-| PUT | `/api/admin/configs/{config_key}` | 更新规则配置 |
-| GET | `/api/admin/statistics/overview` | 查询后台统计总览 |
-| GET | `/api/admin/statistics/courts` | 查询场地使用率统计 |
-| GET | `/api/admin/statistics/time-slots` | 查询热门时间段统计 |
-| GET | `/api/admin/statistics/users` | 查询用户活跃度统计 |
-| GET | `/api/admin/logs` | 查询管理员操作日志 |
-
-统一响应格式：
-
-```json
-{
-  "code": 0,
-  "message": "success",
-  "data": {}
-}
-```
-
-## Redis
-
-后端健康检查会连接默认 Redis：
-
-```text
-127.0.0.1:6379
-```
-
-可以用下面命令确认 Redis 是否可用：
-
-```text
-redis-cli ping
-```
-
-预期返回：
-
-```text
-PONG
-```
-
-## 前端启动
-
-推荐直接使用脚本：
-
-```text
-cd /Users/ericpan/game_project/badminton_platform
-./scripts/start_frontend.sh
-```
-
-也可以手动启动：
-
-```text
-cd /Users/ericpan/game_project/badminton_platform/frontend
+```bash
+cd frontend
 npm install
 npm run dev
 ```
 
-前端默认地址：
+前端默认监听：
 
 ```text
 http://localhost:5188
 ```
 
-Vite 已配置 `/api` 代理到：
+开发环境下 Vite 会把 `/api` 代理到 `http://localhost:8000`。
 
-```text
-http://localhost:8000
+## 8. 生产部署参考
+
+生产环境推荐方式：
+
+1. MySQL 和 Redis 使用独立服务或服务器常驻进程。
+2. 后端用 `backend/.venv/bin/python app.py` 运行，并由 systemd、Supervisor 或 pm2 管理进程。
+3. 前端执行 `npm run build`，把 `frontend/dist` 交给 Nginx。
+4. Nginx 负责静态文件和 `/api` 反向代理。
+
+构建前端：
+
+```bash
+cd frontend
+npm install
+npm run build
 ```
 
-## 下一步开发顺序
+后端生产启动示例：
 
-当前已补齐活动赛事、球友圈、商城库存与余额支付，以及预约待支付订单。下一阶段建议优先做：
+```bash
+cd backend
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+APP_ENV=prod APP_PORT=8000 .venv/bin/python app.py
+```
 
-1. 继续观察预约待支付订单在高并发和超时场景下的业务表现。
-2. 自动化接口测试和关键业务回归脚本。
-3. Docker 部署、生产环境变量和初始化说明。
-4. 商城后续扩展：SKU、库存流水、真实第三方支付、完整售后工单。
-5. 球友圈后续扩展：评论、点赞、图片上传和内容审核。
+Nginx 示例：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    root /path/to/badminton_platform/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+如果前端和后端不在同一个域名下，需要在前端构建时设置 API 地址，例如：
+
+```bash
+cd frontend
+VITE_API_BASE_URL=https://api.example.com/api npm run build
+```
+
+## 9. 常见问题
+
+### 后端启动后健康检查失败
+
+检查：
+
+```bash
+tail -n 100 logs/backend.log
+```
+
+重点确认 MySQL、Redis 是否启动，`backend/.env` 中的账号密码和端口是否正确。
+
+### 前端页面能打开但接口失败
+
+开发环境检查 Vite 代理和后端端口：
+
+```bash
+curl http://localhost:8000/api/health
+```
+
+生产环境检查 Nginx `/api/` 反向代理配置。
+
+### 数据库重复初始化
+
+`sql/init.sql` 使用 `CREATE TABLE IF NOT EXISTS` 和幂等种子写法，重复执行不会清空业务数据。生产环境执行前仍建议先备份数据库。

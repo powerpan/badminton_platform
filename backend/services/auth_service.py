@@ -13,7 +13,7 @@ from utils.tokens import create_access_token, create_refresh_token, decode_refre
 
 
 DEFAULT_ADMIN_USERNAME = "admin"
-DEFAULT_ADMIN_PASSWORD_HASH = "$2b$12$OeO2WdhDYO81lfFsEPMNle//zNjiWq5LuTAFbkK8RPLmv4wVTEAdu"
+DEFAULT_ADMIN_PASSWORD_HASH = "$2b$12$TPjY/z1Ut.JJLpGI6hjaleO/bugGoC9C7ctepWJFjiFcVCkNz3GHi"
 
 
 def _login_fail_key(username: str) -> str:

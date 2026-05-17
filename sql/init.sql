@@ -315,7 +315,7 @@ ON DUPLICATE KEY UPDATE
 
 INSERT INTO user (username, password_hash, nickname, role, contact, status)
 VALUES
-  ('admin', '$2b$12$OeO2WdhDYO81lfFsEPMNle//zNjiWq5LuTAFbkK8RPLmv4wVTEAdu', '系统管理员', 'admin', 'admin', 1)
+  ('admin', '$2b$12$TPjY/z1Ut.JJLpGI6hjaleO/bugGoC9C7ctepWJFjiFcVCkNz3GHi', '系统管理员', 'admin', 'admin', 1)
 ON DUPLICATE KEY UPDATE
   username = VALUES(username);
 
