@@ -37,20 +37,6 @@ class LogoutHandler(BaseHandler):
         self.write_json(success(None, "已退出登录"))
 
 
-class PasswordResetRequestHandler(BaseHandler):
-    async def post(self) -> None:
-        settings = self.application.settings["app_settings"]
-        result = await auth_service.request_password_reset(settings, self.get_json_body())
-        self.write_json(success(result, "身份验证通过，请设置新密码"))
-
-
-class PasswordResetConfirmHandler(BaseHandler):
-    async def post(self) -> None:
-        settings = self.application.settings["app_settings"]
-        await auth_service.confirm_password_reset(settings, self.get_json_body())
-        self.write_json(success(None, "密码重置成功，请重新登录"))
-
-
 class ProfileHandler(BaseHandler):
     async def get(self) -> None:
         user = await self.require_current_user()

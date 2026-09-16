@@ -1,5 +1,4 @@
 import asyncio
-import secrets
 import uuid
 from typing import Any
 
@@ -30,10 +29,6 @@ def _refresh_key(user_id: int, token_id: str) -> str:
 
 def _refresh_pattern(user_id: int) -> str:
     return f"auth:refresh:{user_id}:*"
-
-
-def _password_reset_key(reset_token: str) -> str:
-    return f"auth:password_reset:{reset_token}"
 
 
 def public_user(user: dict[str, Any]) -> dict[str, Any]:
@@ -224,64 +219,6 @@ async def logout(settings: Settings, body: dict[str, Any]) -> None:
 
 async def revoke_user_refresh_tokens(settings: Settings, user_id: int) -> None:
     await redis_service.delete_pattern(settings, _refresh_pattern(user_id))
-
-
-async def request_password_reset(settings: Settings, body: dict[str, Any]) -> dict[str, Any]:
-    username = _clean_text(body.get("username"))
-    contact = _clean_text(body.get("contact"))
-
-    await captcha_service.verify_captcha(settings, body.get("captcha_id"), body.get("captcha_code"))
-    _validate_username(username)
-    if not contact:
-        raise ApiError(400, "联系方式不能为空", 400)
-
-    user = await user_repository.get_user_by_username(settings, username)
-    if user is None or _clean_text(user.get("contact")) != contact:
-        raise ApiError(400, "用户名或联系方式不匹配", 400)
-    if user["status"] != 1:
-        raise ApiError(403, "账号已被禁用", 403)
-
-    reset_token = secrets.token_urlsafe(32)
-    await redis_service.set_value(
-        settings,
-        _password_reset_key(reset_token),
-        str(user["id"]),
-        settings.password_reset_expire_seconds,
-    )
-    return {
-        "reset_token": reset_token,
-        "expires_in": settings.password_reset_expire_seconds,
-    }
-
-
-async def confirm_password_reset(settings: Settings, body: dict[str, Any]) -> None:
-    reset_token = _clean_text(body.get("reset_token"))
-    new_password = str(body.get("new_password") or "")
-    if not reset_token:
-        raise ApiError(400, "重置凭证不能为空", 400)
-    _validate_password(new_password)
-
-    key = _password_reset_key(reset_token)
-    user_id_text = await redis_service.get_value(settings, key)
-    if user_id_text is None:
-        raise ApiError(401, "重置凭证已失效，请重新验证", 401)
-
-    try:
-        user_id = int(user_id_text)
-    except ValueError as exc:
-        await redis_service.delete_keys(settings, key)
-        raise ApiError(401, "重置凭证已失效，请重新验证", 401) from exc
-
-    user = await user_repository.get_user_by_id(settings, user_id)
-    if user is None:
-        await redis_service.delete_keys(settings, key)
-        raise ApiError(404, "用户不存在", 404)
-    if user["status"] != 1:
-        raise ApiError(403, "账号已被禁用", 403)
-
-    await user_repository.update_password(settings, user_id, await _hash_password(new_password))
-    await redis_service.delete_keys(settings, key, _login_fail_key(user["username"]), _login_lock_key(user["username"]))
-    await revoke_user_refresh_tokens(settings, user_id)
 
 
 async def update_profile(

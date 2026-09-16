@@ -7,7 +7,6 @@ import CommunityView from "../views/CommunityView.vue";
 import CourtsView from "../views/CourtsView.vue";
 import EventDetailView from "../views/EventDetailView.vue";
 import EventsView from "../views/EventsView.vue";
-import ForgotPasswordView from "../views/ForgotPasswordView.vue";
 import HelpCenterView from "../views/HelpCenterView.vue";
 import HomeView from "../views/HomeView.vue";
 import LoginView from "../views/LoginView.vue";
@@ -33,7 +32,6 @@ const router = createRouter({
     { path: "/shop/orders", name: "shop-orders", component: ShopOrdersView, meta: { requiresAuth: true } },
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: RegisterView },
-    { path: "/forgot-password", name: "forgot-password", component: ForgotPasswordView },
     { path: "/courts", name: "courts", component: CourtsView, meta: { requiresAuth: true } },
     {
       path: "/reservations",
@@ -87,7 +85,7 @@ router.beforeEach(async (to) => {
     return { name: "home" };
   }
 
-  if ((to.name === "login" || to.name === "register" || to.name === "forgot-password") && authStore.isLoggedIn) {
+  if ((to.name === "login" || to.name === "register") && authStore.isLoggedIn) {
     return { name: authStore.isAdmin ? "admin-overview" : "home" };
   }
 

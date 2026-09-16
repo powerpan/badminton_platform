@@ -14,7 +14,6 @@ const routeTitleMap: Record<string, string> = {
   home: "运营总览",
   login: "会员登录",
   register: "会员注册",
-  "forgot-password": "找回密码",
   announcements: "公告中心",
   "announcement-detail": "公告详情",
   courts: "场地预订",

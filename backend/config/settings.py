@@ -25,7 +25,6 @@ class Settings:
     login_fail_window_seconds: int
     login_lock_seconds: int
     captcha_expire_seconds: int
-    password_reset_expire_seconds: int
     mysql_host: str
     mysql_port: int
     mysql_user: str
@@ -47,7 +46,6 @@ def load_settings() -> Settings:
         login_fail_window_seconds=_int_env("LOGIN_FAIL_WINDOW_SECONDS", 600),
         login_lock_seconds=_int_env("LOGIN_LOCK_SECONDS", 600),
         captcha_expire_seconds=_int_env("CAPTCHA_EXPIRE_SECONDS", 300),
-        password_reset_expire_seconds=_int_env("PASSWORD_RESET_EXPIRE_SECONDS", 600),
         mysql_host=os.getenv("MYSQL_HOST", "127.0.0.1"),
         mysql_port=_int_env("MYSQL_PORT", 3306),
         mysql_user=os.getenv("MYSQL_USER", "root"),

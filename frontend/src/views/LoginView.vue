@@ -90,8 +90,6 @@ onMounted(loadCaptcha);
       </el-form>
       <p class="muted-link">
         还没有账号？<RouterLink to="/register">去注册</RouterLink>
-        <span> · </span>
-        <RouterLink to="/forgot-password">忘记密码</RouterLink>
       </p>
     </el-card>
   </section>

@@ -27,8 +27,6 @@ function isPublicAuthRequest(url: string) {
     "/auth/register",
     "/auth/refresh",
     "/auth/logout",
-    "/auth/password-reset/request",
-    "/auth/password-reset/confirm",
   ].some((path) => url.includes(path));
 }
 

@@ -41,11 +41,6 @@ export interface CaptchaResult {
   expires_in: number;
 }
 
-export interface PasswordResetRequestResult {
-  reset_token: string;
-  expires_in: number;
-}
-
 export function getCaptcha() {
   return http.get<unknown, ApiResponse<CaptchaResult>>("/auth/captcha");
 }
@@ -71,19 +66,6 @@ export function refreshLogin(payload: { refresh_token: string }) {
 
 export function logout(payload: { refresh_token: string }) {
   return http.post<unknown, ApiResponse<null>>("/auth/logout", payload);
-}
-
-export function requestPasswordReset(payload: {
-  username: string;
-  contact: string;
-  captcha_id: string;
-  captcha_code: string;
-}) {
-  return http.post<unknown, ApiResponse<PasswordResetRequestResult>>("/auth/password-reset/request", payload);
-}
-
-export function confirmPasswordReset(payload: { reset_token: string; new_password: string }) {
-  return http.post<unknown, ApiResponse<null>>("/auth/password-reset/confirm", payload);
 }
 
 export function getProfile() {
