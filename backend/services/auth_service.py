@@ -56,11 +56,11 @@ def public_user(user: dict[str, Any]) -> dict[str, Any]:
 
 async def public_current_user(user: dict[str, Any]) -> dict[str, Any]:
     data = public_user(user)
-    data["must_change_password"] = await is_default_admin_password(user)
+    data["must_change_password"] = is_default_admin_password(user)
     return data
 
 
-async def is_default_admin_password(user: dict[str, Any]) -> bool:
+def is_default_admin_password(user: dict[str, Any]) -> bool:
     if user.get("username") != DEFAULT_ADMIN_USERNAME or user.get("role") != "admin":
         return False
     return user.get("password_hash") == DEFAULT_ADMIN_PASSWORD_HASH
@@ -146,6 +146,8 @@ async def login(settings: Settings, body: dict[str, Any]) -> dict[str, Any]:
         raise ApiError(400, "用户名或密码错误", 400)
     if user["status"] != 1:
         raise ApiError(403, "账号已被禁用", 403)
+    if is_default_admin_password(user):
+        raise ApiError(403, "默认管理员密码已禁用，请在服务器上重新设置管理员", 403)
 
     await redis_service.delete_keys(settings, _login_fail_key(username), lock_key)
     await user_repository.update_last_login(settings, user["id"])
@@ -200,6 +202,8 @@ async def refresh_login(settings: Settings, body: dict[str, Any]) -> dict[str, A
         raise ApiError(401, "登录用户不存在，请重新登录", 401)
     if user["status"] != 1:
         raise ApiError(403, "账号已被禁用", 403)
+    if is_default_admin_password(user):
+        raise ApiError(403, "默认管理员密码已禁用，请在服务器上重新设置管理员", 403)
 
     await redis_service.delete_keys(settings, key)
     token, new_refresh_token = await issue_tokens(settings, user)
@@ -240,6 +244,8 @@ async def request_password_reset(settings: Settings, body: dict[str, Any]) -> di
         raise ApiError(400, "用户名或联系方式不匹配", 400)
     if user["status"] != 1:
         raise ApiError(403, "账号已被禁用", 403)
+    if is_default_admin_password(user):
+        raise ApiError(403, "默认管理员密码已禁用，请在服务器上重新设置管理员", 403)
 
     reset_token = secrets.token_urlsafe(32)
     await redis_service.set_value(

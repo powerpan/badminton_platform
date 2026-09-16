@@ -63,16 +63,15 @@ REDIS_DB=0
 mysql -h127.0.0.1 -P3306 -uroot -p < sql/init.sql
 ```
 
-`sql/init.sql` 会创建 `badminton_platform` 数据库、业务表、基础配置和初始管理员。
+`sql/init.sql` 会创建 `badminton_platform` 数据库、业务表和基础配置，不会创建带有公开默认密码的管理员。安装后、对外开放服务前，在服务器上交互式创建管理员：
 
-初始管理员：
-
-```text
-用户名：admin
-密码：admin123
+```bash
+cd backend
+python3 create_admin.py
+cd ..
 ```
 
-首次登录后请立即修改管理员密码。
+命令会要求输入并确认密码，密码不会写入命令行、文档或仓库。该命令也可用于重置同名管理员；从曾使用默认密码的版本升级时，必须在重新开放服务前执行此命令，并同时更换 `JWT_SECRET` 以使旧令牌失效。
 
 如果是从旧版本数据库升级到当前版本，按顺序执行迁移脚本：
 

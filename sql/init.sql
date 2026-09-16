@@ -313,19 +313,6 @@ VALUES
 ON DUPLICATE KEY UPDATE
   court_no = VALUES(court_no);
 
-INSERT INTO user (username, password_hash, nickname, role, contact, status)
-VALUES
-  ('admin', '$2b$12$TPjY/z1Ut.JJLpGI6hjaleO/bugGoC9C7ctepWJFjiFcVCkNz3GHi', '系统管理员', 'admin', 'admin', 1)
-ON DUPLICATE KEY UPDATE
-  username = VALUES(username);
-
-INSERT INTO member_account (user_id, member_level, balance_cents, points, expires_at)
-SELECT id, 'diamond', 200000, 0, '2026-12-31'
-FROM user
-WHERE username = 'admin'
-ON DUPLICATE KEY UPDATE
-  user_id = VALUES(user_id);
-
 INSERT INTO shop_product (product_no, product_name, description, image_url, price_cents, stock, sold_count, status)
 VALUES
   ('P001', '训练羽毛球', '耐打训练用球，适合日常练习。', '/courts/default-court.png', 6800, 30, 0, 1),

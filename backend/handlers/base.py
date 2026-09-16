@@ -5,6 +5,7 @@ from typing import Any
 import tornado.web
 
 from repositories import user_repository
+from services.auth_service import is_default_admin_password
 from utils.response import ApiError, error
 from utils.tokens import decode_access_token
 
@@ -80,6 +81,8 @@ class BaseHandler(tornado.web.RequestHandler):
             raise ApiError(401, "登录用户不存在，请重新登录", 401)
         if user["status"] != 1:
             raise ApiError(403, "账号已被禁用", 403)
+        if is_default_admin_password(user):
+            raise ApiError(403, "默认管理员密码已禁用，请在服务器上重新设置管理员", 403)
 
         self._current_user_data = user
         return user
