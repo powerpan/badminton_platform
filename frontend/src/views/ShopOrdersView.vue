@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductImage from "../components/ProductImage.vue";
 import { onMounted, ref } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 
@@ -121,7 +122,6 @@ onMounted(() => loadOrders());
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">商城订单</p>
     <h1>我的商城订单</h1>
     <p>查看余额支付订单、领取状态和退款申请记录。</p>
   </section>
@@ -187,7 +187,7 @@ onMounted(() => loadOrders());
       </el-descriptions>
       <div class="cart-list">
         <article v-for="item in selectedOrder.items || []" :key="item.id" class="cart-item">
-          <img :src="item.image_url_snapshot || '/courts/default-court.png'" :alt="item.product_name_snapshot" />
+          <ProductImage :name="item.product_name_snapshot" :src="item.image_url_snapshot" />
           <div>
             <strong>{{ item.product_name_snapshot }}</strong>
             <span>{{ formatMoney(item.price_cents) }} x {{ item.quantity }}</span>

@@ -29,7 +29,6 @@ onMounted(loadAnnouncement);
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">公告详情</p>
     <h1>{{ announcement?.title || "公告详情" }}</h1>
     <p v-if="announcement">发布时间：{{ announcement.created_at }}</p>
   </section>

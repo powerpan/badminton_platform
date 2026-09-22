@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-
+import { Bell, ArrowDown, MoreFilled, House, Calendar, Tickets, User, ArrowRight } from "@element-plus/icons-vue";
 import { useAuthStore } from "./stores/auth";
 import { useNotificationStore } from "./stores/notification";
 
@@ -9,200 +9,111 @@ const authStore = useAuthStore();
 const notificationStore = useNotificationStore();
 const route = useRoute();
 const router = useRouter();
-
-const routeTitleMap: Record<string, string> = {
-  home: "运营总览",
-  login: "会员登录",
-  register: "会员注册",
-  "forgot-password": "找回密码",
-  announcements: "公告中心",
-  "announcement-detail": "公告详情",
-  courts: "场地预订",
-  reservations: "我的预订",
-  profile: "会员中心",
-  notifications: "通知中心",
-  help: "帮助中心",
-  events: "活动赛事",
-  "event-detail": "活动详情",
-  community: "球友圈",
-  shop: "商城",
-  "shop-orders": "商城订单",
-  "admin-overview": "运营总览",
-};
-
-const routeTitle = computed(() => String(route.meta.title || routeTitleMap[String(route.name || "")] || "羽毛球平台"));
-
-const userNav = computed(() => [
-  { label: "首页", to: "/", icon: "home", visible: true },
-  { label: "场地预订", to: "/courts", icon: "grid", visible: authStore.isLoggedIn },
-  { label: "我的预订", to: "/reservations", icon: "ticket", visible: authStore.isLoggedIn },
-  { label: "会员中心", to: "/profile", icon: "user", visible: authStore.isLoggedIn },
-  { label: "活动赛事", to: "/events", icon: "flag", visible: true },
-  { label: "球友圈", to: "/community", icon: "circle", visible: true },
-  { label: "商城", to: "/shop", icon: "cart", visible: true },
-  { label: "帮助中心", to: "/help", icon: "help", visible: true },
-]);
-
-const adminNav = [
-  { label: "运营总览", to: "/admin/overview", icon: "home", visible: true },
-  { label: "用户管理", to: "/admin/users", icon: "user", visible: true },
-  { label: "场地管理", to: "/admin/courts", icon: "grid", visible: true },
-  { label: "预约管理", to: "/admin/reservations", icon: "ticket", visible: true },
-  { label: "公告管理", to: "/admin/announcements", icon: "help", visible: true },
-  { label: "通知管理", to: "/admin/notifications", icon: "circle", visible: true },
-  { label: "活动管理", to: "/admin/events", icon: "flag", visible: true },
-  { label: "球友圈管理", to: "/admin/community", icon: "circle", visible: true },
-  { label: "商城商品", to: "/admin/shop/products", icon: "cart", visible: true },
-  { label: "商城订单", to: "/admin/shop/orders", icon: "ticket", visible: true },
-  { label: "规则配置", to: "/admin/configs", icon: "admin", visible: true },
-  { label: "操作日志", to: "/admin/logs", icon: "help", visible: true },
+const moreVisible = ref(false);
+const adminMode = computed(() => Boolean(route.meta.requiresAdmin));
+const memberName = computed(() => authStore.user?.nickname || authStore.user?.username || "会员中心");
+const mainNav = [
+  { label: "首页", to: "/" }, { label: "场地预订", to: "/courts" },
+  { label: "我的预订", to: "/reservations" }, { label: "活动赛事", to: "/events" },
+  { label: "球友圈", to: "/community" }, { label: "商城", to: "/shop" },
 ];
-
-const primaryNav = computed(() => (authStore.isAdmin ? adminNav : userNav.value));
-
-const guestNav = [
-  { label: "登录", to: "/login", icon: "login" },
-  { label: "注册", to: "/register", icon: "register" },
+const mobileNav = [
+  { label: "首页", to: "/", icon: House }, { label: "预订", to: "/courts", icon: Calendar },
+  { label: "订单", to: "/reservations", icon: Tickets }, { label: "我的", to: "/profile", icon: User },
 ];
-
-function formatMoney(cents: number | null | undefined) {
-  return `￥${((cents || 0) / 100).toLocaleString("zh-CN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function validityText(expiresAt: string | null | undefined) {
-  return expiresAt ? `有效期至 ${expiresAt}` : "长期有效";
-}
-
+const adminGroups = [
+  { label: "球馆运营", links: [
+    { label: "运营总览", to: "/admin/overview" }, { label: "预约管理", to: "/admin/reservations" },
+    { label: "场地管理", to: "/admin/courts" }, { label: "用户管理", to: "/admin/users" },
+  ] },
+  { label: "内容与服务", links: [
+    { label: "公告管理", to: "/admin/announcements" }, { label: "活动管理", to: "/admin/events" },
+    { label: "球友圈管理", to: "/admin/community" }, { label: "商城商品", to: "/admin/shop/products" },
+    { label: "商城订单", to: "/admin/shop/orders" }, { label: "通知管理", to: "/admin/notifications" },
+  ] },
+  { label: "设置", links: [
+    { label: "规则配置", to: "/admin/configs" }, { label: "操作日志", to: "/admin/logs" },
+  ] },
+];
 async function logout() {
-  await authStore.logout();
-  notificationStore.clear();
-  await router.push("/login");
-}
-
-onMounted(async () => {
-  if (!authStore.token) return;
   try {
-    await authStore.fetchProfile();
-    await notificationStore.fetchUnreadCount();
-  } catch {
+    await authStore.logout();
+  } finally {
     authStore.clearSession();
     notificationStore.clear();
+    moreVisible.value = false;
+    await router.push("/login");
   }
+}
+async function accountCommand(command: string) {
+  if (command === "logout") await logout();
+  else await router.push(command);
+}
+async function refreshNotifications() {
+  if (!authStore.isLoggedIn) { notificationStore.clear(); return; }
+  try { await notificationStore.fetchUnreadCount(); }
+  catch { notificationStore.clear(); }
+}
+onMounted(async () => {
+  if (authStore.token) {
+    try { await authStore.fetchProfile(); }
+    catch { if (!localStorage.getItem("bf_token")) authStore.clearSession(); }
+  }
+  await refreshNotifications();
 });
-
-watch(
-  () => authStore.isLoggedIn,
-  async (isLoggedIn) => {
-    if (!isLoggedIn) {
-      notificationStore.clear();
-      return;
-    }
-    try {
-      await notificationStore.fetchUnreadCount();
-    } catch {
-      notificationStore.clear();
-    }
-  },
-);
+watch(() => authStore.isLoggedIn, refreshNotifications);
+watch(() => route.fullPath, () => { moreVisible.value = false; });
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <span class="brand-mark" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
-          <span></span>
-        </span>
-        <div>
-          <strong>GREENBIRD</strong>
-          <small>BADMINTON CLUB</small>
-        </div>
-      </div>
-
-      <nav class="nav-list">
-        <RouterLink
-          v-for="item in primaryNav.filter((nav) => nav.visible)"
-          :key="item.to"
-          :to="item.to"
-          class="nav-item"
-        >
-          <span class="nav-icon" :class="`nav-icon-${item.icon}`"></span>
-          <span>{{ item.label }}</span>
-        </RouterLink>
-        <template v-if="!authStore.isLoggedIn">
-          <RouterLink v-for="item in guestNav" :key="item.to" :to="item.to" class="nav-item">
-            <span class="nav-icon" :class="`nav-icon-${item.icon}`"></span>
-            <span>{{ item.label }}</span>
-          </RouterLink>
-        </template>
+  <div class="product-shell" :class="{ 'is-admin': adminMode, 'is-booking': route.name === 'courts' }">
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+    <header class="club-header">
+      <RouterLink :to="adminMode ? '/admin/overview' : '/'" class="club-brand" aria-label="BF 羽毛球馆首页">
+        <img src="/favicon.svg?v=2" alt="" width="34" height="40" /><strong>BF 羽毛球馆</strong>
+      </RouterLink>
+      <nav v-if="!adminMode" class="club-nav" aria-label="主导航">
+        <RouterLink v-for="item in mainNav" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
       </nav>
-
-      <div class="session-box">
-        <template v-if="authStore.user?.role === 'admin'">
-          <div class="session-title">
-            <span>系统管理员</span>
-            <small>后台管理端</small>
-          </div>
-          <div class="session-balance">
-            <small>当前账号</small>
-            <strong>{{ authStore.user.nickname || authStore.user.username }}</strong>
-          </div>
-          <small v-if="authStore.user.must_change_password" class="warning-line">默认密码待修改</small>
-          <RouterLink class="session-link" to="/admin/overview">管理总览</RouterLink>
-        </template>
-        <template v-else-if="authStore.user">
-          <div class="session-title">
-            <span>{{ authStore.user.member.level_label }}</span>
-            <small>{{ validityText(authStore.user.member.expires_at) }}</small>
-          </div>
-          <div class="session-balance">
-            <small>余额</small>
-            <strong>{{ formatMoney(authStore.user.member.balance_cents) }}</strong>
-          </div>
-          <div class="session-balance">
-            <small>积分</small>
-            <strong>{{ authStore.user.member.points.toLocaleString("zh-CN") }}</strong>
-          </div>
-          <small v-if="authStore.user.must_change_password" class="warning-line">默认密码待修改</small>
-          <RouterLink class="session-link" to="/profile">会员权益</RouterLink>
-        </template>
-        <template v-else>
-          <span>未登录</span>
-          <small>登录后可预约场地</small>
-        </template>
+      <span v-else class="admin-header-label">球馆管理</span>
+      <div class="club-account">
+        <RouterLink v-if="authStore.isLoggedIn" class="notification-button" to="/notifications" aria-label="通知中心">
+          <Bell /><span v-if="notificationStore.unreadCount" class="notification-badge">{{ Math.min(notificationStore.unreadCount, 99) }}</span>
+        </RouterLink>
+        <el-dropdown v-if="authStore.isLoggedIn" trigger="click" @command="accountCommand">
+          <button class="account-button" aria-label="账户菜单"><span class="member-avatar">{{ memberName.slice(0, 1) }}</span><span class="account-text">{{ adminMode ? memberName : '会员中心' }}</span><ArrowDown /></button>
+          <template #dropdown><el-dropdown-menu>
+            <el-dropdown-item command="/profile">会员中心</el-dropdown-item>
+            <el-dropdown-item command="/shop/orders">商城订单</el-dropdown-item>
+            <el-dropdown-item v-if="authStore.isAdmin" :command="adminMode ? '/' : '/admin/overview'">{{ adminMode ? '返回用户端' : '进入管理端' }}</el-dropdown-item>
+            <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+          </el-dropdown-menu></template>
+        </el-dropdown>
+        <RouterLink v-else class="guest-login" :to="{ name: 'login', query: { redirect: route.fullPath } }">登录 / 注册</RouterLink>
+        <button class="more-button" aria-label="更多导航" :aria-expanded="moreVisible" @click="moreVisible = true"><MoreFilled /></button>
       </div>
-    </aside>
-
-    <main class="main-panel">
-      <header class="topbar">
-        <h1>{{ routeTitle }}</h1>
-        <div class="topbar-tools">
-          <span class="weather-dot"></span>
-          <span>28°C</span>
-          <RouterLink v-if="authStore.isLoggedIn" class="notice-link" to="/notifications" aria-label="通知中心">
-            <span class="notice-bell">
-              <span v-if="notificationStore.unreadCount > 0" class="notice-count">
-                {{ notificationStore.unreadCount > 99 ? "99+" : notificationStore.unreadCount }}
-              </span>
-            </span>
-          </RouterLink>
-          <div v-if="authStore.user" class="user-chip">
-            <span class="avatar">{{ (authStore.user.nickname || authStore.user.username).slice(0, 1) }}</span>
-            <div>
-              <strong>{{ authStore.user.nickname || authStore.user.username }}</strong>
-              <small>{{ authStore.user.role === "admin" ? "管理员" : "会员卡" }}</small>
-            </div>
-            <button type="button" class="logout-button" @click="logout">退出</button>
-          </div>
+    </header>
+    <aside v-if="adminMode" class="admin-sidebar">
+      <nav aria-label="后台导航">
+        <div v-for="group in adminGroups" :key="group.label" class="admin-nav-group"><p>{{ group.label }}</p>
+          <RouterLink v-for="item in group.links" :key="item.to" :to="item.to">{{ item.label }}</RouterLink>
         </div>
-      </header>
-      <RouterView />
-    </main>
+      </nav>
+      <RouterLink to="/" class="admin-back-link">返回用户端<ArrowRight /></RouterLink>
+    </aside>
+    <main id="main-content" class="club-main" tabindex="-1"><RouterView /></main>
+    <footer v-if="!adminMode" class="club-footer"><span>BF 羽毛球馆</span><RouterLink to="/help">预约帮助</RouterLink></footer>
+    <nav v-if="!adminMode" class="mobile-bottom-nav" aria-label="手机主导航">
+      <RouterLink v-for="item in mobileNav" :key="item.to" :to="item.to"><component :is="item.icon" /><span>{{ item.label }}</span></RouterLink>
+    </nav>
+    <el-drawer v-model="moreVisible" :with-header="false" size="min(330px, 100vw)" class="navigation-drawer" aria-label="更多导航">
+      <div class="drawer-heading"><h2>{{ adminMode ? '球馆管理' : '更多服务' }}</h2><el-button @click="moreVisible = false">关闭</el-button></div>
+      <nav v-if="adminMode" class="drawer-navigation"><template v-for="group in adminGroups" :key="group.label"><p>{{ group.label }}</p><RouterLink v-for="item in group.links" :key="item.to" :to="item.to">{{ item.label }}<ArrowRight /></RouterLink></template><RouterLink to="/">返回用户端<ArrowRight /></RouterLink></nav>
+      <nav v-else class="drawer-navigation">
+        <RouterLink v-for="item in [...mainNav.slice(3), {label: '商城订单', to: '/shop/orders'}, {label: '球馆公告', to: '/announcements'}, {label: '预约帮助', to: '/help'}]" :key="item.to" :to="item.to">{{ item.label }}<ArrowRight /></RouterLink>
+        <RouterLink v-if="authStore.isAdmin" to="/admin/overview">进入管理端<ArrowRight /></RouterLink>
+      </nav>
+      <el-button v-if="authStore.isLoggedIn" class="drawer-logout" @click="logout">退出登录</el-button>
+    </el-drawer>
   </div>
 </template>

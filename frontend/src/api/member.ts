@@ -6,6 +6,7 @@ export type MemberTransactionType =
   | "admin_adjust"
   | "reservation_charge"
   | "reservation_refund"
+  | "reservation_reschedule"
   | "shop_purchase"
   | "shop_refund";
 

@@ -135,9 +135,8 @@ onMounted(() => loadLedger());
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">个人中心</p>
     <h1>账号资料</h1>
-    <p v-if="currentUser">当前登录：{{ currentUser.username }} / {{ currentUser.role }}</p>
+    <p v-if="currentUser">{{ currentUser.nickname || currentUser.username }}，在这里查看会员权益和账号信息。</p>
   </section>
 
   <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
@@ -152,12 +151,12 @@ onMounted(() => loadLedger());
         <template #header>
           <div class="card-header-row">
             <strong>会员账户</strong>
-            <el-tag type="success" effect="plain">{{ currentMember.level_label }}</el-tag>
+            <el-tag :type="currentMember.level !== currentMember.effective_level ? 'info' : 'success'" effect="plain">{{ currentMember.level_label }}{{ currentMember.level !== currentMember.effective_level ? ' · 已到期' : '' }}</el-tag>
           </div>
         </template>
         <div class="member-profile-main">
           <strong>{{ currentMember.level_label }}</strong>
-          <span>{{ validityText(currentMember.expires_at) }}</span>
+          <span>{{ validityText(currentMember.expires_at) }}{{ currentMember.level !== currentMember.effective_level ? '，当前按普通会员价格结算' : '' }}</span>
         </div>
         <div class="member-metric-list">
           <div>
@@ -231,6 +230,7 @@ onMounted(() => loadLedger());
             <el-radio-button :value="''">全部</el-radio-button>
             <el-radio-button :value="'reservation_charge'">预约扣款</el-radio-button>
             <el-radio-button :value="'reservation_refund'">预约退款</el-radio-button>
+            <el-radio-button :value="'reservation_reschedule'">改期差额</el-radio-button>
             <el-radio-button :value="'shop_purchase'">商城支付</el-radio-button>
             <el-radio-button :value="'shop_refund'">商城退款</el-radio-button>
             <el-radio-button :value="'admin_adjust'">后台调整</el-radio-button>

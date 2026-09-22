@@ -104,7 +104,6 @@ onMounted(() => loadNotifications());
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">站内通知</p>
     <h1>通知中心</h1>
     <p>查看预约、会员、公告和系统消息。</p>
   </section>

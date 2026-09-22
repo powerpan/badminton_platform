@@ -10,6 +10,7 @@ import {
   type ClubEvent,
 } from "../api/event";
 import { useAuthStore } from "../stores/auth";
+import EventImage from "../components/EventImage.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -38,6 +39,7 @@ async function loadEvent() {
     const response = await getEvent(eventId.value);
     event.value = response.data;
   } catch (error) {
+    event.value = null;
     errorMessage.value = error instanceof Error ? error.message : "活动详情加载失败";
   } finally {
     loading.value = false;
@@ -55,7 +57,9 @@ async function submitRegister() {
     await loadEvent();
     ElMessage.success("报名成功");
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : "报名失败");
+    const failure = error instanceof Error ? error.message : "报名失败";
+    await loadEvent();
+    ElMessage.error(failure);
   } finally {
     loading.value = false;
   }
@@ -79,7 +83,6 @@ onMounted(loadEvent);
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">活动详情</p>
     <h1>{{ event?.title || "活动详情" }}</h1>
     <p>查看活动时间、地点和报名状态。</p>
   </section>
@@ -89,6 +92,7 @@ onMounted(loadEvent);
   <el-card v-if="event" shadow="never" class="panel-card detail-page-card" v-loading="loading">
     <div class="detail-layout">
       <article class="detail-content">
+        <EventImage :title="event.title" detail />
         <el-tag :type="event.is_registered ? 'warning' : 'success'" effect="plain">
           {{ registrationStateText(event) }}
         </el-tag>
@@ -120,3 +124,16 @@ onMounted(loadEvent);
     </div>
   </el-card>
 </template>
+
+<style scoped>
+.detail-side :deep(.el-descriptions__table) {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+.detail-side :deep(.el-descriptions__label) { width: 88px; }
+.detail-side :deep(.el-descriptions__cell) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+</style>

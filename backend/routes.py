@@ -1,3 +1,5 @@
+from handlers.booking_operations import (RecommendationsHandler, RescheduleQuoteHandler, RescheduleHandler,
+    ReservationChangesHandler, CourtBlocksHandler, ReleaseCourtBlockHandler, AttendanceHandler, OperationsStatisticsHandler)
 from handlers.admin import (
     AdminAnnouncementDetailHandler,
     AdminAnnouncementStatusHandler,
@@ -48,10 +50,10 @@ from handlers.auth import (
     RegisterHandler,
 )
 from handlers.community import CommunityPostHideHandler, CommunityPostsHandler
-from handlers.courts import CourtsHandler, CourtSlotsHandler
+from handlers.courts import CourtsHandler, CourtSlotsHandler, CourtRulesHandler, VenueInfoHandler
 from handlers.events import EventCancelRegistrationHandler, EventDetailHandler, EventRegisterHandler, EventsHandler
 from handlers.health import HealthHandler
-from handlers.members import MemberTransactionsHandler
+from handlers.members import MemberTransactionsHandler, BookingBalanceHandler
 from handlers.notifications import (
     NotificationReadAllHandler,
     NotificationReadHandler,
@@ -61,6 +63,8 @@ from handlers.notifications import (
 from handlers.reservations import (
     CancelReservationHandler,
     MyReservationsHandler,
+    MyReservationDetailHandler,
+    ReservationSummaryHandler,
     ReservationOrderPayHandler,
     ReservationsHandler,
 )
@@ -70,6 +74,7 @@ from handlers.shop import (
     ShopOrderDetailHandler,
     ShopOrderRefundRequestHandler,
     ShopOrdersHandler,
+    ShopOrderQuoteHandler,
     ShopProductDetailHandler,
     ShopProductsHandler,
 )
@@ -95,6 +100,7 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/notifications/read-all", NotificationReadAllHandler),
         (r"/api/notifications/([^/]+)/read", NotificationReadHandler),
         (r"/api/member/transactions", MemberTransactionsHandler),
+        (r"/api/member/booking-balance", BookingBalanceHandler),
         (r"/api/events", EventsHandler),
         (r"/api/events/([^/]+)", EventDetailHandler),
         (r"/api/events/([^/]+)/register", EventRegisterHandler),
@@ -104,14 +110,27 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/shop/products", ShopProductsHandler),
         (r"/api/shop/products/([^/]+)", ShopProductDetailHandler),
         (r"/api/shop/orders", ShopOrdersHandler),
+        (r"/api/shop/orders/quote", ShopOrderQuoteHandler),
         (r"/api/shop/orders/my", MyShopOrdersHandler),
         (r"/api/shop/orders/([^/]+)/refund-request", ShopOrderRefundRequestHandler),
         (r"/api/shop/orders/([^/]+)/cancel", ShopOrderCancelHandler),
         (r"/api/shop/orders/([^/]+)", ShopOrderDetailHandler),
         (r"/api/courts", CourtsHandler),
+        (r"/api/reservations/recommendations", RecommendationsHandler),
+        (r"/api/reservations/([0-9]+)/reschedule/quote", RescheduleQuoteHandler),
+        (r"/api/reservations/([0-9]+)/reschedule", RescheduleHandler),
+        (r"/api/reservations/([0-9]+)/changes", ReservationChangesHandler),
+        (r"/api/admin/court-blocks", CourtBlocksHandler),
+        (r"/api/admin/court-blocks/([0-9]+)/release", ReleaseCourtBlockHandler),
+        (r"/api/admin/reservations/([0-9]+)/attendance", AttendanceHandler),
+        (r"/api/admin/statistics/operations", OperationsStatisticsHandler),
+        (r"/api/venue", VenueInfoHandler),
+        (r"/api/courts/rules", CourtRulesHandler),
         (r"/api/courts/([^/]+)/slots", CourtSlotsHandler),
         (r"/api/reservations", ReservationsHandler),
         (r"/api/reservations/my", MyReservationsHandler),
+        (r"/api/reservations/summary", ReservationSummaryHandler),
+        (r"/api/reservations/([0-9]+)", MyReservationDetailHandler),
         (r"/api/reservations/([^/]+)/cancel", CancelReservationHandler),
         (r"/api/reservation-orders/([^/]+)/pay", ReservationOrderPayHandler),
         (r"/api/admin/users", AdminUsersHandler),

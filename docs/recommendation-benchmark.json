@@ -1,0 +1,252 @@
+{
+  "scope": "Pure Python candidate generation only; no database, Redis, HTTP or browser latency.",
+  "seed": 20260916,
+  "occupancy_probabilities": [
+    0.1,
+    0.3,
+    0.7
+  ],
+  "duration_minutes": 120,
+  "results": [
+    {
+      "courts": 1,
+      "slot_interval_minutes": 15,
+      "slots": 48,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 0.038,
+      "p95_ms": 0.042,
+      "returned": 3
+    },
+    {
+      "courts": 1,
+      "slot_interval_minutes": 15,
+      "slots": 48,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 0.015,
+      "p95_ms": 0.016,
+      "returned": 0
+    },
+    {
+      "courts": 1,
+      "slot_interval_minutes": 15,
+      "slots": 48,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 0.016,
+      "p95_ms": 0.017,
+      "returned": 0
+    },
+    {
+      "courts": 1,
+      "slot_interval_minutes": 60,
+      "slots": 12,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 0.023,
+      "p95_ms": 0.026,
+      "returned": 3
+    },
+    {
+      "courts": 1,
+      "slot_interval_minutes": 60,
+      "slots": 12,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 0.017,
+      "p95_ms": 0.017,
+      "returned": 3
+    },
+    {
+      "courts": 1,
+      "slot_interval_minutes": 60,
+      "slots": 12,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 0.005,
+      "p95_ms": 0.005,
+      "returned": 0
+    },
+    {
+      "courts": 10,
+      "slot_interval_minutes": 15,
+      "slots": 480,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 0.532,
+      "p95_ms": 0.578,
+      "returned": 3
+    },
+    {
+      "courts": 10,
+      "slot_interval_minutes": 15,
+      "slots": 480,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 0.185,
+      "p95_ms": 0.205,
+      "returned": 3
+    },
+    {
+      "courts": 10,
+      "slot_interval_minutes": 15,
+      "slots": 480,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 0.165,
+      "p95_ms": 0.189,
+      "returned": 0
+    },
+    {
+      "courts": 10,
+      "slot_interval_minutes": 60,
+      "slots": 120,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 0.256,
+      "p95_ms": 0.295,
+      "returned": 3
+    },
+    {
+      "courts": 10,
+      "slot_interval_minutes": 60,
+      "slots": 120,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 0.175,
+      "p95_ms": 0.184,
+      "returned": 3
+    },
+    {
+      "courts": 10,
+      "slot_interval_minutes": 60,
+      "slots": 120,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 0.07,
+      "p95_ms": 0.109,
+      "returned": 3
+    },
+    {
+      "courts": 50,
+      "slot_interval_minutes": 15,
+      "slots": 2400,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 2.934,
+      "p95_ms": 3.183,
+      "returned": 3
+    },
+    {
+      "courts": 50,
+      "slot_interval_minutes": 15,
+      "slots": 2400,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 1.181,
+      "p95_ms": 1.265,
+      "returned": 3
+    },
+    {
+      "courts": 50,
+      "slot_interval_minutes": 15,
+      "slots": 2400,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 0.824,
+      "p95_ms": 0.925,
+      "returned": 0
+    },
+    {
+      "courts": 50,
+      "slot_interval_minutes": 60,
+      "slots": 600,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 1.29,
+      "p95_ms": 1.402,
+      "returned": 3
+    },
+    {
+      "courts": 50,
+      "slot_interval_minutes": 60,
+      "slots": 600,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 0.903,
+      "p95_ms": 1.045,
+      "returned": 3
+    },
+    {
+      "courts": 50,
+      "slot_interval_minutes": 60,
+      "slots": 600,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 0.326,
+      "p95_ms": 0.367,
+      "returned": 3
+    },
+    {
+      "courts": 200,
+      "slot_interval_minutes": 15,
+      "slots": 9600,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 12.76,
+      "p95_ms": 14.698,
+      "returned": 3
+    },
+    {
+      "courts": 200,
+      "slot_interval_minutes": 15,
+      "slots": 9600,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 4.668,
+      "p95_ms": 5.01,
+      "returned": 3
+    },
+    {
+      "courts": 200,
+      "slot_interval_minutes": 15,
+      "slots": 9600,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 3.418,
+      "p95_ms": 3.628,
+      "returned": 0
+    },
+    {
+      "courts": 200,
+      "slot_interval_minutes": 60,
+      "slots": 2400,
+      "occupancy_probability": 0.1,
+      "samples": 30,
+      "median_ms": 5.397,
+      "p95_ms": 6.359,
+      "returned": 3
+    },
+    {
+      "courts": 200,
+      "slot_interval_minutes": 60,
+      "slots": 2400,
+      "occupancy_probability": 0.3,
+      "samples": 30,
+      "median_ms": 3.562,
+      "p95_ms": 3.994,
+      "returned": 3
+    },
+    {
+      "courts": 200,
+      "slot_interval_minutes": 60,
+      "slots": 2400,
+      "occupancy_probability": 0.7,
+      "samples": 30,
+      "median_ms": 1.35,
+      "p95_ms": 1.491,
+      "returned": 3
+    }
+  ]
+}

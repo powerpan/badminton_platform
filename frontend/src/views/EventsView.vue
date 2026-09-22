@@ -2,6 +2,7 @@
 import { onMounted, ref } from "vue";
 
 import { getEvents, type ClubEvent } from "../api/event";
+import EventImage from "../components/EventImage.vue";
 
 const events = ref<ClubEvent[]>([]);
 const page = ref({ page: 1, page_size: 9, total: 0 });
@@ -41,7 +42,6 @@ onMounted(() => loadEvents());
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">活动赛事</p>
     <h1>活动赛事</h1>
     <p>查看场馆活动、训练赛和报名名额。</p>
   </section>
@@ -50,8 +50,9 @@ onMounted(() => loadEvents());
 
   <el-card shadow="never" class="panel-card list-page-card" v-loading="loading">
     <el-empty v-if="events.length === 0 && !loading" description="暂无活动" />
-    <div v-else class="feature-grid">
+    <div v-else class="feature-grid event-grid">
       <RouterLink v-for="event in events" :key="event.id" class="feature-card event-card" :to="`/events/${event.id}`">
+        <EventImage :title="event.title" />
         <div class="feature-card-head">
           <el-tag type="success" effect="plain">报名 {{ capacityText(event) }}</el-tag>
           <el-tag v-if="event.is_registered" type="warning" effect="plain">已报名</el-tag>
@@ -76,3 +77,12 @@ onMounted(() => loadEvents());
     />
   </el-card>
 </template>
+
+<style scoped>
+.event-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.event-card { display: flex; flex-direction: column; gap: 12px; }
+.event-card h2 { line-height: 1.5; }
+.event-card .compact-meta { margin-top: auto; padding-top: 4px; }
+@media (max-width: 1100px) { .event-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .event-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>

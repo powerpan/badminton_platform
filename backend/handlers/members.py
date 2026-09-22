@@ -1,7 +1,15 @@
 from handlers.base import BaseHandler
 from services import member_service
+from repositories import member_repository
 from utils.query import pagination
 from utils.response import success
+
+
+class BookingBalanceHandler(BaseHandler):
+    async def get(self) -> None:
+        current_user = await self.require_current_user()
+        data = await member_repository.get_booking_balance(self.application.settings["app_settings"], current_user["id"])
+        self.write_json(success(data))
 
 
 class MemberTransactionsHandler(BaseHandler):

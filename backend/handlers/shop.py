@@ -27,6 +27,13 @@ class ShopProductDetailHandler(BaseHandler):
         self.write_json(success(product))
 
 
+class ShopOrderQuoteHandler(BaseHandler):
+    async def post(self) -> None:
+        user = await self.require_current_user()
+        data = await shop_service.quote_order(self.application.settings['app_settings'], current_user=user, body=self.get_json_body())
+        self.write_json(success(data))
+
+
 class ShopOrdersHandler(BaseHandler):
     async def post(self) -> None:
         settings = self.application.settings["app_settings"]

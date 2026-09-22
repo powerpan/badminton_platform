@@ -63,8 +63,7 @@ onMounted(loadCaptcha);
 <template>
   <section class="auth-layout">
     <el-card class="auth-panel element-auth-card" shadow="never">
-      <p class="eyebrow">新用户注册</p>
-      <h1>创建普通用户账号</h1>
+      <h1>加入 BF 羽毛球馆</h1>
       <el-form label-position="top" class="element-form" @submit.prevent="handleRegister">
         <el-form-item label="用户名" required>
           <el-input v-model="username" autocomplete="username" size="large" />

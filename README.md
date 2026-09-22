@@ -1,6 +1,31 @@
 # BF羽毛球馆管理平台部署说明
 
-这份说明只保留部署和启动步骤。拿到仓库后，按下面流程准备 MySQL、Redis、后端和前端即可运行。
+这份说明包含部署、启动和回归验证步骤。拿到仓库后，按下面流程准备 MySQL、Redis、后端和前端即可运行。
+
+项目完善范围、分阶段验收标准和实施记录见 [项目完善计划](docs/项目完善计划.md)。
+
+第二阶段的界面、导航、后台拆分与浏览器验证见 [设计与验收](docs/第二阶段设计与验收.md)。毕业演示可按 [独立演示环境](docs/演示环境.md) 创建新数据库，保留现有业务数据。
+
+第三阶段的推荐、维护、核销、改期、经营统计和输入框修复见 [实施与验收](docs/第三阶段实施与验收.md)，业务术语见 [CONTEXT.md](CONTEXT.md)。
+
+已有本地开发库的赛事、公告和球友圈内容，可使用 [内容填充与配图](docs/内容填充与配图.md) 中的预览/导入命令补充；与创建完整独立演示库的脚本分开使用。
+
+预约回归检查（使用隔离样例，不写入 MySQL 或 Redis）：
+
+```bash
+cd backend
+.venv/bin/python -B -m unittest discover -s tests -v
+```
+
+前端逻辑测试和生产构建：
+
+```bash
+cd frontend
+npm test
+npm run build
+```
+
+后端每 30 秒检查到期的待支付预约和已结束的预约；支付、查询等请求仍保留即时状态校验。使用率按当前启用场地、当前营业规则和预约时长计算，包含待支付占用，不代表实际到场率。
 
 ## 1. 环境要求
 
@@ -83,9 +108,10 @@ mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase3_n
 mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase4_marketplace.sql
 mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase5_reservation_orders.sql
 mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase6_admin_refund_flow.sql
+backend/.venv/bin/python scripts/migrate_booking_operations.py --database badminton_platform --apply
 ```
 
-新库只需要执行 `sql/init.sql`。
+phase7 只新增维护、到场和改期历史表；可先省略 `--apply` 做只读预览，在停止业务写入的窗口升级并校验原数据合计。新库只需要执行 `sql/init.sql`。
 
 ## 5. 本地一键启动
 

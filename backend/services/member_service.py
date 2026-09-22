@@ -10,6 +10,7 @@ VALID_TYPES = {
     "admin_adjust",
     "reservation_charge",
     "reservation_refund",
+    "reservation_reschedule",
     "shop_purchase",
     "shop_refund",
 }
@@ -18,6 +19,7 @@ TYPE_LABELS = {
     "admin_adjust": "后台调整",
     "reservation_charge": "预约扣款",
     "reservation_refund": "预约退款",
+    "reservation_reschedule": "改期差额",
     "shop_purchase": "商城支付",
     "shop_refund": "商城退款",
 }

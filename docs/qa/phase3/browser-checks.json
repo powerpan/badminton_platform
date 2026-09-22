@@ -1,0 +1,122 @@
+{
+  "date": "2026-09-16",
+  "browser": "Installed Google Chrome through Playwright; isolated browser context",
+  "frontend": "http://localhost:5188",
+  "api": "Isolated MySQL database and private Redis instance; all API requests forwarded to isolated API",
+  "viewports": [
+    [
+      1440,
+      1000
+    ],
+    [
+      768,
+      1000
+    ],
+    [
+      390,
+      844
+    ]
+  ],
+  "focus_states": [
+    {
+      "page": "booking mobile",
+      "inputs": 6,
+      "overflow": false
+    },
+    {
+      "page": "profile mobile",
+      "inputs": 4,
+      "overflow": false
+    },
+    {
+      "page": "shop mobile",
+      "inputs": 4,
+      "overflow": false
+    },
+    {
+      "page": "register mobile",
+      "inputs": 5,
+      "overflow": false
+    },
+    {
+      "page": "register error mobile",
+      "inputs": 5,
+      "overflow": false
+    },
+    {
+      "page": "login mobile",
+      "inputs": 3,
+      "overflow": false
+    },
+    {
+      "page": "operations 390",
+      "inputs": 2,
+      "overflow": false
+    },
+    {
+      "page": "operations 768",
+      "inputs": 2,
+      "overflow": false
+    },
+    {
+      "page": "operations 1440",
+      "inputs": 2,
+      "overflow": false
+    },
+    {
+      "page": "maintenance drawer desktop",
+      "inputs": 3,
+      "overflow": false
+    },
+    {
+      "page": "maintenance drawer mobile",
+      "inputs": 7,
+      "overflow": false
+    },
+    {
+      "page": "new court drawer desktop",
+      "inputs": 11,
+      "overflow": false
+    },
+    {
+      "page": "new court drawer mobile",
+      "inputs": 11,
+      "overflow": false
+    },
+    {
+      "page": "forgot password mobile",
+      "inputs": 3,
+      "overflow": false
+    },
+    {
+      "page": "reschedule drawer mobile",
+      "inputs": 4,
+      "overflow": false
+    }
+  ],
+  "input_checks": 72,
+  "workflows": [
+    "recommendation selects two consecutive slots",
+    "maintenance excludes occupied court from recommendations and manual selection",
+    "maintenance release restores availability",
+    "reschedule quote, higher/lower amount, history and repeated HTTP request",
+    "check-in and explicit no-show",
+    "statistics date URL reload, empty range, injected 503 retains data and retry recovers",
+    "registration empty form shows expected 400; no account created",
+    "keyboard Tab retains single password focus border",
+    "disabled reschedule inputs retain single border"
+  ],
+  "permission_statuses": [
+    403,
+    403,
+    403,
+    401
+  ],
+  "expected_error_statuses": [
+    400,
+    401,
+    403,
+    503
+  ],
+  "unexpected_console_errors": 0
+}

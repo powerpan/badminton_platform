@@ -1,0 +1,253 @@
+/* Existing account components, extracted without changing declarations. */
+.payment-countdown { display: block; margin-top: 6px; color: #a75d0c; font-variant-numeric: tabular-nums; }
+
+
+.auth-layout {
+  display: grid;
+  min-height: calc(100vh - 130px);
+  place-items: center;
+}
+
+.auth-panel {
+  width: min(460px, 100%);
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.captcha-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 10px;
+  align-items: center;
+}
+
+.captcha-image-button {
+  display: grid;
+  width: 132px;
+  height: 46px;
+  padding: 0;
+  place-items: center;
+  overflow: hidden;
+  color: var(--green);
+  cursor: pointer;
+  background: var(--surface-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+}
+
+.captcha-image-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.captcha-image-button img {
+  display: block;
+  width: 132px;
+  height: 46px;
+}
+
+.profile-error {
+  margin-top: 16px;
+}
+
+.member-profile-card {
+  display: grid;
+  gap: 14px;
+}
+
+.member-profile-main {
+  display: grid;
+  gap: 4px;
+}
+
+.member-profile-main strong {
+  color: #143a2b;
+  font-size: 22px;
+}
+
+.member-profile-main span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.member-adjust-form {
+  align-items: center;
+  padding: 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.member-profile-card {
+  min-width: 0;
+}
+
+.member-profile-card .el-descriptions {
+  max-width: 100%;
+}
+
+.member-profile-card .el-descriptions__label,
+.member-profile-card .el-descriptions__content {
+  word-break: break-word;
+}
+
+.member-profile-card .el-descriptions table {
+  table-layout: fixed;
+}
+
+.member-profile-card,
+.member-profile-card .el-card__body,
+.member-profile-card .el-descriptions {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.member-profile-card *,
+.member-profile-card .el-descriptions__body,
+.member-profile-card .el-descriptions table {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.member-profile-card .el-descriptions__label,
+.member-profile-card .el-descriptions__content {
+  width: auto;
+  min-width: 0;
+  white-space: normal;
+}
+
+.member-metric-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.member-metric-list > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 12px 14px;
+  background: #f6f8f4;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.member-metric-list span {
+  color: #5f6b64;
+  font-weight: 800;
+}
+
+.member-metric-list strong {
+  min-width: 0;
+  color: #1f2521;
+  font-size: 18px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.member-ledger-card {
+  max-width: 980px;
+}
+
+.member-ledger-card .card-header-row span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.member-ledger-card .el-radio-group {
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.member-ledger-list {
+  display: grid;
+  gap: 12px;
+}
+
+.member-ledger-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto);
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.member-ledger-main,
+.member-ledger-values {
+  min-width: 0;
+}
+
+.member-ledger-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.member-ledger-title strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.member-ledger-main p {
+  margin: 8px 0 4px;
+  color: #47564e;
+}
+
+.member-ledger-main span,
+.member-ledger-values span,
+.member-ledger-values small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.member-ledger-values {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+}
+
+.member-ledger-values strong {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.member-ledger-values .positive {
+  color: #0a7c50;
+}
+
+.member-ledger-values .negative {
+  color: #b42318;
+}
+
+.member-ledger-values .neutral {
+  color: var(--muted);
+}
+
+@media (max-width: 920px) {
+
+  .member-ledger-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 920px) {
+
+  .member-ledger-values {
+    text-align: left;
+  }
+}

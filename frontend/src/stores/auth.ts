@@ -84,19 +84,21 @@ export const useAuthStore = defineStore("auth", {
     }) {
       await registerRequest(payload);
     },
+    setProfile(user: UserInfo) {
+      this.user = normalizeUser(user);
+      localStorage.setItem('bf_user', JSON.stringify(this.user));
+    },
     async fetchProfile() {
       if (!this.token) {
         return null;
       }
       const response = await getProfile();
-      this.user = normalizeUser(response.data);
-      localStorage.setItem("bf_user", JSON.stringify(this.user));
+      this.setProfile(response.data);
       return this.user;
     },
     async updateProfile(payload: { nickname: string; contact: string }) {
       const response = await updateProfile(payload);
-      this.user = normalizeUser(response.data);
-      localStorage.setItem("bf_user", JSON.stringify(this.user));
+      this.setProfile(response.data);
     },
     async changePassword(payload: { old_password: string; new_password: string }) {
       await changePassword(payload);

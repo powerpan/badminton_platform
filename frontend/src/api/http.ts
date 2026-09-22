@@ -1,5 +1,9 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
+export class ApiRequestError extends Error {
+  constructor(message: string, readonly status?: number) { super(message); this.name = 'ApiRequestError'; }
+}
+
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
   timeout: 10000,
@@ -96,6 +100,6 @@ http.interceptors.response.use(
     } else if (status === 403 && window.location.pathname.startsWith("/admin")) {
       window.location.assign("/");
     }
-    return Promise.reject(new Error(message));
+    return Promise.reject(new ApiRequestError(message, status));
   },
 );

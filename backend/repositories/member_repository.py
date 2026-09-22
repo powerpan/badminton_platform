@@ -233,3 +233,21 @@ async def adjust_member_account_atomic(
             raise
         finally:
             await connection.autocommit(True)
+
+
+async def get_booking_balance(settings: Settings, user_id: int) -> dict[str, Any]:
+    row = await fetch_one(
+        settings,
+        """
+        SELECT ma.balance_cents,
+          COALESCE((SELECT SUM(ro.amount_cents) FROM reservation_order ro
+            WHERE ro.user_id = ma.user_id AND ro.status = 'pending'
+              AND ro.expires_at > NOW()), 0) AS pending_amount_cents
+        FROM member_account ma WHERE ma.user_id = %s
+        """,
+        (user_id,),
+    )
+    balance = int((row or {}).get("balance_cents") or 0)
+    pending = int((row or {}).get("pending_amount_cents") or 0)
+    return {"balance_cents": balance, "pending_amount_cents": pending,
+            "available_balance_cents": max(0, balance - pending)}

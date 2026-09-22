@@ -55,6 +55,8 @@ def _normalize_reservation(row: dict[str, Any]) -> dict[str, Any]:
         normalized["start_time"] = _time_text(normalized["start_time"])
     if "end_time" in normalized:
         normalized["end_time"] = _time_text(normalized["end_time"])
+    if isinstance(normalized.get("order_expires_at"), datetime):
+        normalized["order_expires_at"] = normalized["order_expires_at"].astimezone().isoformat()
     return normalized
 
 
@@ -109,6 +111,9 @@ async def create_reservation(
     start_time = _parse_time(body.get("start_time"))
     end_time = _parse_time(body.get("end_time"))
     remark = clean_text(body.get("remark"))
+    expected_amount = body.get('expected_amount_cents')
+    if type(expected_amount) is not int or expected_amount < 0:
+        raise ApiError(400, '请刷新预约金额后重新确认', 400)
 
     if end_time <= start_time:
         raise ApiError(400, "结束时间必须晚于开始时间", 400)
@@ -141,13 +146,17 @@ async def create_reservation(
 
     start_text = start_time.strftime("%H:%M")
     end_text = end_time.strftime("%H:%M")
-    lock_key = reservation_lock_key(court_id, reserve_date.isoformat(), start_text, end_text)
     lock_value = f"{current_user['id']}:{time_module.time_ns()}"
-    locked = await acquire_lock(settings, lock_key, lock_value, rules.reservation_lock_ttl_seconds)
-    if not locked:
-        raise ApiError(409, "该时间段正在预约或已被占用", 409)
-
+    acquired_keys = []
     try:
+        slot_start = start_dt
+        while slot_start < end_dt:
+            slot_end = slot_start + timedelta(minutes=rules.slot_interval_minutes)
+            key = reservation_lock_key(court_id, reserve_date.isoformat(), slot_start.strftime("%H:%M"), slot_end.strftime("%H:%M"))
+            if not await acquire_lock(settings, key, lock_value, rules.reservation_lock_ttl_seconds):
+                raise ApiError(409, "该时间段正在预约或已被占用", 409)
+            acquired_keys.append(key)
+            slot_start = slot_end
         expires_at = min(
             datetime.now() + timedelta(minutes=rules.reservation_payment_timeout_minutes),
             start_dt,
@@ -165,7 +174,12 @@ async def create_reservation(
             remark=remark,
             daily_limit=rules.daily_reservation_limit,
             expires_at=expires_at,
+            expected_amount_cents=expected_amount,
         )
+        if failure_reason == "price_changed":
+            raise ApiError(409, '场地价格或会员权益已变化，未创建订单，请核对最新金额后重新确认', 409)
+        if failure_reason == "maintenance":
+            raise ApiError(409, "该时段因维护或包场暂停预约", 409)
         if failure_reason == "conflict":
             raise ApiError(409, "该时间段已被预约", 409)
         if failure_reason == "daily_limit":
@@ -188,7 +202,8 @@ async def create_reservation(
             raise ApiError(500, "预约订单创建成功但读取记录失败", 500)
         return _normalize_reservation(detail)
     finally:
-        await release_lock(settings, lock_key, lock_value)
+        for key in reversed(acquired_keys):
+            await release_lock(settings, key, lock_value)
 
 
 async def pay_reservation_order(
@@ -225,6 +240,24 @@ async def pay_reservation_order(
     normalized = _normalize_reservation(detail)
     await notification_service.notify_reservation_created(settings, reservation=normalized)
     return normalized
+
+
+async def get_my_reservation(settings: Settings, *, current_user: dict[str, Any], reservation_id: int) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
+    row = await reservation_repository.get_reservation_detail(settings, reservation_id)
+    if row is None or row['user_id'] != current_user['id']:
+        raise ApiError(404, '预约不存在', 404)
+    return _normalize_reservation(row)
+
+
+async def my_reservation_summary(settings: Settings, *, current_user: dict[str, Any]) -> dict[str, Any]:
+    await refresh_reservation_statuses(settings)
+    summary = await reservation_repository.get_user_summary(settings, user_id=current_user["id"])
+    return {
+        **summary,
+        "upcoming": _normalize_reservation(summary["upcoming"]) if summary["upcoming"] else None,
+        "pending": _normalize_reservation(summary["pending"]) if summary["pending"] else None,
+    }
 
 
 async def list_my_reservations(
@@ -276,9 +309,12 @@ async def cancel_my_reservation(
         operator_id=current_user.get("id"),
         operator_username=current_user.get("username"),
         reason="用户取消预约" if reservation["status"] == "pending" else "用户取消预约退款",
+        require_future=True,
     )
     if failure_reason == "not_found":
         raise ApiError(404, "预约记录不存在", 404)
+    if failure_reason in {"attendance_recorded", "already_started"}:
+        raise ApiError(409, "预约已到场或已开始，不能取消", 409)
     if failure_reason == "not_confirmed":
         raise ApiError(400, "当前预约状态不能取消", 400)
     updated = await reservation_repository.get_reservation_detail(settings, reservation_id)
@@ -367,6 +403,8 @@ async def admin_cancel_reservation(
     )
     if failure_reason == "not_found":
         raise ApiError(404, "预约记录不存在", 404)
+    if failure_reason in {"attendance_recorded", "already_started"}:
+        raise ApiError(409, "预约已到场或已开始，不能取消", 409)
     if failure_reason == "not_confirmed":
         raise ApiError(400, "当前预约状态不能取消", 400)
     updated = await reservation_repository.get_reservation_detail(settings, reservation_id)

@@ -26,7 +26,7 @@ def _date_range(date_from_arg: Any, date_to_arg: Any) -> tuple[date, date]:
     date_to = _parse_date(date_to_arg, today + timedelta(days=6))
     if date_from > date_to:
         raise ApiError(400, "开始日期不能晚于结束日期", 400)
-    if (date_to - date_from).days > 366:
+    if (date_to - date_from).days > 365:
         raise ApiError(400, "统计日期范围不能超过366天", 400)
     return date_from, date_to
 
@@ -81,12 +81,18 @@ async def get_overview(
     business_minutes = _time_minutes(rules.business_end_time) - _time_minutes(rules.business_start_time)
     slots_per_day = max(0, business_minutes // rules.slot_interval_minutes)
     capacity_slots = court_counts["enabled_courts"] * day_count * slots_per_day
-    occupied_slots = (
-        _status_count(reservation_counts, "pending")
-        + _status_count(reservation_counts, "confirmed")
-        + _status_count(reservation_counts, "completed")
-    )
-    utilization_rate = round((occupied_slots / capacity_slots) * 100, 2) if capacity_slots else 0
+    # Capacity uses current enabled courts and current bookable business slots.
+    court_usage = await statistics_repository.list_court_usage(settings, date_from=date_from, date_to=date_to)
+    occupied_minutes = sum(_as_float(row["booked_hours"]) * 60 for row in court_usage if int(row["status"]) == 1)
+    capacity_minutes = capacity_slots * rules.slot_interval_minutes
+    blocks = await statistics_repository.list_block_minutes(settings, date_from=date_from, date_to=date_to,
+        business_start=rules.business_start_time, business_end=rules.business_end_time)
+    enabled_ids = {row['id'] for row in court_usage if int(row['status']) == 1}
+    maintenance_minutes = sum(_as_float(row['minutes']) for row in blocks if row['court_id'] in enabled_ids)
+    capacity_minutes = max(0, capacity_minutes - maintenance_minutes)
+    capacity_slots = capacity_minutes / rules.slot_interval_minutes
+    occupied_slots = occupied_minutes / rules.slot_interval_minutes
+    utilization_rate = round(occupied_minutes / capacity_minutes * 100, 2) if capacity_minutes else 0
 
     return {
         "date_from": date_from.isoformat(),
@@ -106,6 +112,9 @@ async def get_overview(
         "expired_reservations": _status_count(reservation_counts, "expired"),
         "capacity_slots": capacity_slots,
         "occupied_slots": occupied_slots,
+        "occupied_minutes": round(occupied_minutes, 2),
+        "capacity_minutes": capacity_minutes,
+        "maintenance_minutes": maintenance_minutes,
         "utilization_rate": utilization_rate,
     }
 
@@ -124,10 +133,13 @@ async def list_court_statistics(
     slots_per_day = max(0, business_minutes // rules.slot_interval_minutes)
     capacity_slots = day_count * slots_per_day
     rows = await statistics_repository.list_court_usage(settings, date_from=date_from, date_to=date_to)
+    blocks = await statistics_repository.list_block_minutes(settings, date_from=date_from, date_to=date_to,
+        business_start=rules.business_start_time, business_end=rules.business_end_time)
+    blocked_minutes = {row['court_id']: _as_float(row['minutes']) for row in blocks}
     items = []
     for row in rows:
         active_count = int(row["active_count"] or 0)
-        court_capacity = capacity_slots if int(row["status"]) == 1 else 0
+        court_capacity = max(0, capacity_slots - blocked_minutes.get(row['id'], 0) / rules.slot_interval_minutes) if int(row["status"]) == 1 else 0
         items.append(
             {
                 "court_id": row["id"],
@@ -138,7 +150,7 @@ async def list_court_statistics(
                 "active_count": active_count,
                 "booked_hours": round(_as_float(row["booked_hours"]), 2),
                 "capacity_slots": court_capacity,
-                "usage_rate": round((active_count / court_capacity) * 100, 2) if court_capacity else 0,
+                "usage_rate": round((_as_float(row["booked_hours"]) * 60 / (court_capacity * rules.slot_interval_minutes)) * 100, 2) if court_capacity else 0,
             }
         )
     return {"date_from": date_from.isoformat(), "date_to": date_to.isoformat(), "items": items}

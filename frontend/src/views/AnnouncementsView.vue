@@ -40,7 +40,6 @@ onMounted(loadAnnouncements);
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">场馆公告</p>
     <h1>公告中心</h1>
     <p>查看场馆营业调整、活动说明和重要服务提醒。</p>
   </section>

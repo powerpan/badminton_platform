@@ -61,7 +61,7 @@ export function getShopProduct(productId: number) {
 }
 
 export function createShopOrder(payload: {
-  items: Array<{ product_id: number; quantity: number }>;
+  items: Array<{ product_id: number; quantity: number; expected_price_cents: number }>;
   remark?: string;
 }) {
   return http.post<unknown, ApiResponse<ShopOrder>>("/shop/orders", payload);
@@ -81,4 +81,17 @@ export function cancelShopOrder(orderId: number) {
 
 export function requestShopOrderRefund(orderId: number, payload: { reason: string }) {
   return http.put<unknown, ApiResponse<ShopOrder>>(`/shop/orders/${orderId}/refund-request`, payload);
+}
+
+export interface ShopQuote {
+  items: Array<{ product: ShopProduct; quantity: number; subtotal_cents: number }>;
+  total_amount_cents: number;
+  balance_cents: number;
+  pending_amount_cents: number;
+  available_balance_cents: number;
+  issues: string[];
+  can_checkout: boolean;
+}
+export function quoteShopOrder(items: Array<{ product_id: number; quantity: number }>) {
+  return http.post<unknown, ApiResponse<ShopQuote>>('/shop/orders/quote', { items });
 }

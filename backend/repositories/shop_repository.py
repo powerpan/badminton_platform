@@ -56,6 +56,10 @@ async def list_products(
     )
 
 
+async def get_products_by_ids(settings: Settings, product_ids: list[int]) -> list[dict[str, Any]]:
+    return await fetch_all(settings, f"SELECT {PRODUCT_COLUMNS} FROM shop_product WHERE id IN ({','.join(['%s'] * len(product_ids))}) ORDER BY id", product_ids)
+
+
 async def count_products(settings: Settings, *, status: int | None, keyword: str | None) -> int:
     where = []
     args: list[Any] = []
@@ -140,6 +144,7 @@ async def create_paid_order_atomic(
     user_id: int,
     items: list[dict[str, int]],
     remark: str,
+    expected_prices: dict[int, int],
 ) -> tuple[int | None, str | None]:
     product_ids = [item["product_id"] for item in items]
     quantity_by_product = {item["product_id"]: item["quantity"] for item in items}
@@ -186,6 +191,9 @@ async def create_paid_order_atomic(
                         await connection.rollback()
                         return None, "insufficient_stock"
                     price_cents = int(product["price_cents"])
+                    if expected_prices.get(product_id) != price_cents:
+                        await connection.rollback()
+                        return None, 'price_changed'
                     subtotal = price_cents * quantity
                     total_amount_cents += subtotal
                     order_items.append(
@@ -206,6 +214,11 @@ async def create_paid_order_atomic(
                 if balance_before < total_amount_cents:
                     await connection.rollback()
                     return None, "insufficient_balance"
+                await cursor.execute("SELECT COALESCE(SUM(amount_cents),0) AS held FROM reservation_order WHERE user_id=%s AND status='pending' AND expires_at>NOW()", (user_id,))
+                held = int((await cursor.fetchone())['held'])
+                if balance_before - held < total_amount_cents:
+                    await connection.rollback()
+                    return None, 'insufficient_available_balance'
                 balance_after = balance_before - total_amount_cents
 
                 await cursor.execute(

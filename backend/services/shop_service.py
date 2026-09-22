@@ -2,7 +2,7 @@ import time as time_module
 from typing import Any
 
 from config.settings import Settings
-from repositories import shop_repository
+from repositories import shop_repository, member_repository
 from services import notification_service
 from utils.query import clean_text
 from utils.response import ApiError
@@ -13,7 +13,7 @@ ORDER_STATUSES = {"paid", "refund_requested", "completed", "canceled"}
 
 
 def _order_no() -> str:
-    return "S" + time_module.strftime("%Y%m%d%H%M%S") + str(int(time_module.time() * 1000) % 1000).zfill(3)
+    return "S" + time_module.strftime("%Y%m%d%H%M%S") + str(time_module.time_ns() % 1_000_000).zfill(6)
 
 
 def _parse_status(value: Any, default: int | None = None) -> int | None:
@@ -134,10 +134,11 @@ def _product_payload(body: dict[str, Any], *, existing: dict[str, Any] | None = 
     }
 
 
-def _parse_order_items(value: Any) -> list[dict[str, int]]:
+def _parse_order_items(value: Any, *, require_prices: bool = False) -> list[dict[str, int]]:
     if not isinstance(value, list) or not value:
         raise ApiError(400, "订单商品不能为空", 400)
     quantity_by_product: dict[int, int] = {}
+    prices: dict[int, int] = {}
     for raw_item in value:
         if not isinstance(raw_item, dict):
             raise ApiError(400, "订单商品格式错误", 400)
@@ -150,11 +151,20 @@ def _parse_order_items(value: Any) -> list[dict[str, int]]:
             raise ApiError(400, "商品ID格式错误", 400)
         if quantity < 1 or quantity > 99:
             raise ApiError(400, "单个商品购买数量范围应为 1-99", 400)
+        if require_prices:
+            expected = raw_item.get('expected_price_cents')
+            if type(expected) is not int or expected < 1 or expected > 9999999:
+                raise ApiError(400, '请重新核对商品价格后确认支付', 400)
+            if product_id in prices and prices[product_id] != expected:
+                raise ApiError(400, '同一商品的确认价格不一致', 400)
+            prices[product_id] = expected
         quantity_by_product[product_id] = quantity_by_product.get(product_id, 0) + quantity
+        if quantity_by_product[product_id] > 99:
+            raise ApiError(400, '单个商品购买数量范围应为 1-99', 400)
     if len(quantity_by_product) > 20:
         raise ApiError(400, "单个订单最多包含20种商品", 400)
     return [
-        {"product_id": product_id, "quantity": quantity_by_product[product_id]}
+        {"product_id": product_id, "quantity": quantity_by_product[product_id], **({"expected_price_cents": prices[product_id]} if require_prices else {})}
         for product_id in sorted(quantity_by_product)
     ]
 
@@ -231,13 +241,33 @@ async def _order_detail(settings: Settings, order_id: int) -> dict[str, Any]:
     return _normalize_order(order, items)
 
 
+async def quote_order(settings: Settings, *, current_user: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    items = _parse_order_items(body.get('items'))
+    products = {row['id']: _normalize_product(row) for row in await shop_repository.get_products_by_ids(settings, [i['product_id'] for i in items])}
+    lines, issues = [], []
+    for item in items:
+        product = products.get(item['product_id'])
+        if product is None:
+            raise ApiError(404, '购物车中有商品已不存在，请移除后重试', 404)
+        if product['status'] != 1:
+            issues.append(f"{product['product_name']}已下架，请移除")
+        elif product['stock'] < item['quantity']:
+            issues.append(f"{product['product_name']}库存不足，当前剩余 {product['stock']} 件")
+        lines.append({'product': product, 'quantity': item['quantity'], 'subtotal_cents': product['price_cents'] * item['quantity']})
+    balance = await member_repository.get_booking_balance(settings, current_user['id'])
+    total = sum(line['subtotal_cents'] for line in lines)
+    if balance['available_balance_cents'] < total:
+        issues.append('会员可用余额不足，请处理待支付预约、充值或调整购物车')
+    return {'items': lines, 'total_amount_cents': total, **balance, 'issues': issues, 'can_checkout': not issues}
+
+
 async def create_order(
     settings: Settings,
     *,
     current_user: dict[str, Any],
     body: dict[str, Any],
 ) -> dict[str, Any]:
-    items = _parse_order_items(body.get("items"))
+    items = _parse_order_items(body.get("items"), require_prices=True)
     remark = clean_text(body.get("remark"))
     if len(remark) > 255:
         raise ApiError(400, "订单备注不能超过255个字符", 400)
@@ -247,7 +277,12 @@ async def create_order(
         user_id=current_user["id"],
         items=items,
         remark=remark,
+        expected_prices={i["product_id"]: i["expected_price_cents"] for i in items},
     )
+    if failure == "price_changed":
+        raise ApiError(409, '商品价格已变化，本次未扣款，请核对最新金额后重新确认', 409)
+    if failure == "insufficient_available_balance":
+        raise ApiError(409, '会员可用余额不足，请先处理待支付预约或充值', 409)
     if failure == "product_not_found":
         raise ApiError(404, "商品不存在", 404)
     if failure == "product_disabled":

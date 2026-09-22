@@ -1,22 +1,22 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-import AdminDashboard from "../views/AdminDashboard.vue";
-import AnnouncementDetailView from "../views/AnnouncementDetailView.vue";
-import AnnouncementsView from "../views/AnnouncementsView.vue";
-import CommunityView from "../views/CommunityView.vue";
-import CourtsView from "../views/CourtsView.vue";
-import EventDetailView from "../views/EventDetailView.vue";
-import EventsView from "../views/EventsView.vue";
-import ForgotPasswordView from "../views/ForgotPasswordView.vue";
-import HelpCenterView from "../views/HelpCenterView.vue";
-import HomeView from "../views/HomeView.vue";
-import LoginView from "../views/LoginView.vue";
-import NotificationsView from "../views/NotificationsView.vue";
-import ProfileView from "../views/ProfileView.vue";
-import ReservationsView from "../views/ReservationsView.vue";
-import RegisterView from "../views/RegisterView.vue";
-import ShopOrdersView from "../views/ShopOrdersView.vue";
-import ShopView from "../views/ShopView.vue";
+const AdminDashboard = () => import("../views/AdminDashboard.vue");
+const AnnouncementDetailView = () => import("../views/AnnouncementDetailView.vue");
+const AnnouncementsView = () => import("../views/AnnouncementsView.vue");
+const CommunityView = () => import("../views/CommunityView.vue");
+const CourtsView = () => import("../views/CourtsView.vue");
+const EventDetailView = () => import("../views/EventDetailView.vue");
+const EventsView = () => import("../views/EventsView.vue");
+const ForgotPasswordView = () => import("../views/ForgotPasswordView.vue");
+const HelpCenterView = () => import("../views/HelpCenterView.vue");
+const HomeView = () => import("../views/HomeView.vue");
+const LoginView = () => import("../views/LoginView.vue");
+const NotificationsView = () => import("../views/NotificationsView.vue");
+const ProfileView = () => import("../views/ProfileView.vue");
+const ReservationsView = () => import("../views/ReservationsView.vue");
+const RegisterView = () => import("../views/RegisterView.vue");
+const ShopOrdersView = () => import("../views/ShopOrdersView.vue");
+const ShopView = () => import("../views/ShopView.vue");
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({

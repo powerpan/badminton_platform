@@ -5,6 +5,13 @@ from config.settings import Settings
 from repositories.database import fetch_all, fetch_one
 
 
+async def list_block_minutes(settings, *, date_from, date_to, business_start, business_end):
+    return await fetch_all(settings, '''SELECT court_id,
+        SUM(GREATEST(0, TIME_TO_SEC(TIMEDIFF(LEAST(end_time,%s),GREATEST(start_time,%s)))))/60 AS minutes
+        FROM court_block WHERE reserve_date BETWEEN %s AND %s AND status='active' GROUP BY court_id''',
+        (business_end,business_start,date_from,date_to))
+
+
 async def get_user_counts(settings: Settings) -> dict[str, int]:
     row = await fetch_one(
         settings,

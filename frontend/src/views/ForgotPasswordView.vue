@@ -81,7 +81,6 @@ onMounted(loadCaptcha);
 <template>
   <section class="auth-layout">
     <el-card class="auth-panel element-auth-card" shadow="never">
-      <p class="eyebrow">找回密码</p>
       <h1>重置登录密码</h1>
       <el-form v-if="!resetToken" label-position="top" class="element-form" @submit.prevent="handleVerify">
         <el-form-item label="用户名" required>

@@ -2,9 +2,10 @@ from datetime import date, datetime, timedelta, time
 from typing import Any
 
 from config.settings import Settings
-from repositories import court_repository, reservation_repository
+from repositories import court_repository, reservation_repository, booking_operations_repository
 from services.config_service import get_reservation_rules
-from services.redis_service import lock_exists, reservation_lock_key
+from services.redis_service import locks_exist, reservation_lock_key
+from utils.time_slots import overlaps
 from utils.query import clean_text
 from utils.response import ApiError
 
@@ -124,10 +125,11 @@ async def list_admin_courts(
     return {"items": [_normalize_court(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
-async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict[str, Any]:
+async def get_slots(settings: Settings, *, court_id: int, date_arg: str, refresh: bool = True) -> dict[str, Any]:
     reserve_date = _parse_date(date_arg)
-    await reservation_repository.expire_pending_reservation_orders(settings)
-    await reservation_repository.complete_finished_reservations(settings)
+    if refresh:
+        await reservation_repository.expire_pending_reservation_orders(settings)
+        await reservation_repository.complete_finished_reservations(settings)
     court = await court_repository.get_court_by_id(settings, court_id)
     if court is None:
         raise ApiError(404, "场地不存在", 404)
@@ -139,10 +141,11 @@ async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict
         court_id=court_id,
         reserve_date=reserve_date,
     )
-    reserved_slots = {
+    blocks = [row for row in await booking_operations_repository.list_blocks(settings, reserve_date, reserve_date, court_id) if row['status'] == 'active']
+    reserved_slots = [
         (_to_time_string(row["start_time"]), _to_time_string(row["end_time"]))
         for row in existing_reservations
-    }
+    ]
 
     slots = []
     current_dt = datetime.combine(reserve_date, rules.business_start_time)
@@ -160,14 +163,23 @@ async def get_slots(settings: Settings, *, court_id: int, date_arg: str) -> dict
         status = "available"
         if normalized_court["status"] != 1 or date_out_of_range or current_dt <= now:
             status = "disabled"
-        elif (start_text, end_text) in reserved_slots:
+        elif any(overlaps(start_text, end_text, start, end) for start, end in reserved_slots):
             status = "reserved"
-        else:
-            key = reservation_lock_key(court_id, reserve_date.isoformat(), start_text, end_text)
-            if await lock_exists(settings, key):
-                status = "locked"
-        slots.append({"start_time": start_text, "end_time": end_text, "status": status})
+        block = next((row for row in blocks if overlaps(start_text, end_text, row['start_time'], row['end_time'])), None)
+        if status == "available" and block:
+            status = "maintenance"
+        slots.append({
+            "start_time": start_text, "end_time": end_text, "status": status,
+            "unavailable_reason": block['reason'] if block else None,
+            "price_cents": normalized_court["price_per_hour_cents"] * rules.slot_interval_minutes // 60,
+        })
         current_dt = next_dt
+
+    available = [slot for slot in slots if slot["status"] == "available"]
+    keys = [reservation_lock_key(court_id, reserve_date.isoformat(), slot["start_time"], slot["end_time"]) for slot in available]
+    for slot, locked in zip(available, await locks_exist(settings, keys)):
+        if locked:
+            slot["status"] = "locked"
 
     return {"court_id": court_id, "court": normalized_court, "date": reserve_date.isoformat(), "slots": slots}
 

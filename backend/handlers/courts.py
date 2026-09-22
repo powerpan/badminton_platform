@@ -1,5 +1,6 @@
 from handlers.base import BaseHandler
 from services import court_service
+from services.config_service import public_reservation_rules
 from utils.query import pagination
 from utils.response import ApiError, success
 
@@ -16,6 +17,22 @@ class CourtsHandler(BaseHandler):
             page_size=page_size,
             offset=offset,
         )
+        self.write_json(success(data))
+
+
+class VenueInfoHandler(BaseHandler):
+    async def get(self) -> None:
+        rules = await public_reservation_rules(self.application.settings["app_settings"])
+        self.write_json(success({
+            "business_start_time": rules["business_start_time"],
+            "business_end_time": rules["business_end_time"],
+        }))
+
+
+class CourtRulesHandler(BaseHandler):
+    async def get(self) -> None:
+        await self.require_current_user()
+        data = await public_reservation_rules(self.application.settings["app_settings"])
         self.write_json(success(data))
 
 

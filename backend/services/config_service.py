@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import time
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 from config.settings import Settings
@@ -96,6 +96,22 @@ async def get_reservation_rules(settings: Settings) -> ReservationRules:
 
 async def list_configs(settings: Settings) -> list[dict[str, Any]]:
     return await config_repository.list_configs(settings)
+
+
+async def public_reservation_rules(settings: Settings) -> dict[str, Any]:
+    rules = await get_reservation_rules(settings)
+    today = date.today()
+    return {
+        "business_start_time": rules.business_start_time.strftime("%H:%M"),
+        "business_end_time": rules.business_end_time.strftime("%H:%M"),
+        "slot_interval_minutes": rules.slot_interval_minutes,
+        "max_reservation_minutes": rules.max_reservation_hours * 60,
+        "daily_reservation_limit": rules.daily_reservation_limit,
+        "payment_timeout_minutes": rules.reservation_payment_timeout_minutes,
+        "min_date": today.isoformat(),
+        "max_date": (today + timedelta(days=rules.advance_reservation_days)).isoformat(),
+        "server_now": datetime.now().astimezone().isoformat(),
+    }
 
 
 async def update_config(

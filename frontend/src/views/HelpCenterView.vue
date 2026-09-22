@@ -61,7 +61,6 @@ const faqs = [
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">帮助中心</p>
     <h1>使用规则与常见问题</h1>
     <p>预约、取消、会员、活动、球友圈和商城规则说明。</p>
   </section>

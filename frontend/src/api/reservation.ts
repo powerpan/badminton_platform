@@ -6,6 +6,10 @@ export type ReservationStatus = "pending" | "confirmed" | "canceled" | "expired"
 
 export interface Reservation {
   id: number;
+  revision?: number;
+  attendance_outcome?: 'checked_in' | 'no_show' | null;
+  attendance_recorded_at?: string | null;
+  attendance_recorded_by?: number | null;
   reservation_no: string;
   user_id?: number;
   username?: string;
@@ -46,6 +50,7 @@ export function createReservation(payload: {
   start_time: string;
   end_time: string;
   remark?: string;
+  expected_amount_cents: number;
 }) {
   return http.post<unknown, ApiResponse<Reservation>>("/reservations", payload);
 }
@@ -54,10 +59,24 @@ export function getMyReservations(params: { status?: string; page?: number; page
   return http.get<unknown, ApiResponse<PageResult<Reservation>>>("/reservations/my", { params });
 }
 
+export interface ReservationSummary {
+  upcoming: Reservation | null;
+  pending: Reservation | null;
+  pending_count: number;
+}
+
+export function getReservationSummary() {
+  return http.get<unknown, ApiResponse<ReservationSummary>>("/reservations/summary");
+}
+
 export function cancelReservation(reservationId: number) {
   return http.put<unknown, ApiResponse<Reservation>>(`/reservations/${reservationId}/cancel`);
 }
 
 export function payReservationOrder(orderId: number) {
   return http.put<unknown, ApiResponse<Reservation>>(`/reservation-orders/${orderId}/pay`);
+}
+
+export function getReservation(reservationId: number) {
+  return http.get<unknown, ApiResponse<Reservation>>(`/reservations/${reservationId}`);
 }

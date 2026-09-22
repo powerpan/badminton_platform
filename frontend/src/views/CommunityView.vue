@@ -82,7 +82,6 @@ onMounted(() => loadPosts());
 
 <template>
   <section class="page-header">
-    <p class="eyebrow">球友圈</p>
     <h1>球友圈</h1>
     <p>发布约球、训练和场馆交流动态。</p>
   </section>
@@ -125,3 +124,13 @@ onMounted(() => loadPosts());
     />
   </el-card>
 </template>
+
+<style scoped>
+.community-post p {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+</style>
