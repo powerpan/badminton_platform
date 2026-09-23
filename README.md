@@ -1,265 +1,100 @@
-# BF羽毛球馆管理平台部署说明
+# BF 羽毛球馆管理平台
 
-这份说明包含部署、启动和回归验证步骤。拿到仓库后，按下面流程准备 MySQL、Redis、后端和前端即可运行。
+面向羽毛球馆日常运营的前后端分离 Web 应用，围绕场地预约，整合会员账户、余额结算、赛事活动、器材商城和球友交流，为球友提供线上服务，也为管理员提供场地与经营管理工具。
 
-项目完善范围、分阶段验收标准和实施记录见 [项目完善计划](docs/项目完善计划.md)。
+项目使用 **Vue 3 + TypeScript + Tornado + MySQL + Redis**，支持电脑、平板和手机访问，可用于毕业设计展示与全栈开发学习。
 
-第二阶段的界面、导航、后台拆分与浏览器验证见 [设计与验收](docs/第二阶段设计与验收.md)。毕业演示可按 [独立演示环境](docs/演示环境.md) 创建新数据库，保留现有业务数据。
+## 主要功能
 
-第三阶段的推荐、维护、核销、改期、经营统计和输入框修复见 [实施与验收](docs/第三阶段实施与验收.md)，业务术语见 [CONTEXT.md](CONTEXT.md)。
+### 用户端
 
-已有本地开发库的赛事、公告和球友圈内容，可使用 [内容填充与配图](docs/内容填充与配图.md) 中的预览/导入命令补充；与创建完整独立演示库的脚本分开使用。
+| 模块 | 功能 |
+| --- | --- |
+| 场地预约 | 查看场地与可用时段、连续选时、预约费用预览、待支付订单、支付倒计时、预约取消与改期 |
+| 场次推荐 | 根据日期、最早开始时间、运动时长和场地偏好，推荐连续可用的场次并说明推荐原因 |
+| 会员中心 | 个人资料、会员等级与折扣、账户余额、可用余额、积分及账户流水查询 |
+| 赛事活动 | 浏览活动、查看详情、报名和取消报名，展示报名人数与截止时间 |
+| 器材商城 | 浏览商品、购物车、结算核价、余额支付及订单查询 |
+| 球友交流 | 发布与浏览交流动态、隐藏自己的动态，浏览球馆公告和站内通知 |
 
-预约回归检查（使用隔离样例，不写入 MySQL 或 Redis）：
+### 管理端
 
-```bash
-cd backend
-.venv/bin/python -B -m unittest discover -s tests -v
-```
+| 模块 | 功能 |
+| --- | --- |
+| 场地与预约 | 维护场地资料、价格和启用状态，设置维护或包场时段，管理预约取消与到场核销 |
+| 用户与会员 | 管理用户状态、会员等级、余额充值和账户记录 |
+| 内容与活动 | 管理公告、通知、赛事活动及球友圈内容 |
+| 商城管理 | 商品上下架、价格与库存维护、订单处理与退款审核 |
+| 经营统计 | 按日期查看预约趋势、时段热度、预订率、取消率、退款和到场记录 |
+| 规则与日志 | 配置营业时间、预约期限、最长时长等规则，查询操作日志与服务状态 |
 
-前端逻辑测试和生产构建：
+## 设计特点
 
-```bash
-cd frontend
-npm test
-npm run build
-```
+- **连续时段推荐**：使用前缀和筛选完整空闲窗口，依次按开始时间偏差、场地偏好、价格和零散空档排序，返回最多三个候选场次。推荐基于明确规则，提交预约时再次校验可用性。
+- **预约与结算一致性**：统一时间区间冲突规则，结合 Redis 临时锁与 MySQL 事务处理占用；金额以整数分计算，改期时在同一事务中处理场次变更、差价和流水。
+- **结算信息及时确认**：商城结算时重新获取价格、库存和可用余额；预约及改期校验用户确认的报价，避免后台调价后沿用旧金额成交。
+- **到场记录与经营口径分开**：区分预约结束、实际核销和未到场；预订率按时长计算，到场率同时披露记录覆盖情况。
+- **适配实际操作的界面**：桌面端使用场地时间表和费用清单，手机端使用单场地选时与费用抽屉；后台按业务模块拆分，支持筛选、分页和抽屉编辑。
 
-后端每 30 秒检查到期的待支付预约和已结束的预约；支付、查询等请求仍保留即时状态校验。使用率按当前启用场地、当前营业规则和预约时长计算，包含待支付占用，不代表实际到场率。
+## 技术栈
 
-## 1. 环境要求
+| 层次 | 技术 |
+| --- | --- |
+| 前端 | Vue 3、TypeScript、Vite、Element Plus、Vue Router、Pinia、Axios、响应式 CSS |
+| 后端 | Python、Tornado、异步请求处理、分层业务服务 |
+| 数据存储 | MySQL、aiomysql 异步数据库访问 |
+| 临时状态与锁 | Redis |
+| 身份认证 | JWT、bcrypt 密码哈希、用户与管理员权限校验 |
+| 测试与构建 | Python unittest、Node.js Test Runner、vue-tsc、Vite |
 
-- Python 3.10+
-- Node.js 18+ 和 npm
-- MySQL 8.0+
-- Redis 6.0+
-- Git
+前端通过 HTTP API 与后端通信；后端按 `handlers → services → repositories` 分层，分别处理请求、业务规则和数据库访问。
 
-建议先确认版本：
-
-```bash
-python3 --version
-node --version
-npm --version
-mysql --version
-redis-server --version
-```
-
-## 2. 获取代码
-
-```bash
-git clone <仓库地址> badminton_platform
-cd badminton_platform
-```
-
-## 3. 配置后端环境变量
-
-复制示例配置：
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-按实际环境修改 `backend/.env`：
-
-```dotenv
-APP_ENV=dev
-APP_PORT=8000
-JWT_SECRET=请替换为足够长的随机字符串
-
-MYSQL_HOST=127.0.0.1
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=root
-MYSQL_DATABASE=badminton_platform
-
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-REDIS_DB=0
-```
-
-生产环境必须修改 `JWT_SECRET`、数据库账号和数据库密码，不要使用示例值。
-
-## 4. 初始化数据库
-
-确认 MySQL 已启动后执行：
-
-```bash
-mysql -h127.0.0.1 -P3306 -uroot -p < sql/init.sql
-```
-
-`sql/init.sql` 会创建 `badminton_platform` 数据库、业务表、基础配置和初始管理员。
-
-初始管理员：
+## 项目结构
 
 ```text
-用户名：admin
-密码：admin123
+badminton_platform/
+├── frontend/
+│   ├── src/api/          # 接口调用
+│   ├── src/components/   # 预约、推荐、经营看板等组件
+│   ├── src/views/        # 用户页面与后台业务页面
+│   ├── src/stores/       # 状态管理
+│   ├── public/           # 场馆、商品和活动图片
+│   └── tests/            # 前端逻辑测试
+├── backend/
+│   ├── handlers/         # 请求处理与参数入口
+│   ├── services/         # 业务规则与流程
+│   ├── repositories/     # 数据查询与事务
+│   ├── utils/            # 时间、计价、推荐等公共逻辑
+│   └── tests/            # 单元测试与隔离数据库集成检查
+├── sql/                  # 新数据库初始化脚本
+├── scripts/              # 启动、数据库升级、演示数据与算法基准脚本
+├── docs/                 # 部署、设计、实施与验收文档
+├── CONTEXT.md            # 业务术语说明
+├── start-dev.command     # 本地启动入口
+└── stop-dev.command      # 本地停止入口
 ```
 
-首次登录后请立即修改管理员密码。
+## 运行与演示
 
-如果是从旧版本数据库升级到当前版本，按顺序执行迁移脚本：
-
-```bash
-mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase1_court_assets.sql
-mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase2_member_accounts.sql
-mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase3_notifications.sql
-mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase4_marketplace.sql
-mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase5_reservation_orders.sql
-mysql -h127.0.0.1 -P3306 -uroot -p badminton_platform < scripts/upgrade_phase6_admin_refund_flow.sql
-backend/.venv/bin/python scripts/migrate_booking_operations.py --database badminton_platform --apply
-```
-
-phase7 只新增维护、到场和改期历史表；可先省略 `--apply` 做只读预览，在停止业务写入的窗口升级并校验原数据合计。新库只需要执行 `sql/init.sql`。
-
-## 5. 本地一键启动
-
-启动前确认 MySQL 和 Redis 已经运行。
+首次运行请按 [部署说明](docs/部署说明.md) 准备 Python、Node.js、MySQL 和 Redis，完成环境配置与数据库初始化。配置完成后，可在 macOS 终端执行：
 
 ```bash
-chmod +x start-dev.command stop-dev.command scripts/*.sh
 ./start-dev.command
 ```
 
-启动成功后访问：
+默认前端地址为 `http://localhost:5188`，后端健康检查地址为 `http://localhost:8000/api/health`。旧版本数据库的升级步骤、手动启动方式和生产部署参考也在部署说明中。
 
-```text
-前端：http://localhost:5188
-后端：http://localhost:8000/api/health
-```
+仓库提供两种演示数据工具：通过 [独立演示环境](docs/演示环境.md) 创建完整的新演示库，或按 [内容填充与配图](docs/内容填充与配图.md) 为本地开发库补充活动、公告和交流话题。示例内容标注为演示，生成图片标注为场景示意；Git 仓库包含脚本与图片，数据库记录需要在目标环境另行导入。
 
-停止服务：
+## 项目文档
 
-```bash
-./stop-dev.command
-```
-
-日志位置：
-
-```text
-logs/backend.log
-logs/frontend.log
-```
-
-## 6. 手动启动后端
-
-```bash
-cd backend
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python app.py
-```
-
-后端默认监听：
-
-```text
-http://localhost:8000
-```
-
-健康检查：
-
-```bash
-curl http://localhost:8000/api/health
-```
-
-## 7. 手动启动前端
-
-另开一个终端：
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-前端默认监听：
-
-```text
-http://localhost:5188
-```
-
-开发环境下 Vite 会把 `/api` 代理到 `http://localhost:8000`。
-
-## 8. 生产部署参考
-
-生产环境推荐方式：
-
-1. MySQL 和 Redis 使用独立服务或服务器常驻进程。
-2. 后端用 `backend/.venv/bin/python app.py` 运行，并由 systemd、Supervisor 或 pm2 管理进程。
-3. 前端执行 `npm run build`，把 `frontend/dist` 交给 Nginx。
-4. Nginx 负责静态文件和 `/api` 反向代理。
-
-构建前端：
-
-```bash
-cd frontend
-npm install
-npm run build
-```
-
-后端生产启动示例：
-
-```bash
-cd backend
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-APP_ENV=prod APP_PORT=8000 .venv/bin/python app.py
-```
-
-Nginx 示例：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    root /path/to/badminton_platform/frontend/dist;
-    index index.html;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8000/api/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-如果前端和后端不在同一个域名下，需要在前端构建时设置 API 地址，例如：
-
-```bash
-cd frontend
-VITE_API_BASE_URL=https://api.example.com/api npm run build
-```
-
-## 9. 常见问题
-
-### 后端启动后健康检查失败
-
-检查：
-
-```bash
-tail -n 100 logs/backend.log
-```
-
-重点确认 MySQL、Redis 是否启动，`backend/.env` 中的账号密码和端口是否正确。
-
-### 前端页面能打开但接口失败
-
-开发环境检查 Vite 代理和后端端口：
-
-```bash
-curl http://localhost:8000/api/health
-```
-
-生产环境检查 Nginx `/api/` 反向代理配置。
-
-### 数据库重复初始化
-
-`sql/init.sql` 使用 `CREATE TABLE IF NOT EXISTS` 和幂等种子写法，重复执行不会清空业务数据。生产环境执行前仍建议先备份数据库。
+| 文档 | 内容 |
+| --- | --- |
+| [部署说明](docs/部署说明.md) | 环境配置、数据库初始化与升级、启动、构建和常见问题 |
+| [项目完善计划](docs/项目完善计划.md) | 功能范围、分阶段任务、验证记录与尚未覆盖的内容 |
+| [业务术语](CONTEXT.md) | 预约、改期、可用余额、预订率和到场率等定义 |
+| [界面设计与验收](docs/第二阶段设计与验收.md) | 用户端、管理端的设计调整与页面验收 |
+| [预约页视觉重构](docs/预约页视觉重构.md) | 桌面时间表、手机选时和费用确认的设计说明 |
+| [预约运营功能与验收](docs/第三阶段实施与验收.md) | 推荐算法、维护、核销、改期、统计与集成验证 |
+| [独立演示环境](docs/演示环境.md) | 独立演示数据库的创建和使用 |
+| [内容填充与配图](docs/内容填充与配图.md) | 活动、公告、交流话题和图片资源的导入说明 |
