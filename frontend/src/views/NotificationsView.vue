@@ -43,7 +43,7 @@ function sourceLink(notification: NotificationItem) {
   if (notification.source_type === "event" && notification.source_id) return `/events/${notification.source_id}`;
   if (notification.source_type === "shop_order") return "/shop/orders";
   if (notification.source_type === "reservation") return "/reservations";
-  if (notification.source_type === "member") return "/profile";
+  if (["member", "recharge"].includes(notification.source_type || "")) return "/profile";
   return "";
 }
 

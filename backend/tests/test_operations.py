@@ -76,6 +76,18 @@ class RecommendationTests(unittest.TestCase):
 
 
 class OperationsStatisticsTests(unittest.TestCase):
+    def test_extension_adds_court_minutes_without_another_arrival(self):
+        day=date(2026,9,16)
+        base={'reserve_date':day,'start_time':time(14),'end_time':time(15),'status':'completed','attendance_outcome':'checked_in'}
+        rows=[{**base,'source':'walk_in'},
+              {**base,'source':'walk_in_extension','start_time':time(15),'end_time':time(16)},
+              {**base,'source':'online','attendance_outcome':'no_show'}]
+        result=aggregate(rows,[],day,day,datetime(2026,9,17))
+        self.assertEqual(result['daily'][0]['booked_minutes'],180)
+        self.assertEqual((result['total'],result['ended'],result['checked_in'],result['no_show']),(3,2,1,1))
+        self.assertEqual(result['attendance_rate'],50)
+        self.assertEqual(result['attendance_coverage'],100)
+
     def test_minutes_cash_dates_and_unknown_attendance(self):
         start=date(2026,9,16)
         rows=[{'reserve_date':start,'start_time':time(18,30),'end_time':time(20),'status':'completed','attendance_outcome':outcome} for outcome in ['checked_in','no_show',None]]

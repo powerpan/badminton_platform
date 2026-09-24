@@ -146,28 +146,20 @@ class BalanceAndRedisTests(unittest.IsolatedAsyncioTestCase):
         client.aclose.assert_not_awaited()
 
 
-class BookingLockTests(unittest.IsolatedAsyncioTestCase):
-    async def test_partial_multi_slot_lock_failure_releases_only_owned_keys(self):
+class BookingInputTests(unittest.IsolatedAsyncioTestCase):
+    async def test_invalid_payment_inputs_never_create_or_charge(self):
         from services import reservation_service as service
+        from repositories import customer_booking_repository as online
         from utils.response import ApiError
-        config = rules(); config.reservation_lock_ttl_seconds = 15
-        acquire, release, create = AsyncMock(side_effect=[True, False]), AsyncMock(), AsyncMock()
-        with ExitStack() as stack:
-            for name, mock in {
-                'refresh_reservation_statuses': AsyncMock(), 'get_reservation_rules': AsyncMock(return_value=config),
-                'court_repository.get_court_by_id': AsyncMock(return_value={'id':1,'status':1}),
-                'acquire_lock': acquire, 'release_lock': release,
-                'reservation_repository.create_pending_reservation_order_atomic': create,
-            }.items(): stack.enter_context(patch('services.reservation_service.'+name, mock))
-            with self.assertRaises(ApiError):
-                await service.create_reservation(None,current_user={'id':2},body={
-                    'court_id':1, 'reserve_date':str(date.today()+timedelta(days=1)), 'start_time':'18:00', 'end_time':'20:00', 'expected_amount_cents':24000})
-        self.assertEqual(acquire.await_count, 2)
-        first, second = [c.args[1] for c in acquire.await_args_list]
-        self.assertIn('18:00:19:00', first)
-        self.assertIn('19:00:20:00', second)
-        release.assert_awaited_once_with(None, first, acquire.await_args_list[0].args[2])
-        create.assert_not_awaited()
+        body={'court_id':1,'reserve_date':str(date.today()+timedelta(days=1)),
+              'start_time':'18:00','end_time':'19:00','expected_amount_cents':12000}
+        with patch.object(online,'create',AsyncMock()) as create:
+            for extra in ({'pay_method':'alipay_live'}, {'expected_amount_cents':True},
+                          {'expected_amount_cents':-1}, {'expected_amount_cents':2_147_483_648},
+                          {'request_key':'short'}):
+                with self.subTest(extra=extra), self.assertRaises(ApiError):
+                    await service.create_reservation(None,current_user={'id':2},body={**body,**extra})
+            create.assert_not_awaited()
 
 
 class MaintenanceTests(unittest.IsolatedAsyncioTestCase):

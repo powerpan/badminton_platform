@@ -38,7 +38,7 @@ class CourtRulesHandler(BaseHandler):
 
 class CourtSlotsHandler(BaseHandler):
     async def get(self, court_id: str) -> None:
-        await self.require_current_user()
+        await self.require_customer()
         date_arg = self.get_argument("date", None)
         if not date_arg:
             raise ApiError(400, "预约日期不能为空", 400)

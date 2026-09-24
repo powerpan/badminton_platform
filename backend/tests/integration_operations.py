@@ -65,6 +65,9 @@ async def run(keep=False):
         spec=importlib.util.spec_from_file_location('migration',ROOT/'scripts/migrate_booking_operations.py')
         migration=importlib.util.module_from_spec(spec);spec.loader.exec_module(migration)
         await migration.migrate(name,True);await migration.migrate(name,True)
+        staff_spec=importlib.util.spec_from_file_location('staff_migration',ROOT/'scripts/migrate_staff_payments.py')
+        staff_migration=importlib.util.module_from_spec(staff_spec);staff_spec.loader.exec_module(staff_migration)
+        await staff_migration.migrate(name,True)
         assert before==await state();checks.append('old-schema migration, repeat, data preservation')
         p=await payload(1,target(1,10,duration=2))
         old=await state();await service.reschedule(settings,1,p,actor);new=await state()
@@ -149,10 +152,13 @@ async def run(keep=False):
         count=await fetch_one(settings,"SELECT COUNT(*) AS n FROM operation_log WHERE action='release' AND target_id=%s",(block_id,));assert count['n']==1
         checks.append('adjacency, overlapping block, release idempotence')
         # Attendance uses reservation locks and never infers historic presence.
-        now=datetime.now()
+        # Keep the attendance fixture within one date and outside today's ended-session metrics.
+        now=(datetime.now()+timedelta(days=1)).replace(hour=14,minute=10,second=0,microsecond=0)
         await execute(settings,"UPDATE reservation SET reserve_date=%s,start_time=%s,end_time=%s,status='confirmed' WHERE id=2",
             (now.date(),(now-timedelta(minutes=10)).time(),(now+timedelta(minutes=50)).time()))
-        await asyncio.gather(ops.record_attendance(settings,2,'checked_in',manager),ops.record_attendance(settings,2,'checked_in',manager))
+        with patch('utils.booking_operations.datetime',wraps=datetime) as clock:
+            clock.now.return_value=now
+            await asyncio.gather(ops.record_attendance(settings,2,'checked_in',manager),ops.record_attendance(settings,2,'checked_in',manager))
         await rejected(ops.record_attendance(settings,2,'no_show',manager),'不同到场')
         canceled=await reservations.cancel_reservation_atomic(settings,2,operator_id=1,operator_username='demo_manager',reason='QA')
         assert canceled[1]=='attendance_recorded'

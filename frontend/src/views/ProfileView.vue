@@ -57,6 +57,7 @@ function changeClass(value: number) {
 }
 
 function relatedText(transaction: MemberTransaction) {
+  if (transaction.recharge_order_id) return `充值单 #${transaction.recharge_order_id} · 经办 ${transaction.operator_username || "-"}`;
   if (transaction.reservation_id) return `关联预约 #${transaction.reservation_id}`;
   if (transaction.shop_order_id) return `关联商城订单 #${transaction.shop_order_id}`;
   if (transaction.operator_username) return `操作人：${transaction.operator_username}`;
@@ -130,13 +131,13 @@ async function changeLedgerPage(nextPage: number) {
   await loadLedger();
 }
 
-onMounted(() => loadLedger());
+onMounted(() => { if (authStore.canConsume) return loadLedger(); });
 </script>
 
 <template>
   <section class="page-header">
     <h1>账号资料</h1>
-    <p v-if="currentUser">{{ currentUser.nickname || currentUser.username }}，在这里查看会员权益和账号信息。</p>
+    <p v-if="currentUser">{{ currentUser.nickname || currentUser.username }}，{{ authStore.isStaff ? "在这里维护工作账号信息。" : "在这里查看会员权益和账号信息。" }}</p>
   </section>
 
   <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
@@ -146,7 +147,7 @@ onMounted(() => loadLedger());
       <el-alert title="默认管理员密码提醒" description="当前管理员账号仍在使用默认密码，请先完成密码修改，再继续用于演示或部署。" type="warning" show-icon :closable="false" />
     </el-col>
 
-    <el-col v-if="currentMember" :xs="24" :lg="10">
+    <el-col v-if="currentMember && authStore.canConsume" :xs="24" :lg="10">
       <el-card shadow="never" class="panel-card member-profile-card">
         <template #header>
           <div class="card-header-row">
@@ -207,7 +208,7 @@ onMounted(() => loadLedger());
       </el-card>
     </el-col>
 
-    <el-col :xs="24">
+    <el-col v-if="authStore.canConsume" :xs="24">
       <el-card shadow="never" class="panel-card list-page-card member-ledger-card" v-loading="ledgerLoading">
         <template #header>
           <div class="card-header-row">
@@ -233,6 +234,7 @@ onMounted(() => loadLedger());
             <el-radio-button :value="'reservation_reschedule'">改期差额</el-radio-button>
             <el-radio-button :value="'shop_purchase'">商城支付</el-radio-button>
             <el-radio-button :value="'shop_refund'">商城退款</el-radio-button>
+            <el-radio-button :value="'staff_recharge'">柜台储值</el-radio-button>
             <el-radio-button :value="'admin_adjust'">后台调整</el-radio-button>
           </el-radio-group>
           <el-button plain :loading="ledgerLoading" @click="loadLedger()">刷新</el-button>

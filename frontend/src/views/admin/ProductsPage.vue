@@ -150,7 +150,7 @@ const createVisible = ref(false);
           <el-form-item label="编号"><el-input v-model="shopProductForm.product_no" /></el-form-item>
           <el-form-item label="名称"><el-input v-model="shopProductForm.product_name" /></el-form-item>
           <el-form-item label="价格"><el-input v-model="shopProductForm.price_yuan" /></el-form-item>
-          <el-form-item label="库存"><el-input-number v-model="shopProductForm.stock" :min="0" :max="999999" /></el-form-item>
+          <el-form-item label="实物库存"><el-input-number v-model="shopProductForm.stock" :min="0" :max="999999" /></el-form-item>
           <el-form-item label="状态">
             <el-select v-model="shopProductForm.status" class="short-select">
               <el-option label="上架" :value="1" />
@@ -179,7 +179,7 @@ const createVisible = ref(false);
           <el-table-column prop="product_no" label="编号" min-width="100" />
           <el-table-column prop="product_name" label="名称" min-width="150" />
           <el-table-column label="价格" width="110"><template #default="{ row }">{{ formatMoney(row.price_cents) }}</template></el-table-column>
-          <el-table-column prop="stock" label="库存" width="90" />
+          <el-table-column prop="stock" label="实物库存" width="100" /><el-table-column prop="reserved_stock" label="付款预留" width="100" /><el-table-column prop="available_stock" label="可售" width="90" />
           <el-table-column prop="sold_count" label="销量" width="90" />
           <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'info'" effect="plain">{{ row.status === 1 ? "上架" : "下架" }}</el-tag></template></el-table-column>
           <el-table-column label="操作" fixed="right" width="140">
@@ -193,12 +193,12 @@ const createVisible = ref(false);
       </el-card>
     </section>
     <el-drawer :model-value="Boolean(editingShopProductId)" :title="`编辑商品：${editingShopProduct?.product_name || ''}`" size="min(600px, 100vw)" @close="resetShopProductForm" class="admin-edit-drawer">
-      <el-alert title="库存为当前可售库存；已支付订单取消时会自动退回库存。" type="info" show-icon :closable="false" />
+      <el-alert title="实物库存包含待付款预留数量；可售 = 实物库存 − 待付款预留。调库存不能低于预留数量，已付款订单退款后自动归还库存。" type="info" show-icon :closable="false" />
       <el-form label-position="top" class="element-form dialog-form" @submit.prevent="submitShopProduct">
         <el-form-item label="商品编号"><el-input v-model="shopProductEditForm.product_no" /></el-form-item>
         <el-form-item label="商品名称"><el-input v-model="shopProductEditForm.product_name" /></el-form-item>
         <el-form-item label="价格（元）"><el-input v-model="shopProductEditForm.price_yuan" /></el-form-item>
-        <el-form-item label="库存"><el-input-number v-model="shopProductEditForm.stock" :min="0" :max="999999" /></el-form-item>
+        <el-form-item label="实物库存"><el-input-number v-model="shopProductEditForm.stock" :min="0" :max="999999" /></el-form-item>
         <el-form-item label="图片路径"><el-input v-model="shopProductEditForm.image_url" /></el-form-item>
         <el-form-item label="状态">
           <el-select v-model="shopProductEditForm.status">

@@ -2,12 +2,29 @@
 import { onMounted, ref } from "vue";
 import ProductImage from "../../components/ProductImage.vue";
 
+import { useAuthStore } from '../../stores/auth';
+import { ApiRequestError } from '../../api/http';
 import { ElMessageBox } from "element-plus";
 import { adminCancelShopOrder, adminCompleteShopOrder, adminGetShopOrder, adminGetShopOrders, adminRejectShopOrderRefund } from "../../api/admin";
 import { type ShopOrder } from "../../api/shop";
 import { type PageState, formatMoney, payMethodText, confirmAction, setSuccess, setError, resetPage, changePage } from "./shared";
 
 const loading = ref(false);
+const auth = useAuthStore();
+async function submitCommand(order: ShopOrder, action: 'complete' | 'cancel' | 'reject', reason = '') {
+  const storageKey = `bf-admin-shop:${auth.user?.id}:${order.id}:${action}`;
+  const saved = sessionStorage.getItem(storageKey);
+  const payload = saved ? JSON.parse(saved) : { request_key: crypto.randomUUID(), reason };
+  sessionStorage.setItem(storageKey, JSON.stringify(payload));
+  try {
+    const response = action === 'complete' ? await adminCompleteShopOrder(order.id, payload)
+      : action === 'cancel' ? await adminCancelShopOrder(order.id, payload) : await adminRejectShopOrderRefund(order.id, payload);
+    sessionStorage.removeItem(storageKey); return response;
+  } catch (e) {
+    if (e instanceof ApiRequestError && e.status && e.status >= 400 && e.status < 500) sessionStorage.removeItem(storageKey);
+    throw e;
+  }
+}
 
 async function changeShopOrderPage(page: number) {
   await changePage(shopOrderPage.value, page, () => refreshShopOrders());
@@ -25,6 +42,8 @@ const shopOrderFilters = ref({ status: "", username: "" });
 
 function shopOrderStatusType(status: string) {
   const map: Record<string, "success" | "primary" | "info" | "warning"> = {
+    pending: "warning",
+    expired: "info",
     paid: "success",
     refund_requested: "warning",
     completed: "primary",
@@ -35,9 +54,11 @@ function shopOrderStatusType(status: string) {
 
 function shopOrderStatusText(status: string) {
   const map: Record<string, string> = {
-    paid: "已支付",
+    pending: "待付款",
+    expired: "已过期",
+    paid: "待取货",
     refund_requested: "退款待审核",
-    completed: "已完成",
+    completed: "已取货",
     canceled: "已取消",
   };
   return map[status] || status;
@@ -80,15 +101,15 @@ async function openShopOrderDetail(order: ShopOrder) {
 }
 
 async function completeShopOrder(order: ShopOrder) {
-  if (!(await confirmAction(`确认完成订单 ${order.order_no}？完成后不能再退款。`))) return;
+  if (!(await confirmAction(`确认已核对订单 ${order.order_no} 的全部商品并交付给客户？该操作核销整单，只可领取一次，领取后不能普通退款。`))) return;
   loading.value = true;
   try {
-    const response = await adminCompleteShopOrder(order.id);
+    const response = await submitCommand(order, 'complete');
     if (selectedShopOrder.value?.id === order.id) {
       selectedShopOrder.value = response.data;
     }
     await loadShopOrders();
-    setSuccess("订单已完成");
+    setSuccess("商品已核销，请勿重复交付");
   } catch (error) {
     setError(error, "完成订单失败");
   } finally {
@@ -97,16 +118,16 @@ async function completeShopOrder(order: ShopOrder) {
 }
 
 async function cancelAdminShopOrder(order: ShopOrder) {
-  const actionText = order.status === "refund_requested" ? "通过退款申请" : "取消订单并退回会员余额";
+  const actionText = order.status === "pending" ? "取消未付款订单并释放商品" : "取消订单并沿原支付渠道退款";
   if (!(await confirmAction(`确认${actionText} ${order.order_no}？`))) return;
   loading.value = true;
   try {
-    const response = await adminCancelShopOrder(order.id);
+    const response = await submitCommand(order, 'cancel');
     if (selectedShopOrder.value?.id === order.id) {
       selectedShopOrder.value = response.data;
     }
     await loadShopOrders();
-    setSuccess("订单已取消并退款");
+    setSuccess(order.status === "pending" ? "未付款订单已取消" : "订单已取消，款项沿原渠道退回");
   } catch (error) {
     setError(error, "取消商城订单失败");
   } finally {
@@ -131,7 +152,7 @@ async function rejectRefund(order: ShopOrder) {
   }
   loading.value = true;
   try {
-    const response = await adminRejectShopOrderRefund(order.id, { reason });
+    const response = await submitCommand(order, 'reject', reason);
     if (selectedShopOrder.value?.id === order.id) {
       selectedShopOrder.value = response.data;
     }
@@ -162,9 +183,9 @@ onMounted(async () => {
         <el-form inline class="element-filter">
           <el-form-item label="状态">
             <el-select v-model="shopOrderFilters.status" clearable class="short-select" @change="refreshShopOrders(true)">
-              <el-option label="已支付" value="paid" />
+              <el-option label="待付款" value="pending" /><el-option label="待取货" value="paid" /><el-option label="已过期" value="expired" />
               <el-option label="退款待审核" value="refund_requested" />
-              <el-option label="已完成" value="completed" />
+              <el-option label="已取货" value="completed" />
               <el-option label="已取消" value="canceled" />
             </el-select>
           </el-form-item>
@@ -175,18 +196,19 @@ onMounted(async () => {
           <el-table-column prop="order_no" label="订单号" min-width="150" />
           <el-table-column label="用户" min-width="120"><template #default="{ row }">{{ row.nickname || row.username }}</template></el-table-column>
           <el-table-column label="金额" width="120"><template #default="{ row }">{{ formatMoney(row.total_amount_cents) }}</template></el-table-column>
+          <el-table-column label="支付渠道" width="120"><template #default="{ row }">{{ payMethodText(row.pay_method) }}</template></el-table-column>
           <el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="shopOrderStatusType(row.status)" effect="plain">{{ shopOrderStatusText(row.status) }}</el-tag></template></el-table-column>
           <el-table-column label="操作" fixed="right" width="260">
             <template #default="{ row }">
               <el-button link type="primary" @click="openShopOrderDetail(row)">详情</el-button>
-              <el-button link type="primary" :disabled="row.status !== 'paid'" @click="completeShopOrder(row)">完成</el-button>
+              <el-button link type="primary" :disabled="row.status !== 'paid'" @click="openShopOrderDetail(row)">核对取货</el-button>
               <el-button
                 link
                 type="warning"
-                :disabled="!['paid', 'refund_requested'].includes(row.status)"
+                :disabled="!['pending', 'paid', 'refund_requested'].includes(row.status)"
                 @click="cancelAdminShopOrder(row)"
                 >
-                {{ row.status === "refund_requested" ? "通过退款" : "管理员退款" }}
+                {{ row.status === "pending" ? "取消订单" : row.status === "refund_requested" ? "通过退款" : "管理员退款" }}
               </el-button>
               <el-button
                 v-if="row.status === 'refund_requested'"
@@ -211,7 +233,9 @@ onMounted(async () => {
           <el-descriptions-item label="金额">{{ formatMoney(selectedShopOrder.total_amount_cents) }}</el-descriptions-item>
           <el-descriptions-item label="支付方式">{{ payMethodText(selectedShopOrder.pay_method) }}</el-descriptions-item>
           <el-descriptions-item label="支付时间">{{ selectedShopOrder.paid_at || "-" }}</el-descriptions-item>
-          <el-descriptions-item label="完成时间">{{ selectedShopOrder.completed_at || "-" }}</el-descriptions-item>
+          <el-descriptions-item label="取货时间">{{ selectedShopOrder.redeemed_at || selectedShopOrder.completed_at || "-" }}</el-descriptions-item>
+          <el-descriptions-item v-if="selectedShopOrder.redeemed_by_name" label="核销人员">{{ selectedShopOrder.redeemed_by_name }}</el-descriptions-item>
+          <el-descriptions-item v-if="selectedShopOrder.status === 'pending'" label="付款截止">{{ selectedShopOrder.expires_at }}</el-descriptions-item>
           <el-descriptions-item label="取消时间">{{ selectedShopOrder.canceled_at || "-" }}</el-descriptions-item>
           <el-descriptions-item label="取消原因">{{ selectedShopOrder.cancel_reason || "-" }}</el-descriptions-item>
           <el-descriptions-item label="退款申请时间">{{ selectedShopOrder.refund_requested_at || "-" }}</el-descriptions-item>
@@ -232,14 +256,14 @@ onMounted(async () => {
         </div>
         <div class="dialog-actions">
           <el-button @click="shopOrderDetailVisible = false">关闭</el-button>
-          <el-button v-if="selectedShopOrder.status === 'paid'" type="primary" :loading="loading" @click="completeShopOrder(selectedShopOrder)">完成订单</el-button>
+          <el-button v-if="selectedShopOrder.status === 'paid'" type="primary" :loading="loading" @click="completeShopOrder(selectedShopOrder)">确认整单交付</el-button>
           <el-button
-            v-if="['paid', 'refund_requested'].includes(selectedShopOrder.status)"
+            v-if="['pending', 'paid', 'refund_requested'].includes(selectedShopOrder.status)"
             type="warning"
             :loading="loading"
             @click="cancelAdminShopOrder(selectedShopOrder)"
             >
-            {{ selectedShopOrder.status === "refund_requested" ? "通过退款" : "管理员退款" }}
+            {{ selectedShopOrder.status === "pending" ? "取消订单" : selectedShopOrder.status === "refund_requested" ? "通过退款" : "管理员退款" }}
           </el-button>
           <el-button
             v-if="selectedShopOrder.status === 'refund_requested'"

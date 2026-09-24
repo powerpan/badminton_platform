@@ -7,6 +7,7 @@ from utils.response import ApiError
 
 
 VALID_TYPES = {
+    "staff_recharge",
     "admin_adjust",
     "reservation_charge",
     "reservation_refund",
@@ -16,6 +17,7 @@ VALID_TYPES = {
 }
 
 TYPE_LABELS = {
+    "staff_recharge": "柜台储值",
     "admin_adjust": "后台调整",
     "reservation_charge": "预约扣款",
     "reservation_refund": "预约退款",
@@ -49,6 +51,8 @@ def _public_entry(row: dict[str, Any]) -> dict[str, Any]:
         "reason": row.get("reason"),
         "reservation_id": row.get("reservation_id"),
         "shop_order_id": row.get("shop_order_id"),
+        "payment_order_id": row.get("payment_order_id"),
+        "recharge_order_id": row.get("recharge_order_id"),
         "operator_username": row.get("operator_username"),
         "created_at": row.get("created_at"),
     }

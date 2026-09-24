@@ -167,17 +167,44 @@ export function adminUpdateCourtStatus(courtId: number, status: number) {
 export function adminGetReservations(params: {
   status?: string;
   username?: string;
+  source?: string;
+  pay_method?: string;
+  operator?: string;
+  order_no?: string;
   court_id?: number;
   date_from?: string;
   date_to?: string;
   page?: number;
   page_size?: number;
 } = {}) {
-  return http.get<unknown, ApiResponse<PageResult<Reservation>>>("/admin/reservations", { params });
+  return http.get<unknown, ApiResponse<PageResult<Reservation> & { server_now: string }>>("/admin/reservations", { params });
+}
+
+export interface AdminBookingDetail extends Reservation {
+  customer_contact?: string | null;
+  server_now: string;
+  chain: Array<Pick<Reservation, 'id' | 'reservation_no' | 'source' | 'parent_reservation_id' | 'reserve_date' | 'start_time' | 'end_time' | 'court_no' | 'court_name' | 'status' | 'payable_amount_cents'>>;
+  payments: Array<{
+    id: number; payment_no: string; purpose: string; amount_cents: number; pay_method: string; status: string;
+    created_at: string; expires_at: string; paid_at: string | null; closed_at: string | null;
+    operator_id: number; operator_name_snapshot: string; collected_by: number | null;
+    collector_username: string | null; collection_recorded_at: string | null; refunded_cents: number;
+  }>;
+  refunds: Array<{
+    id: number; refund_no: string; payment_order_id: number; payment_no: string; pay_method: string;
+    refund_group_no: string; amount_cents: number; reason: string; purpose: string; status: string;
+    operator_id: number; operator_name_snapshot: string; refunded_at: string;
+  }>;
+  account_transactions: Array<{
+    id: number; transaction_type: string; balance_change_cents: number; balance_before_cents: number;
+    balance_after_cents: number; points_change: number; reason: string; operator_id: number | null;
+    operator_username: string | null; payment_order_id: number | null; payment_refund_id: number | null; created_at: string;
+  }>;
+  changes: import('./operations').ReservationChange[];
 }
 
 export function adminGetReservation(reservationId: number) {
-  return http.get<unknown, ApiResponse<Reservation>>(`/admin/reservations/${reservationId}`);
+  return http.get<unknown, ApiResponse<AdminBookingDetail>>(`/admin/reservations/${reservationId}`);
 }
 
 export function adminCancelReservation(reservationId: number) {
@@ -300,15 +327,15 @@ export function adminGetShopOrder(orderId: number) {
   return http.get<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}`);
 }
 
-export function adminCompleteShopOrder(orderId: number) {
-  return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/complete`);
+export function adminCompleteShopOrder(orderId: number, payload?: { request_key: string }) {
+  return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/complete`, payload);
 }
 
-export function adminCancelShopOrder(orderId: number) {
-  return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/cancel`);
+export function adminCancelShopOrder(orderId: number, payload?: { request_key: string; reason?: string }) {
+  return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/cancel`, payload);
 }
 
-export function adminRejectShopOrderRefund(orderId: number, payload: { reason: string }) {
+export function adminRejectShopOrderRefund(orderId: number, payload: { reason: string; request_key?: string }) {
   return http.put<unknown, ApiResponse<ShopOrder>>(`/admin/shop/orders/${orderId}/refund-reject`, payload);
 }
 

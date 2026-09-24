@@ -108,7 +108,7 @@ onMounted(loadEvent);
           <el-descriptions-item label="报名人数">{{ event.registered_count }}/{{ event.capacity }}</el-descriptions-item>
         </el-descriptions>
         <el-button
-          v-if="!event.is_registered"
+          v-if="!event.is_registered && (!authStore.isLoggedIn || authStore.canConsume)"
           type="primary"
           size="large"
           :disabled="!event.can_register"
@@ -117,7 +117,7 @@ onMounted(loadEvent);
         >
           报名活动
         </el-button>
-        <el-button v-else type="warning" size="large" plain :loading="loading" @click="submitCancel">
+        <el-button v-else-if="event.is_registered && authStore.canConsume" type="warning" size="large" plain :loading="loading" @click="submitCancel">
           取消报名
         </el-button>
       </aside>

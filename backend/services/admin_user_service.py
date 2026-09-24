@@ -10,6 +10,7 @@ from utils.member_levels import DEFAULT_MEMBER_LEVEL, valid_member_level
 from utils.passwords import hash_password
 from utils.query import clean_text
 from utils.response import ApiError
+from utils.roles import ROLES
 
 
 def _parse_role(value: Any, *, required: bool = True) -> str | None:
@@ -18,8 +19,8 @@ def _parse_role(value: Any, *, required: bool = True) -> str | None:
         if required:
             raise ApiError(400, "角色不能为空", 400)
         return None
-    if role not in {"user", "admin"}:
-        raise ApiError(400, "角色只能是 user 或 admin", 400)
+    if role not in ROLES:
+        raise ApiError(400, "角色只能是 user、admin、frontdesk 或 maintenance", 400)
     return role
 
 

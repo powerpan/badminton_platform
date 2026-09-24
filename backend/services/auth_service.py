@@ -91,6 +91,8 @@ def _validate_password(password: str) -> None:
 
 
 async def register(settings: Settings, body: dict[str, Any]) -> dict[str, Any]:
+    if body.get("role", "user") != "user":
+        raise ApiError(400, "注册仅可创建普通用户，工作人员账号由管理员分配", 400)
     username = _clean_text(body.get("username"))
     password = str(body.get("password") or "")
     nickname = _clean_text(body.get("nickname")) or username

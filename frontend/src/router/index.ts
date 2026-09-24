@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 
+const MaintenanceView = () => import("../views/MaintenanceView.vue");
+const FrontdeskView = () => import("../views/FrontdeskView.vue");
 const AdminDashboard = () => import("../views/AdminDashboard.vue");
 const AnnouncementDetailView = () => import("../views/AnnouncementDetailView.vue");
 const AnnouncementsView = () => import("../views/AnnouncementsView.vue");
@@ -22,6 +24,8 @@ import { useAuthStore } from "../stores/auth";
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: "/frontdesk", name: "frontdesk", component: FrontdeskView, meta: { requiresAuth: true, roles: ["frontdesk", "admin"] } },
+    { path: "/maintenance", name: "maintenance", component: MaintenanceView, meta: { requiresAuth: true, roles: ["maintenance", "admin"] } },
     { path: "/", name: "home", component: HomeView },
     { path: "/announcements", name: "announcements", component: AnnouncementsView },
     { path: "/announcements/:id", name: "announcement-detail", component: AnnouncementDetailView },
@@ -30,16 +34,16 @@ const router = createRouter({
     { path: "/events/:id", name: "event-detail", component: EventDetailView },
     { path: "/community", name: "community", component: CommunityView },
     { path: "/shop", name: "shop", component: ShopView },
-    { path: "/shop/orders", name: "shop-orders", component: ShopOrdersView, meta: { requiresAuth: true } },
+    { path: "/shop/orders", name: "shop-orders", component: ShopOrdersView, meta: { requiresAuth: true, roles: ["user", "admin"] } },
     { path: "/login", name: "login", component: LoginView },
     { path: "/register", name: "register", component: RegisterView },
     { path: "/forgot-password", name: "forgot-password", component: ForgotPasswordView },
-    { path: "/courts", name: "courts", component: CourtsView, meta: { requiresAuth: true } },
+    { path: "/courts", name: "courts", component: CourtsView, meta: { requiresAuth: true, roles: ["user", "admin"] } },
     {
       path: "/reservations",
       name: "reservations",
       component: ReservationsView,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, roles: ["user", "admin"] },
     },
     { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
     { path: "/notifications", name: "notifications", component: NotificationsView, meta: { requiresAuth: true } },
@@ -54,6 +58,8 @@ const router = createRouter({
       component: AdminDashboard,
       meta: { requiresAuth: true, requiresAdmin: true, adminTab: "statistics", title: "运营总览" },
     },
+    { path: "/admin/recharges", name: "admin-recharges", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "recharges", title: "会员储值" } },
+    { path: "/admin/transactions", name: "admin-transactions", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "transactions", title: "交易流水" } },
     { path: "/admin/users", name: "admin-users", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "users", title: "用户管理" } },
     { path: "/admin/courts", name: "admin-courts", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "courts", title: "场地管理" } },
     { path: "/admin/reservations", name: "admin-reservations", component: AdminDashboard, meta: { requiresAuth: true, requiresAdmin: true, adminTab: "reservations", title: "预约管理" } },
@@ -71,7 +77,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const authStore = useAuthStore();
 
-  if (authStore.token && !authStore.user) {
+  if (authStore.token && (!authStore.user || to.meta.requiresAuth)) {
     try {
       await authStore.fetchProfile();
     } catch {
@@ -84,11 +90,15 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    return { name: "home" };
+    return authStore.homePath;
+  }
+
+  if (Array.isArray(to.meta.roles) && !to.meta.roles.includes(authStore.user?.role)) {
+    return authStore.homePath;
   }
 
   if ((to.name === "login" || to.name === "register" || to.name === "forgot-password") && authStore.isLoggedIn) {
-    return { name: authStore.isAdmin ? "admin-overview" : "home" };
+    return authStore.homePath;
   }
 
   return true;

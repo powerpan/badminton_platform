@@ -38,7 +38,7 @@ async function handleLogin() {
   try {
     await authStore.login(username.value.trim(), password.value, captchaId.value, captchaCode.value.trim());
     const redirect = safeRedirect(route.query.redirect);
-    await router.push(authStore.isAdmin && redirect === "/" ? "/admin/overview" : redirect);
+    await router.push(redirect === "/" ? authStore.homePath : redirect);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : "登录失败";
     await loadCaptcha();
@@ -49,13 +49,13 @@ async function handleLogin() {
 
 function safeRedirect(value: unknown) {
   if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) {
-    return authStore.isAdmin ? "/admin/overview" : "/";
+    return authStore.homePath;
   }
   try {
     const resolved = router.resolve(value);
-    return resolved.matched.length ? resolved.fullPath : authStore.isAdmin ? "/admin/overview" : "/";
+    return resolved.matched.length ? resolved.fullPath : authStore.homePath;
   } catch {
-    return authStore.isAdmin ? "/admin/overview" : "/";
+    return authStore.homePath;
   }
 }
 

@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "checks": [
+    "committed creation with lost TCP response resumes the same shop order after a new backend process",
+    "lost paid response and separate profile failure cannot repeat wallet debit, stock or pickup after restart and retries",
+    "online creation and simulated-payment response losses recover original booking across process restart without wallet debit",
+    "counter walk-in creation and collection recover one guest booking after lost responses and backend restart",
+    "lost recharge creation/payment responses recover exactly one credit across restart and different staff retry",
+    "administrator announcement publishing/hiding works; frontdesk cannot publish and public hidden content is absent",
+    "event publish, single registration, duplicate/role rejection and cancellation preserve registered count",
+    "customer and administrator community publishing, own hide and admin moderation work without staff content privileges",
+    "notification ownership/idempotent read and editable profile preserve account balance, points and role",
+    "recommendations exclude paid walk-in, pending extension and maintenance; release restores only the freed interval"
+  ],
+  "backend_processes": 6,
+  "scope": "actual loopback HTTP TCP drops after service commit; owned disposable DB; browser UI not covered"
+}

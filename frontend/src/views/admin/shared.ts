@@ -105,7 +105,7 @@ export function reservationStatusText(status: string) {
 }
 
 export function payMethodText(value: string | null | undefined) {
-  return value === "balance" ? "会员余额" : value || "-";
+  return value === "balance" ? "会员余额" : value === 'mock_alipay' ? '模拟支付宝' : value || "-";
 }
 
 export async function confirmAction(message: string, title = "确认操作") {

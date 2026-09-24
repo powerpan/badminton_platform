@@ -22,3 +22,5 @@ app.mount("#app");
 import "./styles/product.css";
 
 import "./styles/operations.css";
+
+import "./styles/staff.css";

@@ -1,4 +1,9 @@
-from handlers.booking_operations import (RecommendationsHandler, RescheduleQuoteHandler, RescheduleHandler,
+from handlers.recharges import RechargeCustomersHandler, RechargesHandler, RechargeDetailHandler, RechargeCancelHandler, AdminRechargesHandler, AdminRechargeDetailHandler
+from handlers.finance import AdminTransactionsHandler, AdminTransactionDetailHandler
+from handlers.pickup import ShopPickupCodeHandler, PickupLookupHandler, PickupRedeemHandler
+from handlers.staff_booking import (WalkInQuoteHandler, WalkInsHandler, WalkInDetailHandler, WalkInCancelHandler,
+    WalkInExtensionQuoteHandler, WalkInExtensionsHandler, StaffPaymentHandler, MockPaymentActionHandler, BalancePaymentHandler, CancelSupplementHandler)
+from handlers.booking_operations import (FrontdeskCourtSlotsHandler, ClassifyCourtBlockHandler, MaintenanceCourtBlocksHandler, RecommendationsHandler, RescheduleQuoteHandler, RescheduleHandler,
     ReservationChangesHandler, CourtBlocksHandler, ReleaseCourtBlockHandler, AttendanceHandler, OperationsStatisticsHandler)
 from handlers.admin import (
     AdminAnnouncementDetailHandler,
@@ -82,6 +87,14 @@ from handlers.shop import (
 
 def build_routes() -> list[tuple[str, object]]:
     return [
+        (r'/api/frontdesk/recharge-customers', RechargeCustomersHandler),
+        (r'/api/frontdesk/recharges', RechargesHandler),
+        (r'/api/frontdesk/recharges/([0-9]+)', RechargeDetailHandler),
+        (r'/api/frontdesk/recharges/([0-9]+)/cancel', RechargeCancelHandler),
+        (r'/api/admin/recharges', AdminRechargesHandler),
+        (r'/api/admin/recharges/([0-9]+)', AdminRechargeDetailHandler),
+        (r'/api/admin/transactions', AdminTransactionsHandler),
+        (r'/api/admin/transactions/([^/]+)/([0-9]+)', AdminTransactionDetailHandler),
         (r"/api/health", HealthHandler),
         (r"/api/admin/health", HealthHandler),
         (r"/api/auth/captcha", CaptchaHandler),
@@ -121,6 +134,22 @@ def build_routes() -> list[tuple[str, object]]:
         (r"/api/reservations/([0-9]+)/reschedule", RescheduleHandler),
         (r"/api/reservations/([0-9]+)/changes", ReservationChangesHandler),
         (r"/api/admin/court-blocks", CourtBlocksHandler),
+        (r"/api/admin/court-blocks/([0-9]+)/type", ClassifyCourtBlockHandler),
+        (r"/api/maintenance/court-blocks", MaintenanceCourtBlocksHandler),
+        (r"/api/frontdesk/court-slots", FrontdeskCourtSlotsHandler),
+        (r"/api/frontdesk/walk-ins/quote", WalkInQuoteHandler),
+        (r"/api/frontdesk/walk-ins", WalkInsHandler),
+        (r"/api/frontdesk/walk-ins/([0-9]+)", WalkInDetailHandler),
+        (r"/api/frontdesk/walk-ins/([0-9]+)/cancel", WalkInCancelHandler),
+        (r"/api/frontdesk/walk-ins/([0-9]+)/extensions/quote", WalkInExtensionQuoteHandler),
+        (r"/api/frontdesk/walk-ins/([0-9]+)/extensions", WalkInExtensionsHandler),
+        (r"/api/payments/([0-9]+)", StaffPaymentHandler),
+        (r"/api/payments/([0-9]+)/mock-(confirm|fail)", MockPaymentActionHandler),
+        (r"/api/payments/([0-9]+)/balance-pay", BalancePaymentHandler),
+        (r"/api/payments/([0-9]+)/cancel", CancelSupplementHandler),
+        (r"/api/shop/orders/([0-9]+)/pickup-code", ShopPickupCodeHandler),
+        (r"/api/frontdesk/pickups/lookup", PickupLookupHandler),
+        (r"/api/frontdesk/pickups/redeem", PickupRedeemHandler),
         (r"/api/admin/court-blocks/([0-9]+)/release", ReleaseCourtBlockHandler),
         (r"/api/admin/reservations/([0-9]+)/attendance", AttendanceHandler),
         (r"/api/admin/statistics/operations", OperationsStatisticsHandler),

@@ -37,7 +37,32 @@ async def create_block(settings, body, actor):
     if not 2 <= len(reason) <= 255:
         raise ApiError(400, '请填写 2 至 255 字的维护或包场原因', 400)
     await refresh_reservation_statuses(settings)
-    return {'id': await operations.create_block(settings, target, reason, actor)}
+    block_type = parse_block_type(body.get('block_type', 'maintenance'))
+    return {'id': await operations.create_block(settings, target, reason, actor, block_type)}
+
+
+def parse_block_type(value):
+    if value not in ('maintenance', 'private_booking'):
+        raise ApiError(400, '请选择维修或包场类别', 400)
+    return value
+
+
+async def maintenance_blocks(settings, start, end, court_id=None, schedule_status=None):
+    first, last = date_range(start, end)
+    if schedule_status and schedule_status not in ('scheduled', 'in_progress', 'ended', 'released'):
+        raise ApiError(400, '维修安排状态无效', 400)
+    rows = await operations.list_blocks(settings, first, last, court_id, 'maintenance', schedule_status)
+    now = datetime.now()
+    items = []
+    for row in rows:
+        status = ('released' if row['status'] == 'released' else
+                  'scheduled' if at(row['reserve_date'], row['start_time']) > now else
+                  'ended' if at(row['reserve_date'], row['end_time']) <= now else 'in_progress')
+        # Whitelist the work information; no customer, contact or financial data.
+        item = {key: row[key] for key in ('id', 'court_id', 'court_no', 'court_name', 'reserve_date',
+                                         'start_time', 'end_time', 'reason', 'status', 'block_type')}
+        items.append({**_normalize_reservation(item), 'schedule_status': status})
+    return {'items': items}
 
 
 async def detail(settings, reservation_id, actor):
@@ -75,6 +100,15 @@ async def quote(settings, reservation_id, body, actor):
 
 async def reschedule(settings, reservation_id, body, actor):
     rules = await get_reservation_rules(settings)
+    from repositories import customer_booking_repository as online
+    from utils.staff_booking import parse_target, request_key
+    initial=await online.initial_payment(settings,reservation_id)
+    if initial:
+        revision,amount=body.get('expected_revision'),body.get('expected_amount_cents')
+        if type(revision) is not int or revision<0 or type(amount) is not int or not 0<=amount<=2_147_483_647:
+            raise ApiError(400,'请先获取有效改期报价',400)
+        return await online.reschedule(settings,actor,await online.link(settings,initial['id']),parse_target(body),rules,
+            revision,amount,request_key(body))
     target = window(body, rules)
     key = str(body.get('request_key') or '')
     if not re.fullmatch(r'[A-Za-z0-9_-]{16,64}', key):

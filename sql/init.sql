@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS court (
 CREATE TABLE IF NOT EXISTS reservation (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   reservation_no VARCHAR(64) NOT NULL,
-  user_id BIGINT NOT NULL,
+  user_id BIGINT NULL,
   court_id BIGINT NOT NULL,
   reserve_date DATE NOT NULL,
   start_time TIME NOT NULL,
@@ -68,6 +68,14 @@ CREATE TABLE IF NOT EXISTS reservation (
   member_level_snapshot VARCHAR(20) NOT NULL DEFAULT 'normal',
   discount_rate INT NOT NULL DEFAULT 100,
   points_awarded INT NOT NULL DEFAULT 0,
+  source VARCHAR(30) NOT NULL DEFAULT 'online',
+  operator_id BIGINT NULL,
+  operator_name_snapshot VARCHAR(50) NULL,
+  guest_name VARCHAR(50) NULL,
+  guest_contact VARCHAR(50) NULL,
+  opened_at DATETIME NULL,
+  parent_reservation_id BIGINT NULL,
+  root_reservation_id BIGINT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   canceled_at DATETIME NULL,
@@ -77,14 +85,21 @@ CREATE TABLE IF NOT EXISTS reservation (
   KEY idx_reservation_status (status),
   KEY idx_reservation_slot (court_id, reserve_date, start_time, end_time),
   CONSTRAINT fk_reservation_user FOREIGN KEY (user_id) REFERENCES user(id),
-  CONSTRAINT fk_reservation_court FOREIGN KEY (court_id) REFERENCES court(id)
+  CONSTRAINT fk_reservation_court FOREIGN KEY (court_id) REFERENCES court(id),
+  KEY idx_reservation_source (reserve_date, source, id),
+  KEY idx_reservation_operator (operator_id, reserve_date, id),
+  KEY idx_reservation_parent (parent_reservation_id),
+  KEY idx_reservation_root (root_reservation_id, start_time),
+  CONSTRAINT fk_reservation_operator FOREIGN KEY (operator_id) REFERENCES user(id),
+  CONSTRAINT fk_reservation_parent FOREIGN KEY (parent_reservation_id) REFERENCES reservation(id),
+  CONSTRAINT fk_reservation_root FOREIGN KEY (root_reservation_id) REFERENCES reservation(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS reservation_order (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   order_no VARCHAR(64) NOT NULL,
   reservation_id BIGINT NOT NULL,
-  user_id BIGINT NOT NULL,
+  user_id BIGINT NULL,
   status VARCHAR(20) NOT NULL DEFAULT 'pending',
   amount_cents INT NOT NULL DEFAULT 0,
   pay_method VARCHAR(20) NOT NULL DEFAULT 'balance',
@@ -92,6 +107,7 @@ CREATE TABLE IF NOT EXISTS reservation_order (
   paid_at DATETIME NULL,
   canceled_at DATETIME NULL,
   cancel_reason VARCHAR(255) NULL,
+  operator_id BIGINT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_reservation_order_no (order_no),
@@ -100,7 +116,8 @@ CREATE TABLE IF NOT EXISTS reservation_order (
   KEY idx_reservation_order_status (status),
   KEY idx_reservation_order_expires (status, expires_at),
   CONSTRAINT fk_reservation_order_reservation FOREIGN KEY (reservation_id) REFERENCES reservation(id),
-  CONSTRAINT fk_reservation_order_user FOREIGN KEY (user_id) REFERENCES user(id)
+  CONSTRAINT fk_reservation_order_user FOREIGN KEY (user_id) REFERENCES user(id),
+  CONSTRAINT fk_reservation_order_operator FOREIGN KEY (operator_id) REFERENCES user(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS shop_product (
@@ -136,13 +153,17 @@ CREATE TABLE IF NOT EXISTS shop_order (
   refund_reviewed_at DATETIME NULL,
   refund_reject_reason VARCHAR(255) NULL,
   remark VARCHAR(255) NULL,
+  expires_at DATETIME NULL,
+  operator_id BIGINT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_shop_order_no (order_no),
   KEY idx_shop_order_user (user_id),
   KEY idx_shop_order_status (status),
   KEY idx_shop_order_created_at (created_at),
-  CONSTRAINT fk_shop_order_user FOREIGN KEY (user_id) REFERENCES user(id)
+  CONSTRAINT fk_shop_order_user FOREIGN KEY (user_id) REFERENCES user(id),
+  KEY idx_shop_order_expires (status, expires_at),
+  CONSTRAINT fk_shop_order_operator FOREIGN KEY (operator_id) REFERENCES user(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS shop_order_item (
@@ -162,6 +183,131 @@ CREATE TABLE IF NOT EXISTS shop_order_item (
   CONSTRAINT fk_shop_order_item_product FOREIGN KEY (product_id) REFERENCES shop_product(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS recharge_order (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  recharge_no VARCHAR(64) NOT NULL,
+  user_id BIGINT NOT NULL,
+  amount_cents INT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  expires_at DATETIME NOT NULL,
+  paid_at DATETIME NULL,
+  canceled_at DATETIME NULL,
+  operator_id BIGINT NOT NULL,
+  operator_name_snapshot VARCHAR(50) NOT NULL,
+  request_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_recharge_no (recharge_no),
+  UNIQUE KEY uk_recharge_request (operator_id, request_key),
+  KEY idx_recharge_user (user_id, created_at),
+  KEY idx_recharge_expires (status, expires_at),
+  CONSTRAINT fk_recharge_user FOREIGN KEY (user_id) REFERENCES user(id),
+  CONSTRAINT fk_recharge_operator FOREIGN KEY (operator_id) REFERENCES user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS payment_order (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  payment_no VARCHAR(64) NOT NULL,
+  reservation_order_id BIGINT NULL,
+  shop_order_id BIGINT NULL,
+  recharge_order_id BIGINT NULL,
+  purpose VARCHAR(20) NOT NULL DEFAULT 'initial',
+  business_key VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  customer_user_id BIGINT NULL,
+  operator_id BIGINT NOT NULL,
+  operator_name_snapshot VARCHAR(50) NOT NULL,
+  amount_cents INT NOT NULL,
+  pay_method VARCHAR(20) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  request_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  context_snapshot JSON NOT NULL,
+  expires_at DATETIME NOT NULL,
+  paid_at DATETIME NULL,
+  closed_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_payment_no (payment_no),
+  UNIQUE KEY uk_payment_business (business_key),
+  KEY idx_payment_expires (status, expires_at, id),
+  KEY idx_payment_paid (paid_at, id),
+  KEY idx_payment_customer (customer_user_id, created_at),
+  KEY idx_payment_operator (operator_id, created_at),
+  CONSTRAINT fk_payment_reservation FOREIGN KEY (reservation_order_id) REFERENCES reservation_order(id),
+  CONSTRAINT fk_payment_shop FOREIGN KEY (shop_order_id) REFERENCES shop_order(id),
+  CONSTRAINT fk_payment_recharge FOREIGN KEY (recharge_order_id) REFERENCES recharge_order(id),
+  CONSTRAINT fk_payment_customer FOREIGN KEY (customer_user_id) REFERENCES user(id),
+  CONSTRAINT fk_payment_operator FOREIGN KEY (operator_id) REFERENCES user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS payment_command (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  payment_order_id BIGINT NOT NULL,
+  operator_id BIGINT NOT NULL,
+  request_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  action VARCHAR(30) NOT NULL,
+  result_snapshot JSON NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_payment_command (payment_order_id, operator_id, request_key),
+  CONSTRAINT fk_command_payment FOREIGN KEY (payment_order_id) REFERENCES payment_order(id),
+  CONSTRAINT fk_command_operator FOREIGN KEY (operator_id) REFERENCES user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS payment_refund (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  refund_no VARCHAR(64) NOT NULL,
+  payment_order_id BIGINT NOT NULL,
+  refund_group_no VARCHAR(64) NOT NULL,
+  amount_cents INT NOT NULL,
+  reason VARCHAR(255) NOT NULL,
+  purpose VARCHAR(20) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'succeeded',
+  operator_id BIGINT NOT NULL,
+  operator_name_snapshot VARCHAR(50) NOT NULL,
+  request_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  allocation_key VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  refunded_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_refund_no (refund_no),
+  UNIQUE KEY uk_refund_allocation (allocation_key),
+  KEY idx_refund_group (refund_group_no),
+  KEY idx_refund_time (refunded_at, id),
+  CONSTRAINT fk_refund_payment FOREIGN KEY (payment_order_id) REFERENCES payment_order(id),
+  CONSTRAINT fk_refund_operator FOREIGN KEY (operator_id) REFERENCES user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS shop_pickup (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  shop_order_id BIGINT NOT NULL,
+  code VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'ready',
+  redeemed_by BIGINT NULL,
+  redeemed_at DATETIME NULL,
+  redeem_request_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  redeem_request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_pickup_order (shop_order_id),
+  UNIQUE KEY uk_pickup_code (code),
+  CONSTRAINT fk_pickup_order FOREIGN KEY (shop_order_id) REFERENCES shop_order(id),
+  CONSTRAINT fk_pickup_operator FOREIGN KEY (redeemed_by) REFERENCES user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS shop_stock_hold (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  shop_order_id BIGINT NOT NULL,
+  product_id BIGINT NOT NULL,
+  quantity INT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_stock_hold_order_product (shop_order_id, product_id),
+  KEY idx_stock_hold_available (product_id, status, expires_at),
+  CONSTRAINT fk_hold_order FOREIGN KEY (shop_order_id) REFERENCES shop_order(id),
+  CONSTRAINT fk_hold_product FOREIGN KEY (product_id) REFERENCES shop_product(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS member_account_transaction (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
@@ -177,6 +323,10 @@ CREATE TABLE IF NOT EXISTS member_account_transaction (
   reason VARCHAR(255) NULL,
   operator_id BIGINT NULL,
   operator_username VARCHAR(50) NULL,
+  payment_order_id BIGINT NULL,
+  payment_refund_id BIGINT NULL,
+  recharge_order_id BIGINT NULL,
+  effect_key VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY idx_member_transaction_user (user_id),
   KEY idx_member_transaction_reservation (reservation_id),
@@ -185,7 +335,11 @@ CREATE TABLE IF NOT EXISTS member_account_transaction (
   KEY idx_member_transaction_created_at (created_at),
   CONSTRAINT fk_member_transaction_user FOREIGN KEY (user_id) REFERENCES user(id),
   CONSTRAINT fk_member_transaction_reservation FOREIGN KEY (reservation_id) REFERENCES reservation(id),
-  CONSTRAINT fk_member_transaction_shop_order FOREIGN KEY (shop_order_id) REFERENCES shop_order(id)
+  CONSTRAINT fk_member_transaction_shop_order FOREIGN KEY (shop_order_id) REFERENCES shop_order(id),
+  UNIQUE KEY uk_member_effect (effect_key),
+  CONSTRAINT fk_member_payment FOREIGN KEY (payment_order_id) REFERENCES payment_order(id),
+  CONSTRAINT fk_member_refund FOREIGN KEY (payment_refund_id) REFERENCES payment_refund(id),
+  CONSTRAINT fk_member_recharge FOREIGN KEY (recharge_order_id) REFERENCES recharge_order(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS announcement (
@@ -303,10 +457,12 @@ CREATE TABLE IF NOT EXISTS court_block (
   status VARCHAR(20) NOT NULL DEFAULT 'active',
   created_by BIGINT NOT NULL,
   released_by BIGINT NULL,
+  block_type VARCHAR(30) NOT NULL DEFAULT 'legacy_unspecified',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   released_at DATETIME NULL,
   KEY idx_block_court_date (court_id, reserve_date, status),
-  CONSTRAINT fk_block_court FOREIGN KEY (court_id) REFERENCES court(id)
+  CONSTRAINT fk_block_court FOREIGN KEY (court_id) REFERENCES court(id),
+  KEY idx_block_type_date (block_type, reserve_date, court_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS reservation_attendance (
@@ -327,10 +483,15 @@ CREATE TABLE IF NOT EXISTS reservation_change (
   balance_change_cents INT NOT NULL,
   points_change INT NOT NULL,
   changed_by BIGINT NOT NULL,
+  pay_method VARCHAR(20) NULL,
+  settlement_delta_cents INT NULL,
+  payment_order_id BIGINT NULL,
+  refund_group_no VARCHAR(64) NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uk_change_request (reservation_id, request_key),
   KEY idx_change_reservation (reservation_id, id),
-  CONSTRAINT fk_change_reservation FOREIGN KEY (reservation_id) REFERENCES reservation(id)
+  CONSTRAINT fk_change_reservation FOREIGN KEY (reservation_id) REFERENCES reservation(id),
+  CONSTRAINT fk_change_payment FOREIGN KEY (payment_order_id) REFERENCES payment_order(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO config (config_key, config_value, description)

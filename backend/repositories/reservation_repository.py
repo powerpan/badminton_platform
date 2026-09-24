@@ -20,12 +20,16 @@ RESERVATION_OPERATIONS_COLUMNS = (
 )
 
 RESERVATION_MONEY_COLUMNS = (
+    "r.source, r.operator_id, r.operator_name_snapshot, r.guest_name, r.guest_contact, "
+    "r.opened_at, r.parent_reservation_id, r.root_reservation_id, "
     "r.price_per_hour_cents, r.duration_minutes, r.original_amount_cents, "
     "r.discount_amount_cents, r.payable_amount_cents, "
     "r.member_level_snapshot, r.discount_rate, r.points_awarded, " + RESERVATION_OPERATIONS_COLUMNS
 )
 
 RESERVATION_ORDER_COLUMNS = (
+    "(SELECT id FROM payment_order WHERE reservation_order_id=ro.id AND purpose='initial' LIMIT 1) AS payment_id, "
+    "(SELECT MAX(id) FROM payment_order WHERE reservation_order_id=ro.id AND purpose='reschedule' AND status='pending' AND expires_at>NOW()) AS reschedule_payment_id, "
     "ro.id AS order_id, ro.order_no, ro.status AS order_status, "
     "ro.amount_cents AS order_amount_cents, ro.pay_method AS order_pay_method, "
     "ro.expires_at AS order_expires_at, ro.paid_at AS order_paid_at, "
@@ -73,10 +77,11 @@ async def list_reservations_for_court_date(
     return await fetch_all(
         settings,
         """
-        SELECT id, reservation_no, user_id, court_id, reserve_date, start_time, end_time, time_slot, status
-        FROM reservation
-        WHERE court_id = %s AND reserve_date = %s AND status IN ('pending', 'confirmed')
-        ORDER BY start_time ASC
+        SELECT r.id, r.reservation_no, r.user_id, r.court_id, r.reserve_date, r.start_time, r.end_time, r.time_slot, r.status
+        FROM reservation r LEFT JOIN reservation_order ro ON ro.reservation_id=r.id
+        WHERE r.court_id = %s AND r.reserve_date = %s
+          AND (r.status='confirmed' OR (r.status='pending' AND ro.status='pending' AND ro.expires_at>NOW()))
+        ORDER BY r.start_time ASC
         """,
         (court_id, reserve_date),
     )
@@ -93,13 +98,13 @@ async def find_conflict(
     return await fetch_one(
         settings,
         """
-        SELECT id, reservation_no, status
-        FROM reservation
-        WHERE court_id = %s
-          AND reserve_date = %s
-          AND status IN ('pending', 'confirmed')
-          AND %s < end_time
-          AND %s > start_time
+        SELECT r.id, r.reservation_no, r.status
+        FROM reservation r LEFT JOIN reservation_order ro ON ro.reservation_id=r.id
+        WHERE r.court_id = %s
+          AND r.reserve_date = %s
+          AND (r.status='confirmed' OR (r.status='pending' AND ro.status='pending' AND ro.expires_at>NOW()))
+          AND %s < r.end_time
+          AND %s > r.start_time
         LIMIT 1
         """,
         (court_id, reserve_date, start_time, end_time),
@@ -212,18 +217,8 @@ async def create_pending_reservation_order_atomic(
                     await connection.rollback()
                     return None, None, 'price_changed'
                 balance_before = int(member_account.get("balance_cents") or 0)
-                await cursor.execute(
-                    """
-                    SELECT COALESCE(SUM(amount_cents), 0) AS pending_amount_cents
-                    FROM reservation_order
-                    WHERE user_id = %s
-                      AND status = 'pending'
-                      AND expires_at > NOW()
-                    """,
-                    (user_id,),
-                )
-                pending_order_total = await cursor.fetchone()
-                pending_amount_cents = int((pending_order_total or {}).get("pending_amount_cents") or 0)
+                from repositories.balance_holds import held_balance
+                pending_amount_cents = await held_balance(cursor,user_id)
                 available_balance_cents = balance_before - pending_amount_cents
                 if available_balance_cents < payable_amount_cents:
                     await connection.rollback()
@@ -320,7 +315,7 @@ async def get_reservation_detail(settings: Settings, reservation_id: int) -> dic
                r.status, r.remark, {money_columns}, {order_columns},
                r.created_at, r.updated_at, r.canceled_at
         FROM reservation r
-        JOIN user u ON u.id = r.user_id
+        LEFT JOIN user u ON u.id = r.user_id
         JOIN court c ON c.id = r.court_id
         LEFT JOIN reservation_order ro ON ro.reservation_id = r.id
         WHERE r.id = %s
@@ -411,107 +406,6 @@ async def count_future_active_reservations_by_court(settings: Settings, *, court
     return int(row["total"]) if row else 0
 
 
-async def list_admin_reservations(
-    settings: Settings,
-    *,
-    status: str | None,
-    username: str | None,
-    court_id: int | None,
-    date_from: date | None,
-    date_to: date | None,
-    offset: int,
-    limit: int,
-) -> list[dict[str, Any]]:
-    where = []
-    args: list[Any] = []
-    if status:
-        where.append("r.status = %s")
-        args.append(status)
-    if username:
-        where.append("(u.username LIKE %s OR u.nickname LIKE %s)")
-        args.extend([f"%{username}%", f"%{username}%"])
-    if court_id:
-        where.append("r.court_id = %s")
-        args.append(court_id)
-    if date_from:
-        where.append("r.reserve_date >= %s")
-        args.append(date_from)
-    if date_to:
-        where.append("r.reserve_date <= %s")
-        args.append(date_to)
-    where_sql = "WHERE " + " AND ".join(where) if where else ""
-    args.extend([offset, limit])
-    return await fetch_all(
-        settings,
-        f"""
-        SELECT r.id, r.reservation_no, r.user_id, u.username, u.nickname,
-               r.court_id, c.court_no, c.court_name,
-               r.reserve_date, r.start_time, r.end_time, r.time_slot,
-               r.status, r.remark, {RESERVATION_MONEY_COLUMNS}, {RESERVATION_ORDER_COLUMNS},
-               r.created_at, r.canceled_at
-        FROM reservation r
-        JOIN user u ON u.id = r.user_id
-        JOIN court c ON c.id = r.court_id
-        LEFT JOIN reservation_order ro ON ro.reservation_id = r.id
-        {where_sql}
-        ORDER BY r.reserve_date DESC, r.start_time DESC, r.id DESC
-        LIMIT %s, %s
-        """,
-        args,
-    )
-
-
-async def count_admin_reservations(settings: Settings, *, status: str | None) -> int:
-    return await count_admin_reservations_filtered(
-        settings,
-        status=status,
-        username=None,
-        court_id=None,
-        date_from=None,
-        date_to=None,
-    )
-
-
-async def count_admin_reservations_filtered(
-    settings: Settings,
-    *,
-    status: str | None,
-    username: str | None,
-    court_id: int | None,
-    date_from: date | None,
-    date_to: date | None,
-) -> int:
-    where = []
-    args: list[Any] = []
-    if status:
-        where.append("r.status = %s")
-        args.append(status)
-    if username:
-        where.append("(u.username LIKE %s OR u.nickname LIKE %s)")
-        args.extend([f"%{username}%", f"%{username}%"])
-    if court_id:
-        where.append("r.court_id = %s")
-        args.append(court_id)
-    if date_from:
-        where.append("r.reserve_date >= %s")
-        args.append(date_from)
-    if date_to:
-        where.append("r.reserve_date <= %s")
-        args.append(date_to)
-    where_sql = "WHERE " + " AND ".join(where) if where else ""
-    row = await fetch_one(
-        settings,
-        f"""
-        SELECT COUNT(*) AS total
-        FROM reservation r
-        JOIN user u ON u.id = r.user_id
-        {where_sql}
-        """,
-        args,
-    )
-    return int(row["total"]) if row else 0
-
-
 async def cancel_reservation(settings: Settings, reservation_id: int) -> None:
     await execute(
         settings,
@@ -530,6 +424,8 @@ async def expire_pending_reservation_orders(settings: Settings) -> int:
             r.status = 'expired'
         WHERE ro.status = 'pending'
           AND r.status = 'pending'
+          AND r.source = 'online'
+          AND NOT EXISTS (SELECT 1 FROM payment_order p WHERE p.reservation_order_id=ro.id)
           AND ro.expires_at <= NOW()
         """,
     )
@@ -552,7 +448,7 @@ async def pay_reservation_order_atomic(
                 await cursor.execute(
                     """
                     SELECT ro.id AS order_id, ro.order_no, ro.user_id, ro.status AS order_status,
-                           ro.amount_cents, ro.expires_at,
+                           ro.amount_cents, ro.expires_at, ro.pay_method,
                            r.id AS reservation_id, r.reservation_no, r.status AS reservation_status,
                            r.payable_amount_cents, r.points_awarded
                     FROM reservation_order ro
@@ -595,12 +491,17 @@ async def pay_reservation_order_atomic(
                     await connection.rollback()
                     return None, "user_disabled"
 
+                if order['pay_method'] != 'balance':
+                    await connection.rollback()
+                    return None, 'wrong_channel'
                 amount_cents = int(order.get("amount_cents") or order.get("payable_amount_cents") or 0)
                 points_awarded = int(order.get("points_awarded") or 0)
                 account = await member_repository.get_or_create_account_for_update(cursor, user_id)
                 balance_before = int(account.get("balance_cents") or 0)
                 points_before = int(account.get("points") or 0)
-                if balance_before < amount_cents:
+                from repositories.balance_holds import held_balance
+                held = await held_balance(cursor,user_id,reservation_order_id=order_id)
+                if balance_before - held < amount_cents:
                     await connection.rollback()
                     return None, "insufficient_balance"
                 balance_after = balance_before - amount_cents

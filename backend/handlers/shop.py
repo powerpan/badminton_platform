@@ -29,7 +29,7 @@ class ShopProductDetailHandler(BaseHandler):
 
 class ShopOrderQuoteHandler(BaseHandler):
     async def post(self) -> None:
-        user = await self.require_current_user()
+        user = await self.require_customer()
         data = await shop_service.quote_order(self.application.settings['app_settings'], current_user=user, body=self.get_json_body())
         self.write_json(success(data))
 
@@ -37,15 +37,15 @@ class ShopOrderQuoteHandler(BaseHandler):
 class ShopOrdersHandler(BaseHandler):
     async def post(self) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         order = await shop_service.create_order(settings, current_user=current_user, body=self.get_json_body())
-        self.write_json(success(order, "订单已支付"))
+        self.write_json(success(order, "订单已创建，请完成付款"))
 
 
 class MyShopOrdersHandler(BaseHandler):
     async def get(self) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         page, page_size, offset = pagination(self)
         data = await shop_service.list_my_orders(
             settings,
@@ -61,7 +61,7 @@ class MyShopOrdersHandler(BaseHandler):
 class ShopOrderDetailHandler(BaseHandler):
     async def get(self, order_id: str) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         order = await shop_service.get_my_order(settings, current_user=current_user, order_id=self.path_int(order_id, "订单ID"))
         self.write_json(success(order))
 
@@ -69,7 +69,7 @@ class ShopOrderDetailHandler(BaseHandler):
 class ShopOrderRefundRequestHandler(BaseHandler):
     async def put(self, order_id: str) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         order = await shop_service.request_my_refund(
             settings,
             current_user=current_user,
@@ -82,11 +82,11 @@ class ShopOrderRefundRequestHandler(BaseHandler):
 class ShopOrderCancelHandler(BaseHandler):
     async def put(self, order_id: str) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
-        order = await shop_service.request_my_refund(
+        current_user = await self.require_customer()
+        order = await shop_service.cancel_my_order(
             settings,
             current_user=current_user,
             order_id=self.path_int(order_id, "订单ID"),
             body=self.get_json_body(),
         )
-        self.write_json(success(order, "退款申请已提交，等待管理员审核"))
+        self.write_json(success(order, "订单状态已更新"))

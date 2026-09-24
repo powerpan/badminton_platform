@@ -7,6 +7,7 @@ import tornado.web
 from repositories import user_repository
 from utils.response import ApiError, error
 from utils.tokens import decode_access_token
+from utils.roles import ROLES, CUSTOMER_ROLES, FRONTDESK_ROLES, MAINTENANCE_ROLES, require_role
 
 
 def _json_default(value: Any) -> str:
@@ -80,6 +81,7 @@ class BaseHandler(tornado.web.RequestHandler):
             raise ApiError(401, "登录用户不存在，请重新登录", 401)
         if user["status"] != 1:
             raise ApiError(403, "账号已被禁用", 403)
+        require_role(user, ROLES)
 
         self._current_user_data = user
         return user
@@ -89,6 +91,18 @@ class BaseHandler(tornado.web.RequestHandler):
         if user["role"] != "admin":
             raise ApiError(403, "无管理员权限", 403)
         return user
+
+    async def require_roles(self, allowed) -> dict[str, Any]:
+        return require_role(await self.require_current_user(), allowed)
+
+    async def require_customer(self) -> dict[str, Any]:
+        return await self.require_roles(CUSTOMER_ROLES)
+
+    async def require_frontdesk(self) -> dict[str, Any]:
+        return await self.require_roles(FRONTDESK_ROLES)
+
+    async def require_maintenance(self) -> dict[str, Any]:
+        return await self.require_roles(MAINTENANCE_ROLES)
 
     def write_error(self, status_code: int, **kwargs: Any) -> None:
         exc_info = kwargs.get("exc_info")

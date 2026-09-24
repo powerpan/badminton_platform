@@ -12,19 +12,30 @@ const router = useRouter();
 const moreVisible = ref(false);
 const adminMode = computed(() => Boolean(route.meta.requiresAdmin));
 const memberName = computed(() => authStore.user?.nickname || authStore.user?.username || "会员中心");
-const mainNav = [
+const customerNav = [
   { label: "首页", to: "/" }, { label: "场地预订", to: "/courts" },
   { label: "我的预订", to: "/reservations" }, { label: "活动赛事", to: "/events" },
   { label: "球友圈", to: "/community" }, { label: "商城", to: "/shop" },
 ];
-const mobileNav = [
+const customerMobileNav = [
   { label: "首页", to: "/", icon: House }, { label: "预订", to: "/courts", icon: Calendar },
   { label: "订单", to: "/reservations", icon: Tickets }, { label: "我的", to: "/profile", icon: User },
 ];
+const mainNav = computed(() => authStore.isStaff ? [
+  { label: authStore.roleLabel, to: authStore.homePath }, { label: "球馆公告", to: "/announcements" },
+  { label: "活动赛事", to: "/events" }, { label: "球友圈", to: "/community" }, { label: "商城", to: "/shop" },
+] : customerNav);
+const mobileNav = computed(() => authStore.isStaff ? [
+  { label: "工作台", to: authStore.homePath, icon: Calendar }, { label: "公告", to: "/announcements", icon: House },
+  { label: "通知", to: "/notifications", icon: Bell }, { label: "账号", to: "/profile", icon: User },
+] : customerMobileNav);
+const extraNav = computed(() => [...mainNav.value.slice(authStore.isStaff ? 1 : 3),
+  ...(!authStore.isStaff ? [{ label: '商城订单', to: '/shop/orders' }, { label: '球馆公告', to: '/announcements' }] : []),
+  { label: '预约帮助', to: '/help' }]);
 const adminGroups = [
   { label: "球馆运营", links: [
     { label: "运营总览", to: "/admin/overview" }, { label: "预约管理", to: "/admin/reservations" },
-    { label: "场地管理", to: "/admin/courts" }, { label: "用户管理", to: "/admin/users" },
+    { label: "场地管理", to: "/admin/courts" }, { label: "用户管理", to: "/admin/users" }, { label: "会员储值", to: "/admin/recharges" }, { label: "交易流水", to: "/admin/transactions" },
   ] },
   { label: "内容与服务", links: [
     { label: "公告管理", to: "/admin/announcements" }, { label: "活动管理", to: "/admin/events" },
@@ -81,11 +92,13 @@ watch(() => route.fullPath, () => { moreVisible.value = false; });
           <Bell /><span v-if="notificationStore.unreadCount" class="notification-badge">{{ Math.min(notificationStore.unreadCount, 99) }}</span>
         </RouterLink>
         <el-dropdown v-if="authStore.isLoggedIn" trigger="click" @command="accountCommand">
-          <button class="account-button" aria-label="账户菜单"><span class="member-avatar">{{ memberName.slice(0, 1) }}</span><span class="account-text">{{ adminMode ? memberName : '会员中心' }}</span><ArrowDown /></button>
+          <button class="account-button" aria-label="账户菜单"><span class="member-avatar">{{ memberName.slice(0, 1) }}</span><span class="account-text">{{ adminMode ? memberName : authStore.isStaff ? authStore.roleLabel : '会员中心' }}</span><ArrowDown /></button>
           <template #dropdown><el-dropdown-menu>
-            <el-dropdown-item command="/profile">会员中心</el-dropdown-item>
-            <el-dropdown-item command="/shop/orders">商城订单</el-dropdown-item>
+            <el-dropdown-item command="/profile">{{ authStore.isStaff ? "账号资料" : "会员中心" }}</el-dropdown-item>
+            <el-dropdown-item v-if="authStore.canConsume" command="/shop/orders">商城订单</el-dropdown-item>
             <el-dropdown-item v-if="authStore.isAdmin" :command="adminMode ? '/' : '/admin/overview'">{{ adminMode ? '返回用户端' : '进入管理端' }}</el-dropdown-item>
+            <el-dropdown-item v-if="authStore.canFrontdesk" command="/frontdesk">前台工作台</el-dropdown-item>
+            <el-dropdown-item v-if="authStore.canMaintenance" command="/maintenance">维修安排</el-dropdown-item>
             <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
           </el-dropdown-menu></template>
         </el-dropdown>
@@ -110,7 +123,7 @@ watch(() => route.fullPath, () => { moreVisible.value = false; });
       <div class="drawer-heading"><h2>{{ adminMode ? '球馆管理' : '更多服务' }}</h2><el-button @click="moreVisible = false">关闭</el-button></div>
       <nav v-if="adminMode" class="drawer-navigation"><template v-for="group in adminGroups" :key="group.label"><p>{{ group.label }}</p><RouterLink v-for="item in group.links" :key="item.to" :to="item.to">{{ item.label }}<ArrowRight /></RouterLink></template><RouterLink to="/">返回用户端<ArrowRight /></RouterLink></nav>
       <nav v-else class="drawer-navigation">
-        <RouterLink v-for="item in [...mainNav.slice(3), {label: '商城订单', to: '/shop/orders'}, {label: '球馆公告', to: '/announcements'}, {label: '预约帮助', to: '/help'}]" :key="item.to" :to="item.to">{{ item.label }}<ArrowRight /></RouterLink>
+        <RouterLink v-for="item in extraNav" :key="item.to" :to="item.to">{{ item.label }}<ArrowRight /></RouterLink>
         <RouterLink v-if="authStore.isAdmin" to="/admin/overview">进入管理端<ArrowRight /></RouterLink>
       </nav>
       <el-button v-if="authStore.isLoggedIn" class="drawer-logout" @click="logout">退出登录</el-button>

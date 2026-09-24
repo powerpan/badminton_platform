@@ -1,0 +1,60 @@
+{
+  "executed_at": "2026-09-24T01:27:14.026002+08:00",
+  "environment": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "python": "3.14.3",
+    "mysql": "5.7.28",
+    "pool_max": 10,
+    "http": "loopback Tornado with normal JWT and role checks"
+  },
+  "scope": "owned disposable database; 20 customers, 1 product, 201 real pending orders, 201 distinct payments; no production capacity claim",
+  "measurements": [
+    {
+      "name": "shop_quote",
+      "cold_ms": 2.62,
+      "warm_samples": 200,
+      "concurrency": 20,
+      "p50_ms": 15.39,
+      "p95_ms": 17.93,
+      "max_ms": 21.31,
+      "failures": 0,
+      "target_ms": 2000,
+      "passed": true
+    },
+    {
+      "name": "mock_collection",
+      "cold_ms": 10.18,
+      "warm_samples": 200,
+      "concurrency": 20,
+      "p50_ms": 61.0,
+      "p95_ms": 74.46,
+      "max_ms": 95.5,
+      "failures": 0,
+      "target_ms": 3000,
+      "passed": true
+    },
+    {
+      "name": "admin_financial_list",
+      "cold_ms": 71.58,
+      "warm_samples": 200,
+      "concurrency": 20,
+      "p50_ms": 305.47,
+      "p95_ms": 349.48,
+      "max_ms": 462.51,
+      "failures": 0,
+      "target_ms": 2000,
+      "passed": true
+    }
+  ],
+  "final_facts": {
+    "payments": 201,
+    "pickups": 201,
+    "stock": 299,
+    "sold": 201,
+    "wallet_effects": 0,
+    "active_holds": 0
+  },
+  "passed": true,
+  "measurement_note": "cold_ms means the first HTTP request in that group. MySQL buffer and OS caches were not flushed. Figures cover this synthetic workload only."
+}

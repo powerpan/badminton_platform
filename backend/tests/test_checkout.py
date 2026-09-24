@@ -34,7 +34,7 @@ class CheckoutTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('已下架',q['issues'][0])
 
     async def test_quote_failure_cannot_create_order(self):
-        with patch.object(shop_service.shop_repository,'create_paid_order_atomic',AsyncMock()) as create:
+        with patch.object(shop_service.checkout,'create',AsyncMock()) as create:
             with self.assertRaises(ApiError):
                 await shop_service.create_order(None,current_user={'id':2},body={'items':[{'product_id':1,'quantity':1}]})
             create.assert_not_awaited()

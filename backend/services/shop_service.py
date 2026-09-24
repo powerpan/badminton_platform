@@ -3,13 +3,29 @@ from typing import Any
 
 from config.settings import Settings
 from repositories import shop_repository, member_repository
+from repositories import shop_checkout_repository as checkout
+from repositories.database import fetch_one
+from services.config_service import get_reservation_rules
+from utils.staff_booking import request_key, text_field, json_value
+from uuid import uuid4
 from services import notification_service
 from utils.query import clean_text
 from utils.response import ApiError
 
 
 DEFAULT_PRODUCT_IMAGE_URL = "/courts/default-court.png"
-ORDER_STATUSES = {"paid", "refund_requested", "completed", "canceled"}
+ORDER_STATUSES = {"pending", "expired", "paid", "refund_requested", "completed", "canceled"}
+
+
+def pay_method(body):
+    method = body.get('pay_method', 'balance')
+    if method not in ('balance', 'mock_alipay'):
+        raise ApiError(400, '请选择储值余额或模拟支付宝', 400)
+    return method
+
+
+def command_key(body, fallback=None):
+    return request_key(body) if 'request_key' in body else fallback or uuid4().hex
 
 
 def _order_no() -> str:
@@ -70,6 +86,8 @@ def _normalize_product(row: dict[str, Any]) -> dict[str, Any]:
     product = dict(row)
     product["price_cents"] = int(product.get("price_cents") or 0)
     product["stock"] = int(product.get("stock") or 0)
+    product['reserved_stock'] = int(product.get('reserved_stock') or 0)
+    product['available_stock'] = int(product.get('available_stock', product['stock']))
     product["sold_count"] = int(product.get("sold_count") or 0)
     product["status"] = int(product.get("status") or 0)
     product["image_url"] = clean_text(product.get("image_url"), DEFAULT_PRODUCT_IMAGE_URL) or DEFAULT_PRODUCT_IMAGE_URL
@@ -81,7 +99,7 @@ def _normalize_order(row: dict[str, Any], items: list[dict[str, Any]] | None = N
     order["total_amount_cents"] = int(order.get("total_amount_cents") or 0)
     if items is not None:
         order["items"] = [_normalize_order_item(item) for item in items]
-    return order
+    return json_value(order)
 
 
 def _normalize_order_item(row: dict[str, Any]) -> dict[str, Any]:
@@ -142,6 +160,8 @@ def _parse_order_items(value: Any, *, require_prices: bool = False) -> list[dict
     for raw_item in value:
         if not isinstance(raw_item, dict):
             raise ApiError(400, "订单商品格式错误", 400)
+        if type(raw_item.get('product_id')) is not int or type(raw_item.get('quantity')) is not int:
+            raise ApiError(400, '商品ID与数量必须为整数', 400)
         try:
             product_id = int(raw_item.get("product_id"))
             quantity = int(raw_item.get("quantity"))
@@ -234,14 +254,16 @@ async def update_product_status(settings: Settings, product_id: int, body: dict[
 
 
 async def _order_detail(settings: Settings, order_id: int) -> dict[str, Any]:
+    await checkout.expire(settings, order_id)
     order = await shop_repository.get_order(settings, order_id)
     if order is None:
         raise ApiError(404, "订单不存在", 404)
     items = await shop_repository.list_order_items(settings, order_id)
-    return _normalize_order(order, items)
+    return {**_normalize_order(order, items), **json_value(await fetch_one(settings, 'SELECT NOW() AS server_now'))}
 
 
 async def quote_order(settings: Settings, *, current_user: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    method = pay_method(body)
     items = _parse_order_items(body.get('items'))
     products = {row['id']: _normalize_product(row) for row in await shop_repository.get_products_by_ids(settings, [i['product_id'] for i in items])}
     lines, issues = [], []
@@ -251,55 +273,27 @@ async def quote_order(settings: Settings, *, current_user: dict[str, Any], body:
             raise ApiError(404, '购物车中有商品已不存在，请移除后重试', 404)
         if product['status'] != 1:
             issues.append(f"{product['product_name']}已下架，请移除")
-        elif product['stock'] < item['quantity']:
-            issues.append(f"{product['product_name']}库存不足，当前剩余 {product['stock']} 件")
+        elif product['available_stock'] < item['quantity']:
+            issues.append(f"{product['product_name']}库存不足，当前可售 {product['available_stock']} 件")
         lines.append({'product': product, 'quantity': item['quantity'], 'subtotal_cents': product['price_cents'] * item['quantity']})
     balance = await member_repository.get_booking_balance(settings, current_user['id'])
     total = sum(line['subtotal_cents'] for line in lines)
-    if balance['available_balance_cents'] < total:
-        issues.append('会员可用余额不足，请处理待支付预约、充值或调整购物车')
-    return {'items': lines, 'total_amount_cents': total, **balance, 'issues': issues, 'can_checkout': not issues}
+    if method == 'balance' and balance['available_balance_cents'] < total:
+            issues.append('会员可用余额不足，请处理待付款订单、充值或选择模拟支付宝')
+    if total > 2_147_483_647:
+        issues.append('订单金额超出允许范围，请减少商品')
+    return {'items': lines, 'total_amount_cents': total, 'pay_method': method, **balance, 'issues': issues, 'can_checkout': not issues}
 
 
-async def create_order(
-    settings: Settings,
-    *,
-    current_user: dict[str, Any],
-    body: dict[str, Any],
-) -> dict[str, Any]:
-    items = _parse_order_items(body.get("items"), require_prices=True)
-    remark = clean_text(body.get("remark"))
-    if len(remark) > 255:
-        raise ApiError(400, "订单备注不能超过255个字符", 400)
-    order_id, failure = await shop_repository.create_paid_order_atomic(
-        settings,
-        order_no=_order_no(),
-        user_id=current_user["id"],
-        items=items,
-        remark=remark,
-        expected_prices={i["product_id"]: i["expected_price_cents"] for i in items},
-    )
-    if failure == "price_changed":
-        raise ApiError(409, '商品价格已变化，本次未扣款，请核对最新金额后重新确认', 409)
-    if failure == "insufficient_available_balance":
-        raise ApiError(409, '会员可用余额不足，请先处理待支付预约或充值', 409)
-    if failure == "product_not_found":
-        raise ApiError(404, "商品不存在", 404)
-    if failure == "product_disabled":
-        raise ApiError(400, "商品已下架，不能下单", 400)
-    if failure == "insufficient_stock":
-        raise ApiError(400, "商品库存不足，请调整购买数量", 400)
-    if failure == "insufficient_balance":
-        raise ApiError(400, "会员余额不足，请联系管理员充值或调整余额", 400)
-    if failure == "user_not_found":
-        raise ApiError(401, "登录用户不存在，请重新登录", 401)
-    if failure == "user_disabled":
-        raise ApiError(403, "账号已被禁用", 403)
-    if order_id is None:
-        raise ApiError(500, "订单创建失败，请重试", 500)
-    order = await _order_detail(settings, order_id)
-    await notification_service.notify_shop_order_paid(settings, order=order)
-    return order
+async def create_order(settings: Settings, *, current_user: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+    items = _parse_order_items(body.get('items'), require_prices=True)
+    method = pay_method(body)
+    key = command_key(body)
+    remark = text_field(body, 'remark', 255)
+    rules = await get_reservation_rules(settings)
+    await checkout.expire(settings)
+    oid = await checkout.create(settings, current_user, items, method, remark, key, rules.reservation_payment_timeout_minutes)
+    return await _order_detail(settings, oid)
 
 
 async def list_my_orders(
@@ -311,6 +305,7 @@ async def list_my_orders(
     page_size: int,
     offset: int,
 ) -> dict[str, Any]:
+    await checkout.expire(settings)
     status = _parse_order_status(status_arg)
     rows = await shop_repository.list_orders(
         settings,
@@ -321,7 +316,7 @@ async def list_my_orders(
         limit=page_size,
     )
     total = await shop_repository.count_orders(settings, user_id=current_user["id"], status=status, username=None)
-    return {"items": [_normalize_order(row) for row in rows], "total": total, "page": page, "page_size": page_size}
+    return {"items": [_normalize_order(row) for row in rows], "total": total, "page": page, "page_size": page_size, **json_value(await fetch_one(settings, "SELECT NOW() AS server_now"))}
 
 
 async def get_my_order(settings: Settings, *, current_user: dict[str, Any], order_id: int) -> dict[str, Any]:
@@ -331,39 +326,15 @@ async def get_my_order(settings: Settings, *, current_user: dict[str, Any], orde
     return order
 
 
-async def cancel_my_order(settings: Settings, *, current_user: dict[str, Any], order_id: int) -> dict[str, Any]:
-    return await request_my_refund(settings, current_user=current_user, order_id=order_id, body={})
+async def cancel_my_order(settings: Settings, *, current_user: dict[str, Any], order_id: int, body=None) -> dict[str, Any]:
+    body = body or {}
+    return await checkout.action(settings, current_user, order_id, 'cancel', command_key(body),
+                                 _parse_refund_reason(body, default='用户取消商城订单'))
 
 
-async def request_my_refund(
-    settings: Settings,
-    *,
-    current_user: dict[str, Any],
-    order_id: int,
-    body: dict[str, Any],
-) -> dict[str, Any]:
-    reason = _parse_refund_reason(body, default="用户申请商城订单退款")
-    requested_id, failure = await shop_repository.request_refund_atomic(
-        settings,
-        order_id=order_id,
-        current_user_id=int(current_user["id"]),
-        reason=reason,
-    )
-    if failure == "not_found":
-        raise ApiError(404, "订单不存在", 404)
-    if failure == "already_requested":
-        raise ApiError(400, "该订单已提交退款申请，请等待管理员审核", 400)
-    if failure == "not_paid":
-        raise ApiError(400, "当前订单状态不能申请退款", 400)
-    if requested_id is None:
-        raise ApiError(500, "提交退款申请失败，请重试", 500)
-    order = await _order_detail(settings, requested_id)
-    await notification_service.notify_shop_refund_requested(
-        settings,
-        order=order,
-        operator_id=int(current_user["id"]),
-    )
-    return order
+async def request_my_refund(settings: Settings, *, current_user: dict[str, Any], order_id: int, body: dict[str, Any]) -> dict[str, Any]:
+    return await checkout.action(settings, current_user, order_id, 'request_refund', command_key(body),
+                                 _parse_refund_reason(body, default='用户申请商城订单退款'))
 
 
 async def list_admin_orders(
@@ -375,6 +346,7 @@ async def list_admin_orders(
     page_size: int,
     offset: int,
 ) -> dict[str, Any]:
+    await checkout.expire(settings)
     status = _parse_order_status(status_arg)
     username = clean_text(username_arg) or None
     rows = await shop_repository.list_orders(
@@ -386,88 +358,26 @@ async def list_admin_orders(
         limit=page_size,
     )
     total = await shop_repository.count_orders(settings, user_id=None, status=status, username=username)
-    return {"items": [_normalize_order(row) for row in rows], "total": total, "page": page, "page_size": page_size}
+    return {"items": [_normalize_order(row) for row in rows], "total": total, "page": page, "page_size": page_size, **json_value(await fetch_one(settings, "SELECT NOW() AS server_now"))}
 
 
 async def get_admin_order(settings: Settings, order_id: int) -> dict[str, Any]:
     return await _order_detail(settings, order_id)
 
 
-async def admin_cancel_order(
-    settings: Settings,
-    *,
-    current_user: dict[str, Any],
-    order_id: int,
-) -> dict[str, Any]:
-    canceled_id, failure = await shop_repository.cancel_order_atomic(
-        settings,
-        order_id=order_id,
-        current_user_id=None,
-        operator_id=current_user["id"],
-        operator_username=current_user.get("username"),
-        reason="管理员取消商城订单退款",
-    )
-    if failure == "not_found":
-        raise ApiError(404, "订单不存在", 404)
-    if failure == "not_paid":
-        raise ApiError(400, "只有已支付或退款待审核订单可以取消退款", 400)
-    if canceled_id is None:
-        raise ApiError(500, "取消订单失败，请重试", 500)
-    order = await _order_detail(settings, canceled_id)
-    await notification_service.notify_shop_order_canceled(
-        settings,
-        order=order,
-        by_admin=True,
-        operator_id=current_user["id"],
-    )
-    return order
+async def admin_cancel_order(settings: Settings, *, current_user: dict[str, Any], order_id: int, body=None) -> dict[str, Any]:
+    body = body or {}
+    return await checkout.action(settings, current_user, order_id, 'refund', command_key(body, f'admin-shop-cancel-{order_id}'),
+                                 _parse_refund_reason(body, default='管理员取消商城订单退款'))
 
 
-async def reject_refund_request(
-    settings: Settings,
-    *,
-    current_user: dict[str, Any],
-    order_id: int,
-    body: dict[str, Any],
-) -> dict[str, Any]:
-    reason = _parse_refund_reason(body, default="管理员驳回商城订单退款申请")
-    rejected_id, failure = await shop_repository.reject_refund_request_atomic(
-        settings,
-        order_id=order_id,
-        reason=reason,
-    )
-    if failure == "not_found":
-        raise ApiError(404, "订单不存在", 404)
-    if failure == "not_refund_requested":
-        raise ApiError(400, "只有退款待审核订单可以驳回申请", 400)
-    if rejected_id is None:
-        raise ApiError(500, "驳回退款申请失败，请重试", 500)
-    order = await _order_detail(settings, rejected_id)
-    await notification_service.notify_shop_refund_rejected(
-        settings,
-        order=order,
-        operator_id=int(current_user["id"]),
-    )
-    return order
+async def reject_refund_request(settings: Settings, *, current_user: dict[str, Any], order_id: int, body: dict[str, Any]) -> dict[str, Any]:
+    return await checkout.action(settings, current_user, order_id, 'reject', command_key(body),
+                                 _parse_refund_reason(body, default='管理员驳回商城订单退款申请'))
 
 
-async def complete_order(
-    settings: Settings,
-    *,
-    current_user: dict[str, Any],
-    order_id: int,
-) -> dict[str, Any]:
-    completed_id, failure = await shop_repository.complete_order_atomic(settings, order_id)
-    if failure == "not_found":
-        raise ApiError(404, "订单不存在", 404)
-    if failure == "not_paid":
-        raise ApiError(400, "只有已支付且未申请退款的订单可以完成", 400)
-    if completed_id is None:
-        raise ApiError(500, "完成订单失败，请重试", 500)
-    order = await _order_detail(settings, completed_id)
-    await notification_service.notify_shop_order_completed(
-        settings,
-        order=order,
-        operator_id=current_user["id"],
-    )
-    return order
+async def complete_order(settings: Settings, *, current_user: dict[str, Any], order_id: int, body=None) -> dict[str, Any]:
+    body = body or {}
+    if current_user.get('role') != 'admin':
+        raise ApiError(403, '只有管理员可从订单完成入口核销', 403)
+    return await checkout.action(settings, current_user, order_id, 'redeem', command_key(body, f'admin-shop-complete-{order_id}'))

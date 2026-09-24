@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-24",
+  "engineering_markdown": 11,
+  "valid_local_links": 127,
+  "case_rows": 42,
+  "requirement_rows": 24,
+  "source_fingerprints": 117,
+  "known_qa_bypass_or_token_patterns": 0,
+  "git_diff_check": "passed",
+  "owned_qa_servers": "stopped",
+  "owned_d06_browser_database": "dropped and absence verified",
+  "qa_session_secret": "removed",
+  "source_commit_push": "not run",
+  "business_database_migration": "not run",
+  "deployment": "not run"
+}

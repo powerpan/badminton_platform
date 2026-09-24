@@ -1,51 +1,31 @@
 import hashlib
 import json
-from contextlib import asynccontextmanager
 from datetime import datetime
 
-import aiomysql
-from repositories.database import get_pool, fetch_all, fetch_one
+from repositories.database import fetch_all, fetch_one
+from repositories.transaction import transaction, audit
 from repositories.member_repository import get_or_create_account_for_update, insert_member_transaction_with_cursor
 from utils.booking_operations import at, price, validate_attendance
 from utils.response import ApiError
 
 
-@asynccontextmanager
-async def transaction(settings):
-    pool = await get_pool(settings)
-    async with pool.acquire() as connection:
-        await connection.autocommit(False)
-        try:
-            await connection.begin()
-            async with connection.cursor(aiomysql.DictCursor) as cursor:
-                yield cursor
-            await connection.commit()
-        except aiomysql.OperationalError as exc:
-            await connection.rollback()
-            if exc.args[0] in (1205, 1213):
-                raise ApiError(409, '该预约正在处理中，请刷新后重试', 409) from exc
-            raise
-        except Exception:
-            await connection.rollback()
-            raise
-        finally:
-            await connection.autocommit(True)
-
-
-async def audit(cursor, actor, module, action, target_id, detail):
-    await cursor.execute('''INSERT INTO operation_log
-        (user_id, username, role, module, action, target_type, target_id, detail)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)''',
-        (actor['id'], actor.get('username'), actor.get('role', 'user'), module, action, module, target_id,
-         json.dumps(detail, ensure_ascii=False, default=str)))
-
-
-async def list_blocks(settings, day_from, day_to, court_id=None):
+async def list_blocks(settings, day_from, day_to, court_id=None, block_type=None, schedule_status=None):
     args = [day_from, day_to]
     where = ''
     if court_id:
         where = ' AND b.court_id = %s'
         args.append(court_id)
+    if block_type:
+        where += ' AND b.block_type = %s'
+        args.append(block_type)
+    if schedule_status:
+        predicates = {
+            'released': "b.status='released'",
+            'scheduled': "b.status='active' AND TIMESTAMP(b.reserve_date,b.start_time)>NOW()",
+            'in_progress': "b.status='active' AND TIMESTAMP(b.reserve_date,b.start_time)<=NOW() AND TIMESTAMP(b.reserve_date,b.end_time)>NOW()",
+            'ended': "b.status='active' AND TIMESTAMP(b.reserve_date,b.end_time)<=NOW()",
+        }
+        where += ' AND ' + predicates[schedule_status]
     return await fetch_all(settings, '''SELECT b.*, c.court_no, c.court_name FROM court_block b
         JOIN court c ON c.id=b.court_id WHERE b.reserve_date BETWEEN %s AND %s''' + where +
         ' ORDER BY b.reserve_date, b.start_time, b.id', args)
@@ -67,18 +47,30 @@ async def conflicts(cursor, target, exclude=0):
     return await cursor.fetchone()
 
 
-async def create_block(settings, target, reason, actor):
+async def create_block(settings, target, reason, actor, block_type='maintenance'):
     async with transaction(settings) as cursor:
         await cursor.execute('SELECT id FROM court WHERE id=%s FOR UPDATE', (target['court_id'],))
         if not await cursor.fetchone():
             raise ApiError(404, '场地不存在', 404)
         if await conflicts(cursor, target) or await blocked(cursor, target):
             raise ApiError(409, '该时段有有效预约或维护安排，请先处理冲突', 409)
-        await cursor.execute('''INSERT INTO court_block (court_id,reserve_date,start_time,end_time,reason,created_by)
-            VALUES (%s,%s,%s,%s,%s,%s)''', (*target.values(), reason, actor['id']))
+        await cursor.execute('''INSERT INTO court_block (court_id,reserve_date,start_time,end_time,reason,created_by,block_type)
+            VALUES (%s,%s,%s,%s,%s,%s,%s)''', (*target.values(), reason, actor['id'], block_type))
         block_id = cursor.lastrowid
-        await audit(cursor, actor, 'court', 'block', block_id, {**target, 'reason': reason})
+        await audit(cursor, actor, 'court', 'block', block_id, {**target, 'reason': reason, 'block_type': block_type})
     return block_id
+
+
+async def classify_block(settings, block_id, block_type, actor):
+    async with transaction(settings) as cursor:
+        await cursor.execute('SELECT block_type FROM court_block WHERE id=%s FOR UPDATE', (block_id,))
+        row = await cursor.fetchone()
+        if not row:
+            raise ApiError(404, '维护安排不存在', 404)
+        if row['block_type'] == block_type:
+            return
+        await cursor.execute('UPDATE court_block SET block_type=%s WHERE id=%s', (block_type, block_id))
+        await audit(cursor, actor, 'court', 'classify_block', block_id, {'before': row['block_type'], 'after': block_type})
 
 
 async def release_block(settings, block_id, actor):
@@ -114,7 +106,7 @@ async def record_attendance(settings, reservation_id, outcome, actor):
 
 async def change_history(settings, reservation_id):
     rows = await fetch_all(settings, '''SELECT id,before_snapshot,after_snapshot,balance_change_cents,
-        points_change,created_at FROM reservation_change WHERE reservation_id=%s ORDER BY id DESC''', (reservation_id,))
+        points_change,pay_method,settlement_delta_cents,created_at FROM reservation_change WHERE reservation_id=%s ORDER BY id DESC''', (reservation_id,))
     for row in rows:
         for key in ('before_snapshot', 'after_snapshot'):
             if isinstance(row[key], str): row[key] = json.loads(row[key])
@@ -190,8 +182,8 @@ async def reschedule(settings, *, reservation_id, actor, target, daily_limit, ex
         if cost['payable_amount_cents'] != expected_amount:
             raise ApiError(409, '价格或会员权益已经变化，请重新报价', 409)
         delta = original['payable_amount_cents'] - cost['payable_amount_cents']
-        await cursor.execute("SELECT COALESCE(SUM(amount_cents),0) AS total FROM reservation_order WHERE user_id=%s AND status='pending' AND expires_at>NOW()", (actor['id'],))
-        held = int((await cursor.fetchone())['total'])
+        from repositories.balance_holds import held_balance
+        held = await held_balance(cursor,actor['id'])
         balance, points = int(account['balance_cents']), int(account['points'])
         if delta < 0 and balance - held + delta < 0:
             raise ApiError(409, '可用余额不足以支付改期差价', 409)

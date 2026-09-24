@@ -67,6 +67,7 @@ onMounted(async () => {
             <el-option label="用户" value="user" />
             <el-option label="场地" value="court" />
             <el-option label="预约" value="reservation" />
+            <el-option label="支付" value="payment" /><el-option label="储值" value="recharge" />
             <el-option label="公告" value="announcement" />
             <el-option label="通知" value="notification" />
             <el-option label="活动" value="event" />
@@ -77,8 +78,9 @@ onMounted(async () => {
         </el-form-item>
         <el-form-item label="操作">
           <el-select v-model="logFilters.action" clearable class="short-select" @change="refreshOperationLogs(true)">
-            <el-option label="维护占用" value="block" /><el-option label="释放维护" value="release" /><el-option label="到场记录" value="attendance" /><el-option label="预约改期" value="reschedule" />
+            <el-option label="维护占用" value="block" /><el-option label="安排分类" value="classify_block" /><el-option label="释放维护" value="release" /><el-option label="到场记录" value="attendance" /><el-option label="预约改期" value="reschedule" />
             <el-option label="新增" value="create" />
+            <el-option label="散客开单" value="walk_in_create" /><el-option label="模拟收款成功" value="mock_confirm" /><el-option label="模拟失败尝试" value="mock_fail" /><el-option label="退款" value="refund" /><el-option label="超时释放" value="expire" />
             <el-option label="修改" value="update" />
             <el-option label="状态调整" value="status" />
             <el-option label="角色调整" value="role" />

@@ -41,7 +41,7 @@ onMounted(() => {
       </figure>
       <dl class="venue-facts">
         <div><dt>营业时间</dt><dd>{{ businessHours }}</dd></div>
-        <div><dt>预约方式</dt><dd>在线选时 · 余额支付</dd></div>
+        <div><dt>预约方式</dt><dd>在线选时 · 余额 / 模拟支付宝</dd></div>
       </dl>
     </section>
     <BookingAgenda />

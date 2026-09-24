@@ -17,7 +17,7 @@ MEMBER_TRANSACTION_COLUMNS = """
     balance_change_cents, points_change,
     balance_before_cents, balance_after_cents,
     points_before, points_after,
-    reason, operator_id, operator_username, created_at
+    reason, operator_id, operator_username, payment_order_id, payment_refund_id, recharge_order_id, created_at
 """
 
 
@@ -133,14 +133,18 @@ async def insert_member_transaction_with_cursor(
     reason: str,
     operator_id: int | None,
     operator_username: str | None,
+    payment_order_id: int | None = None,
+    payment_refund_id: int | None = None,
+    recharge_order_id: int | None = None,
+    effect_key: str | None = None,
 ) -> None:
     await cursor.execute(
         """
         INSERT INTO member_account_transaction
           (user_id, reservation_id, shop_order_id, transaction_type, balance_change_cents, points_change,
            balance_before_cents, balance_after_cents, points_before, points_after,
-           reason, operator_id, operator_username)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           reason, operator_id, operator_username, payment_order_id, payment_refund_id, recharge_order_id, effect_key)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             user_id,
@@ -156,6 +160,7 @@ async def insert_member_transaction_with_cursor(
             reason,
             operator_id,
             operator_username,
+            payment_order_id, payment_refund_id, recharge_order_id, effect_key,
         ),
     )
 
@@ -242,7 +247,10 @@ async def get_booking_balance(settings: Settings, user_id: int) -> dict[str, Any
         SELECT ma.balance_cents,
           COALESCE((SELECT SUM(ro.amount_cents) FROM reservation_order ro
             WHERE ro.user_id = ma.user_id AND ro.status = 'pending'
-              AND ro.expires_at > NOW()), 0) AS pending_amount_cents
+              AND ro.pay_method='balance' AND ro.expires_at > NOW()), 0)
+          + COALESCE((SELECT SUM(so.total_amount_cents) FROM shop_order so
+            WHERE so.user_id=ma.user_id AND so.status='pending' AND so.pay_method='balance'
+              AND so.expires_at>NOW()),0) AS pending_amount_cents
         FROM member_account ma WHERE ma.user_id = %s
         """,
         (user_id,),

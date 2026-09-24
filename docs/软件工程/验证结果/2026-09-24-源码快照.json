@@ -1,0 +1,479 @@
+{
+  "date": "2026-09-24",
+  "base_commit": "7b27268cf50955fdecb03abbe19b67f020bc2e40",
+  "scope": "modified and untracked source/test files; uncommitted; excludes docs, credentials, test databases and dependencies",
+  "files": [
+    {
+      "path": "backend/handlers/admin.py",
+      "sha256": "0ccff377184bbe8b3adfd0ef8d2da52988e09260c83f6fb1459007a972be4e42"
+    },
+    {
+      "path": "backend/handlers/base.py",
+      "sha256": "45bc8d32a2d0ec4621a3af57a591efc8b82e1bbf51a84fc0166bfd75c86d266c"
+    },
+    {
+      "path": "backend/handlers/booking_operations.py",
+      "sha256": "e695cc8ccf6f2e46dca87dfde96fda3322f1bda68e4924964c16d62174866d71"
+    },
+    {
+      "path": "backend/handlers/community.py",
+      "sha256": "0fc1e5213fdff8d21a22fd055fdf8f5e2fe81f8a8e1498ad6935542dcbbd3e9b"
+    },
+    {
+      "path": "backend/handlers/courts.py",
+      "sha256": "c3a0292ac888946540b6558483253a09730ea26a4792e57d07f170f3d462c744"
+    },
+    {
+      "path": "backend/handlers/events.py",
+      "sha256": "d029663c43eddc08b71d8dd7a8e909b3636e35ca4638c6a177c99c6341007b4d"
+    },
+    {
+      "path": "backend/handlers/finance.py",
+      "sha256": "66e3646c52c6cd8b4f6c08a48979605e0c2847e4faf15dc8f1e89039ed25af29"
+    },
+    {
+      "path": "backend/handlers/members.py",
+      "sha256": "a9144a948cc4566650e4ddb241b5193aa4a51ab6dbdbf1a799f1cfbecc885d40"
+    },
+    {
+      "path": "backend/handlers/pickup.py",
+      "sha256": "56226645727c1f66f307e9d112219e18b8e740969d8d01b672d32b4fce07f988"
+    },
+    {
+      "path": "backend/handlers/recharges.py",
+      "sha256": "286a48f5252cbd69d492f23c5c0cfc8dda0eaa087042da856690e2e087f59bed"
+    },
+    {
+      "path": "backend/handlers/reservations.py",
+      "sha256": "c6a43f54fc527469ff092d2c9ca374608a22bc671147d551569ad3be3f7ba7b2"
+    },
+    {
+      "path": "backend/handlers/shop.py",
+      "sha256": "83cc396f98f24c3121e95feb14d00e1ea1c5bfe5ed187c57477815b88af9c0b8"
+    },
+    {
+      "path": "backend/handlers/staff_booking.py",
+      "sha256": "9a109654ad5e214747fb29d408d4637479c6971580deaed9207caeef8b6eb1b9"
+    },
+    {
+      "path": "backend/repositories/admin_booking_repository.py",
+      "sha256": "3383680fb1345d2f5a0d026fc852e553087e45d2b7b734e9f15d888e856fe487"
+    },
+    {
+      "path": "backend/repositories/balance_holds.py",
+      "sha256": "a68c0b1d15435dd51ea47f64fb5a6ac4b45b842e2cb59355e0f534e33bae379e"
+    },
+    {
+      "path": "backend/repositories/booking_operations_repository.py",
+      "sha256": "7201d95731cb54d81de224376dd5f4beb91ec84a3387e0f25bbc0a7a2274ec58"
+    },
+    {
+      "path": "backend/repositories/customer_booking_repository.py",
+      "sha256": "d76dbd5d41da043a43266147c992a4f0b76f350f5dc6adc009796a2a0f384790"
+    },
+    {
+      "path": "backend/repositories/finance_repository.py",
+      "sha256": "ec105c4ff87355f5cb5fc4bd70953291a4e233e1ec3f63903ac1596185ab1bf6"
+    },
+    {
+      "path": "backend/repositories/member_repository.py",
+      "sha256": "64a156e2f6140a0264904aad392f00dbe5cc31df326c5733a07b7945cdcb1559"
+    },
+    {
+      "path": "backend/repositories/payment_common.py",
+      "sha256": "52f4992ed999ed60b3c2ad1875e21ca0691f14970a336964a3e187dd2af41e41"
+    },
+    {
+      "path": "backend/repositories/recharge_repository.py",
+      "sha256": "4d444639f354bb21ec905faf45288e65ba5388a5fa0554c5d9daedf785263ac1"
+    },
+    {
+      "path": "backend/repositories/reservation_repository.py",
+      "sha256": "6a4465267e9354d40fd639cd3585f510f89672bbd77fcee045c23ec022c0fb5d"
+    },
+    {
+      "path": "backend/repositories/shop_checkout_repository.py",
+      "sha256": "69d2df88eedb6f47d5276395bb8febee92ca0a61254f8c373f6cd2d6484d5c08"
+    },
+    {
+      "path": "backend/repositories/shop_repository.py",
+      "sha256": "987eff93d0e567badb1bbebaa3071458c7778aea96b525c46e4dd3e63b4d0e17"
+    },
+    {
+      "path": "backend/repositories/shop_stock.py",
+      "sha256": "ffa663bbc1402ed103f80f155bc68cd1a8a52a0ac4b27f2b9ae398d8b8963eb0"
+    },
+    {
+      "path": "backend/repositories/staff_booking_repository.py",
+      "sha256": "6c6892c4da9111dfdbc71332025a2682e6240c1e16a56f8a23f91107d2ca9aa4"
+    },
+    {
+      "path": "backend/repositories/transaction.py",
+      "sha256": "a4054efe842b675153182085553efb2dc330d6f182b11beab0daf22b8a8d735e"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "sha256": "cbdb5ab48ce2237ba2ab6bffabda6cb48d6896eb3c77d0ad39f14cfed2a657e7"
+    },
+    {
+      "path": "backend/routes.py",
+      "sha256": "eaa113523a033a04f32b4f01a03faf8c13cca9b41ba6a404981ba0299ebd3d35"
+    },
+    {
+      "path": "backend/services/admin_user_service.py",
+      "sha256": "57c393271ea251bbd306adc219f2aaabc8a62eea7e29153063a9b0c5c06b2010"
+    },
+    {
+      "path": "backend/services/auth_service.py",
+      "sha256": "46ef62230891ef1e54717144596be2ecde6b84dde0b440c1b960fb5d34b60c41"
+    },
+    {
+      "path": "backend/services/booking_operations_service.py",
+      "sha256": "cbb8c6579debe18890f2d90560363800cd68dde016f20f8cf68d800adebcee39"
+    },
+    {
+      "path": "backend/services/court_service.py",
+      "sha256": "f6ffecdff73f48d98c235c8ad5033064365a3ee25a6eb1813c1e7484fd02fd7f"
+    },
+    {
+      "path": "backend/services/finance_service.py",
+      "sha256": "674744308fd2af89a4665b5bff447fc6306ede324780227ed6fde75a20c82f68"
+    },
+    {
+      "path": "backend/services/member_service.py",
+      "sha256": "b7d695523ea0fcd874e12b35be5ba9b4d3fdc269ac8565086af8468b57737131"
+    },
+    {
+      "path": "backend/services/operation_log_service.py",
+      "sha256": "b43e86124980d62d5f1c6a3c1dbcf5ed32dd0ebf6cc128685e4c4a90406d65d8"
+    },
+    {
+      "path": "backend/services/operations_statistics_service.py",
+      "sha256": "7a2556745268cfe4da65a8a2e198039d038ebf6ffeca312c036e039fcb2cba93"
+    },
+    {
+      "path": "backend/services/payment_service.py",
+      "sha256": "894faafcb4011b987e13dbf9c9cd416b8d34e91e9b9e2e10c6147cc64ba2fbc2"
+    },
+    {
+      "path": "backend/services/pickup_service.py",
+      "sha256": "b955d9a199050fd59f560825b4c8fe71b6b04632ff4c2afee22bed6b204818fe"
+    },
+    {
+      "path": "backend/services/recharge_service.py",
+      "sha256": "2fc8c028a4000d9ea73cd9af3530e5915445231b99794037e9142e4c42e17640"
+    },
+    {
+      "path": "backend/services/reservation_service.py",
+      "sha256": "d4110aa44339499da7594e815e33d8c3a70bb59e642c9873f8f50443f7d8d762"
+    },
+    {
+      "path": "backend/services/shop_service.py",
+      "sha256": "a3af3898009052f47f825f963f72a5d60766a0b00fdbb24fd99c8fec4f712305"
+    },
+    {
+      "path": "backend/services/staff_booking_service.py",
+      "sha256": "9bf5b14c61b3767dc4a81575268e2f8bd8d6311a2f28ffd35b2f201555b8f505"
+    },
+    {
+      "path": "backend/tests/fixtures/phase7_schema.sql",
+      "sha256": "f3a149dbae8c3c7ff3db3e0f2a69d5bf74c8b996449637884b83f1f1d1366170"
+    },
+    {
+      "path": "backend/tests/integration_acceptance_boundaries.py",
+      "sha256": "2db83a56bbed28defc5db79db8ecbe16f24e9b01b65a87f72fb7d4a9bee24e54"
+    },
+    {
+      "path": "backend/tests/integration_admin_bookings.py",
+      "sha256": "3eb602dc942efd2e6638bc9688ee4224ceb5dac31be0ce0ddc8bf555818dba53"
+    },
+    {
+      "path": "backend/tests/integration_checkout.py",
+      "sha256": "d59b8c36e660c6aab8f1988785c9b0e0a7684334241a0c14099fbfda227b12d2"
+    },
+    {
+      "path": "backend/tests/integration_customer_payments.py",
+      "sha256": "c844518ba2c0a3d11e3b1842401cd34ff6c6598aed8ce72027378e05fab4b0f7"
+    },
+    {
+      "path": "backend/tests/integration_delivery.py",
+      "sha256": "8dd3d6640545f10aef696e7c10de18c0f5ecb713f65625709dbcabe5c0f1b19e"
+    },
+    {
+      "path": "backend/tests/integration_finance.py",
+      "sha256": "4e6aaae4598ea4f48bc5bdafd5c50162dd283a72354354aff42a52db898fd42f"
+    },
+    {
+      "path": "backend/tests/integration_operations.py",
+      "sha256": "6dba9cb3977cf168c900af67b67a50c5e5d1df7b6b5ac0d69f17c06869163c86"
+    },
+    {
+      "path": "backend/tests/integration_recharges.py",
+      "sha256": "4b453f2bc3e35ee2a6aeefcaefbb264ee188662597a0f3740683fcc85cf2c959"
+    },
+    {
+      "path": "backend/tests/integration_shop_payments.py",
+      "sha256": "d964508689c5c6a252a8a9453f44c0d219e9fec20b61d632edcddb7f8d2fd1ac"
+    },
+    {
+      "path": "backend/tests/integration_staff_foundation.py",
+      "sha256": "666db2a38ad8131b92e0dc3a90250c5d138efcac43beabab1c076d5b79655b20"
+    },
+    {
+      "path": "backend/tests/integration_walkin.py",
+      "sha256": "b613cf14b9fb7aebb570757924f65ef7324cbd20e3e5a669619b2d1a0cabc179"
+    },
+    {
+      "path": "backend/tests/test_booking.py",
+      "sha256": "66c4cac453857d631938c582b4e2eeb204593630eae98403f1a299bc4e0fa249"
+    },
+    {
+      "path": "backend/tests/test_checkout.py",
+      "sha256": "817edee6ea7dfc34f07219b70e5e83a9fc7d330d336e3047d0e4986703a110b2"
+    },
+    {
+      "path": "backend/tests/test_operations.py",
+      "sha256": "fa330dce9177239132f769d18245a7621d46f2019e04e93077e607f089a0f975"
+    },
+    {
+      "path": "backend/tests/test_staff_booking_rules.py",
+      "sha256": "cd3def8aeb28594a5ee84c04fd1753bbe83dde939697de737aa44239f57c3eb2"
+    },
+    {
+      "path": "backend/tests/test_staff_roles.py",
+      "sha256": "99326ad43654f941c9c836490e40a4f5268327628744de9e4efe873b7cfd4563"
+    },
+    {
+      "path": "backend/tests/test_transaction_boundary.py",
+      "sha256": "399f12287b3efe5c85b7e9b4b1cf22c6fecba63c13c2c38bb160ca9fc174b68f"
+    },
+    {
+      "path": "backend/utils/roles.py",
+      "sha256": "55677fcb0b9fe637c93e1e9eaab7d193cb15bca9e780288f0dd574e62911c90f"
+    },
+    {
+      "path": "backend/utils/staff_booking.py",
+      "sha256": "ae7a162107e378d7e7afb841ad32458191633fb9def9dbb4399a95f6d00be23d"
+    },
+    {
+      "path": "frontend/src/App.vue",
+      "sha256": "d6e40b9814a159acc943a2331551e83ddb0e08f9786796bbe6d481d058e6160a"
+    },
+    {
+      "path": "frontend/src/api/admin.ts",
+      "sha256": "3a3e7e02bed50da352a736d78e6fb77b7e2b6bef47774375f56341d23eb4b757"
+    },
+    {
+      "path": "frontend/src/api/auth.ts",
+      "sha256": "091f548f5aeede88abeb02caa1202d82bc98063e82b9b00b5714f09dbd3745c7"
+    },
+    {
+      "path": "frontend/src/api/finance.ts",
+      "sha256": "69a952607b60423a5ae35bbb724e3c7d7001b500108ca1ff5e6da6d39be06ec9"
+    },
+    {
+      "path": "frontend/src/api/member.ts",
+      "sha256": "4260a1145a28a30740a6abbaa712818e6418851e4d77e74ca44a02d44f8b3d4b"
+    },
+    {
+      "path": "frontend/src/api/operations.ts",
+      "sha256": "64c7d12022bd8b3dacea3eda3a57d549f706bb5ffdeb84d167c35e5f8be4a324"
+    },
+    {
+      "path": "frontend/src/api/payment.ts",
+      "sha256": "7b45f19df328d8c7dd0276157a9e961a9e3068e89e27314d882a1ce3eb8371d9"
+    },
+    {
+      "path": "frontend/src/api/recharge.ts",
+      "sha256": "72a6246ac4bea48fe01d81b982e61fa5f9e45c7d400554689549f3b40b24e552"
+    },
+    {
+      "path": "frontend/src/api/reservation.ts",
+      "sha256": "6be21776f1c6763814e9d12f1be67ec23524e056ae63efed66a38c4450934141"
+    },
+    {
+      "path": "frontend/src/api/shop.ts",
+      "sha256": "80fdf54d16d4650afafc947cd1098257e3a4d262d5377b0e405d1679e88ca1a7"
+    },
+    {
+      "path": "frontend/src/api/staff.ts",
+      "sha256": "9bdcca218a5bc83baadc3a9ba259419a2dfdbee2591f93bf14139f5c682d6664"
+    },
+    {
+      "path": "frontend/src/components/BookingFinancialRecords.vue",
+      "sha256": "d6a04b89ea4f468eb3676e9b22c2fb9f6a61997ebcc7264855a12bd7b3ab2678"
+    },
+    {
+      "path": "frontend/src/components/BookingReceipt.vue",
+      "sha256": "35055c86a51e7468b288250878c2aa4981645621cc1d2c66084e7b4eebde132d"
+    },
+    {
+      "path": "frontend/src/components/CourtBlockManager.vue",
+      "sha256": "6b734f5391833159fabd08068f80b7fc9793f54627fb299544354554589d9c65"
+    },
+    {
+      "path": "frontend/src/components/OperationsDashboard.vue",
+      "sha256": "3d8c7ee1e26db81d842d5a004a30027710f891339e75c757cf97e636dd72fc10"
+    },
+    {
+      "path": "frontend/src/components/PaymentDialog.vue",
+      "sha256": "0815441baab8c3e1f8ada1004545d9fe8cca743f8f13caea2a3e0592a40f3b90"
+    },
+    {
+      "path": "frontend/src/components/PickupCodeDialog.vue",
+      "sha256": "9a9ed54e16e608efccf693fd21eb7703cef1c60743370e64c874b710547f18ad"
+    },
+    {
+      "path": "frontend/src/components/PickupWorkbench.vue",
+      "sha256": "334d489b77746804b05e1259009f2b08c53840fd57bbee8a40cbe87639b7a373"
+    },
+    {
+      "path": "frontend/src/components/RechargeWorkbench.vue",
+      "sha256": "e13083f2fbe62fb08fc35129bb9619ee3c6336fc89e0d31e80118fa05b48482a"
+    },
+    {
+      "path": "frontend/src/components/RescheduleDrawer.vue",
+      "sha256": "e678a24ca0e63e7c35dbb1eb1e52e9106544942c9c0c3abd4638eb7ec281309d"
+    },
+    {
+      "path": "frontend/src/components/ReservationHistory.vue",
+      "sha256": "3b6b696a378e51ba2708cbe984b77d46169aad992e5b1988f400c8ab73dbd206"
+    },
+    {
+      "path": "frontend/src/components/WalkInForm.vue",
+      "sha256": "0450ad84080c26178c3f687f30546e4f08f7e62483f63e4186169643471a7e8e"
+    },
+    {
+      "path": "frontend/src/main.ts",
+      "sha256": "09a5f0289cee149480293a8c25f419cc44ce47d18c8f0bd089a9e0ecba500e7c"
+    },
+    {
+      "path": "frontend/src/router/index.ts",
+      "sha256": "08174138724b2eb6a3689e3e5e55130991605269979bfa28b0f64c2f5d30570a"
+    },
+    {
+      "path": "frontend/src/stores/auth.ts",
+      "sha256": "a23c2a09f6fde19d0e6344fa8a163990ac1183d3d34ecae5bf94aca130fb8119"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "sha256": "e9f64dfd54f662d9f76014ba5534f154b9c47543cdd06596bad4e4104ea3cbda"
+    },
+    {
+      "path": "frontend/src/styles/admin-legacy.css",
+      "sha256": "b1c9b3ca07ad227c4dba7094c4c26c6163160c0271f9c7db49359daa396e5080"
+    },
+    {
+      "path": "frontend/src/styles/staff.css",
+      "sha256": "46e6513596dfebaaee18fce69d596a0d400abcf24249795617acaa1f5a0bfd05"
+    },
+    {
+      "path": "frontend/src/utils/roles.ts",
+      "sha256": "63bc762648bb2a9be3926afce1b3717f7ac3e924cfb38e4c023db6c56e8e63ba"
+    },
+    {
+      "path": "frontend/src/views/AdminDashboard.vue",
+      "sha256": "7ac3841e83c48fd80e3c65723417e06fd6ec991d63b4b147d772c89da12ab296"
+    },
+    {
+      "path": "frontend/src/views/CommunityView.vue",
+      "sha256": "f07ba87b9831a124891f9f8e5224025ea58307a2f4dc5bc6c1cdb656481bfb04"
+    },
+    {
+      "path": "frontend/src/views/CourtsView.vue",
+      "sha256": "829927de193a8db1320c71847f6da274b68e641ba8cec7fb5129ba7d3fa5d29d"
+    },
+    {
+      "path": "frontend/src/views/EventDetailView.vue",
+      "sha256": "c800cc8a29e48a4f0adca34df6f28de127ae3c77f3a18f5efa56eea27e216487"
+    },
+    {
+      "path": "frontend/src/views/FrontdeskView.vue",
+      "sha256": "3b202dc518af7343e8af1ae506d1db3c38abf336525ea17ae734e7f7c15108bf"
+    },
+    {
+      "path": "frontend/src/views/HelpCenterView.vue",
+      "sha256": "de59fdabb90fdcfbdcd2a6767756c05b130cf24ff736d9d7a0ed1c3f9bf41d83"
+    },
+    {
+      "path": "frontend/src/views/HomeView.vue",
+      "sha256": "02fa40132d1c5491e862d55b1f04f3c3726c979b04907fce99c777a20f4fcb63"
+    },
+    {
+      "path": "frontend/src/views/LoginView.vue",
+      "sha256": "64b1cbc442b372853edc6b69ea198eaf216e2da4e22a2cc7812159aee40e299d"
+    },
+    {
+      "path": "frontend/src/views/MaintenanceView.vue",
+      "sha256": "d8465cb3e289a85ab782148fc7c8b19e741ed73d8ed6de524238863aad452289"
+    },
+    {
+      "path": "frontend/src/views/NotificationsView.vue",
+      "sha256": "c79ba771bf179d28547676e0f45f63f2b4a0d978b0509ff163e960500574ee80"
+    },
+    {
+      "path": "frontend/src/views/ProfileView.vue",
+      "sha256": "fb59d452c13ae39fbd0bd1e51bfba84cef6f7be78b73dd4e47bc0b74aee4666b"
+    },
+    {
+      "path": "frontend/src/views/ReservationsView.vue",
+      "sha256": "160b6ccea176bd332d9eab9397cdfa1a975fda270e5ea2b66d448c204e67ce38"
+    },
+    {
+      "path": "frontend/src/views/ShopOrdersView.vue",
+      "sha256": "66f91eeeaf213213046a2ec7f86a66ebca0fab7ce858cd1ad0563015a205d0e0"
+    },
+    {
+      "path": "frontend/src/views/ShopView.vue",
+      "sha256": "7ad9899939068191d944d0444da1507f0c29688054ea54edc5527d246d94f77d"
+    },
+    {
+      "path": "frontend/src/views/admin/LogsPage.vue",
+      "sha256": "2cb5dbb6932b54eb9d5acb3365fa0b733915bccb17b66986e78ee3cb188181b7"
+    },
+    {
+      "path": "frontend/src/views/admin/OrdersPage.vue",
+      "sha256": "6f79edfc211f7f70c5ace2ce92c465986c4bbdb093556b5daabe1122188b3def"
+    },
+    {
+      "path": "frontend/src/views/admin/ProductsPage.vue",
+      "sha256": "f9bbf51040fa180ef751e9893f703477c3c309837471b0161ea32c55e1d7d3fb"
+    },
+    {
+      "path": "frontend/src/views/admin/RechargesPage.vue",
+      "sha256": "156fd73eac2c550a8f48b7b9ff216d8a80bccf593fa7c9c310de5f8b47cbfe97"
+    },
+    {
+      "path": "frontend/src/views/admin/ReservationsPage.vue",
+      "sha256": "6585c30a807dcded9e2b60a81a81c9b6d3cd182f8c70c1059b2af47ed4f3e20e"
+    },
+    {
+      "path": "frontend/src/views/admin/TransactionsPage.vue",
+      "sha256": "2ff2ba3bfa8133f66f9f7e933f7497ff89a08a3f4498609ef9653c41390488c3"
+    },
+    {
+      "path": "frontend/src/views/admin/UsersPage.vue",
+      "sha256": "a52a1838c6233e52ba0eeb38873fcb40d8424aadb01902a190746d592fab7701"
+    },
+    {
+      "path": "frontend/src/views/admin/shared.ts",
+      "sha256": "9f5b73c7b692cf26c0487c678ae383a0f22b5023da437cf5cde9019413bea461"
+    },
+    {
+      "path": "scripts/benchmark_staff_payments.py",
+      "sha256": "753821ae26f4c69ada361a0e831f230f354ce9e4769d50c8810f2bcb6c33b33d"
+    },
+    {
+      "path": "scripts/migrate_staff_payments.py",
+      "sha256": "429c40ec5b9defe79e059b59bb21ce1a7fbe9982eb17923610896597d5d85253"
+    },
+    {
+      "path": "sql/init.sql",
+      "sha256": "a756c9c9fbdaf530a5c548dd6c95edb5d02581922407dcf4e75b700a814780c0"
+    }
+  ],
+  "delivery_normalization": {
+    "file": "backend/repositories/transaction.py",
+    "change": "Remove trailing blank line only; no behavioral change."
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "passed": 9,
+  "checks": [
+    {
+      "cases": [
+        "TC-03",
+        "TC-04"
+      ],
+      "result": "all admin endpoints reject real non-admin JWTs; privileged registration rejected; all table rows unchanged",
+      "denied_http_requests": 156
+    },
+    {
+      "cases": [
+        "TC-05"
+      ],
+      "result": "same real JWT immediately follows database role, disabled state and restored permissions"
+    },
+    {
+      "cases": [
+        "TC-07"
+      ],
+      "result": "30-minute and two-segment quotes equal full segment totals at two court prices; cannot cross blocked segment; adjacent segment remains bookable"
+    },
+    {
+      "cases": [
+        "TC-08"
+      ],
+      "result": "past, future, outside hours, unaligned and overlong walk-ins rejected; three guests accepted despite personal daily limit one"
+    },
+    {
+      "cases": [
+        "TC-09",
+        "TC-13"
+      ],
+      "result": "one online customer and two frontdesks race for adjacent segment: exactly one hold; paid original end time remains unchanged"
+    },
+    {
+      "cases": [
+        "TC-12",
+        "TC-13"
+      ],
+      "result": "maintenance blocks extension; repeated identical creation returns one child; failed/unpaid child keeps parent deadline; repeated collection charges child only once"
+    },
+    {
+      "cases": [
+        "TC-10",
+        "TC-11"
+      ],
+      "result": "two-hour order payable at 14:59:59, rejected at first segment end 15:00; without worker query/payment expire once; concurrent sweep/payment and repeated cleanup leave no duplicate effect; court reusable"
+    },
+    {
+      "cases": [
+        "TC-16"
+      ],
+      "result": "expired gold member pays original price and receives equal points with both channels; only balance channel deducts wallet"
+    },
+    {
+      "cases": [
+        "TC-04",
+        "TC-28",
+        "TC-29"
+      ],
+      "result": "real HTTP ownership and anonymous pickup-code boundaries; unpaid/forged codes rejected; frontdesk lookup does not deliver and authorized redemption changes status without another stock debit"
+    }
+  ],
+  "scope": "owned disposable MySQL; real JWT/HTTP and database-clock boundary tests"
+}

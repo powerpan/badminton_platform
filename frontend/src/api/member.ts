@@ -3,6 +3,7 @@ import type { ApiResponse } from "./auth";
 import type { PageResult } from "./court";
 
 export type MemberTransactionType =
+  | "staff_recharge"
   | "admin_adjust"
   | "reservation_charge"
   | "reservation_refund"
@@ -23,6 +24,8 @@ export interface MemberTransaction {
   reason: string | null;
   reservation_id: number | null;
   shop_order_id: number | null;
+  recharge_order_id: number | null;
+  payment_order_id: number | null;
   operator_username: string | null;
   created_at: string;
 }

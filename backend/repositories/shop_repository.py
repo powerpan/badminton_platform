@@ -5,18 +5,26 @@ import aiomysql
 from config.settings import Settings
 from repositories import member_repository
 from repositories.database import execute, fetch_all, fetch_one, get_pool
+from repositories.shop_stock import RESERVED_SQL, held_quantity
+from repositories.transaction import transaction
+from utils.response import ApiError
 
 
 PRODUCT_COLUMNS = (
     "id, product_no, product_name, description, image_url, price_cents, stock, sold_count, "
-    "status, created_at, updated_at"
+    "status, created_at, updated_at, "
+    f"{RESERVED_SQL} AS reserved_stock, GREATEST(stock-({RESERVED_SQL}),0) AS available_stock"
 )
 
 ORDER_COLUMNS = (
     "o.id, o.order_no, o.user_id, u.username, u.nickname, o.status, o.total_amount_cents, "
     "o.pay_method, o.paid_at, o.completed_at, o.canceled_at, o.cancel_reason, o.remark, "
     "o.refund_requested_at, o.refund_request_reason, o.refund_reviewed_at, o.refund_reject_reason, "
-    "o.created_at, o.updated_at"
+    "o.created_at, o.updated_at, o.expires_at, o.operator_id, "
+    "(SELECT p.id FROM payment_order p WHERE p.shop_order_id=o.id LIMIT 1) AS payment_id, "
+    "(SELECT p.status FROM shop_pickup p WHERE p.shop_order_id=o.id) AS pickup_status, "
+    "(SELECT p.redeemed_at FROM shop_pickup p WHERE p.shop_order_id=o.id) AS redeemed_at, "
+    "(SELECT u2.username FROM shop_pickup p JOIN user u2 ON u2.id=p.redeemed_by WHERE p.shop_order_id=o.id) AS redeemed_by_name"
 )
 
 ORDER_ITEM_COLUMNS = (
@@ -116,21 +124,15 @@ async def update_product(
     stock: int,
     status: int,
 ) -> None:
-    await execute(
-        settings,
-        """
-        UPDATE shop_product
-        SET product_no = %s,
-            product_name = %s,
-            description = %s,
-            image_url = %s,
-            price_cents = %s,
-            stock = %s,
-            status = %s
-        WHERE id = %s
-        """,
-        (product_no, product_name, description, image_url, price_cents, stock, status, product_id),
-    )
+    async with transaction(settings) as cursor:
+        await cursor.execute('SELECT id FROM shop_product WHERE id=%s FOR UPDATE', (product_id,))
+        if not await cursor.fetchone():
+            raise ApiError(404, '商品不存在', 404)
+        if stock < await held_quantity(cursor, product_id):
+            raise ApiError(409, '库存不能低于有效待付款订单已占用的数量', 409)
+        await cursor.execute('''UPDATE shop_product SET product_no=%s,product_name=%s,description=%s,image_url=%s,
+            price_cents=%s,stock=%s,status=%s WHERE id=%s''',
+            (product_no, product_name, description, image_url, price_cents, stock, status, product_id))
 
 
 async def update_product_status(settings: Settings, product_id: int, status: int) -> None:
@@ -187,7 +189,7 @@ async def create_paid_order_atomic(
                     if int(product["status"]) != 1:
                         await connection.rollback()
                         return None, "product_disabled"
-                    if int(product["stock"]) < quantity:
+                    if int(product["stock"]) - await held_quantity(cursor, product_id) < quantity:
                         await connection.rollback()
                         return None, "insufficient_stock"
                     price_cents = int(product["price_cents"])
@@ -214,8 +216,8 @@ async def create_paid_order_atomic(
                 if balance_before < total_amount_cents:
                     await connection.rollback()
                     return None, "insufficient_balance"
-                await cursor.execute("SELECT COALESCE(SUM(amount_cents),0) AS held FROM reservation_order WHERE user_id=%s AND status='pending' AND expires_at>NOW()", (user_id,))
-                held = int((await cursor.fetchone())['held'])
+                from repositories.balance_holds import held_balance
+                held = await held_balance(cursor,user_id)
                 if balance_before - held < total_amount_cents:
                     await connection.rollback()
                     return None, 'insufficient_available_balance'

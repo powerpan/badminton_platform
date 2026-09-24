@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { getAllCourts, getReservationRules, type Court, type ReservationRules } from '../api/court';
-import { createCourtBlock, getCourtBlocks, releaseCourtBlock, type CourtBlock } from '../api/operations';
+import { classifyCourtBlock, createCourtBlock, getCourtBlocks, releaseCourtBlock, type CourtBlock } from '../api/operations';
 import { addDays, confirmAction } from '../views/admin/shared';
 const items = ref<CourtBlock[]>([]), courts = ref<Court[]>([]), rules = ref<ReservationRules>();
 const visible = ref(false), loading = ref(false), saving = ref(false), error = ref('');
 const range = ref({ date_from: addDays(0), date_to: addDays(7) });
-const form = ref({ court_id: 0, reserve_date: addDays(1), start_time: '09:00', end_time: '10:00', reason: '' });
+const form = ref({ court_id: 0, reserve_date: addDays(1), start_time: '09:00', end_time: '10:00', reason: '', block_type: 'maintenance' });
 const step = computed(() => { const n = rules.value?.slot_interval_minutes || 60; return `${String(Math.floor(n / 60)).padStart(2,'0')}:${String(n % 60).padStart(2,'0')}`; });
 async function load() {
   loading.value = true; error.value = '';
@@ -18,7 +18,7 @@ async function open() {
   error.value = '';
   try {
     const [c,r] = await Promise.all([getAllCourts(),getReservationRules()]); courts.value = c; rules.value = r.data;
-    form.value = { court_id: courts.value[0]?.id || 0, reserve_date: addDays(1), start_time: r.data.business_start_time, end_time: r.data.business_end_time, reason: '' }; visible.value = true;
+    form.value = { court_id: courts.value[0]?.id || 0, reserve_date: addDays(1), start_time: r.data.business_start_time, end_time: r.data.business_end_time, reason: '', block_type: 'maintenance' }; visible.value = true;
   } catch (e) { error.value = e instanceof Error ? e.message : '无法打开维护表单'; }
 }
 async function save() {
@@ -32,6 +32,11 @@ async function release(row: CourtBlock) {
   try { await releaseCourtBlock(row.id); await load(); }
   catch (e) { error.value = e instanceof Error ? e.message : '释放失败'; }
 }
+async function classify(row: CourtBlock, blockType: string) {
+  if (!await confirmAction(`将 ${row.court_name} 的这项安排归类为${blockType === 'maintenance' ? '维修' : '包场'}？`)) return;
+  try { await classifyCourtBlock(row.id, blockType); await load(); }
+  catch (e) { error.value = e instanceof Error ? e.message : '分类失败'; }
+}
 onMounted(load);
 </script>
 <template>
@@ -42,8 +47,9 @@ onMounted(load);
     <el-table :data="items" v-loading="loading" empty-text="此日期范围暂无维护安排">
       <el-table-column prop="court_name" label="场地" min-width="100" /><el-table-column prop="reserve_date" label="日期" min-width="120" />
       <el-table-column label="时间" min-width="130"><template #default="{ row }">{{ row.start_time }}–{{ row.end_time }}</template></el-table-column>
+      <el-table-column label="类别" min-width="110"><template #default="{ row }">{{ row.block_type === 'maintenance' ? '维修' : row.block_type === 'private_booking' ? '包场' : '历史未分类' }}</template></el-table-column>
       <el-table-column prop="reason" label="原因" min-width="180" /><el-table-column label="状态" min-width="90"><template #default="{ row }">{{ row.status === 'active' ? '占用中' : '已释放' }}</template></el-table-column>
-      <el-table-column label="操作" width="85" fixed="right"><template #default="{ row }"><el-button link type="primary" :disabled="row.status !== 'active'" @click="release(row)">释放</el-button></template></el-table-column>
+      <el-table-column label="操作" width="190" fixed="right"><template #default="{ row }"><el-dropdown trigger="click" @command="classify(row, $event)"><el-button link>归类</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="maintenance">维修</el-dropdown-item><el-dropdown-item command="private_booking">包场</el-dropdown-item></el-dropdown-menu></template></el-dropdown><el-button link type="primary" :disabled="row.status !== 'active'" @click="release(row)">释放</el-button></template></el-table-column>
     </el-table>
   </section>
   <el-drawer v-model="visible" title="新增维护时段" size="min(520px, 100vw)" class="admin-edit-drawer" :close-on-click-modal="!saving" :close-on-press-escape="!saving" :show-close="!saving">
@@ -53,6 +59,7 @@ onMounted(load);
       <el-form-item label="日期"><el-date-picker v-model="form.reserve_date" value-format="YYYY-MM-DD" :clearable="false" /></el-form-item>
       <el-form-item label="开始时间"><el-time-select v-model="form.start_time" :start="rules.business_start_time" :end="rules.business_end_time" :step="step" :clearable="false" /></el-form-item>
       <el-form-item label="结束时间"><el-time-select v-model="form.end_time" :start="rules.business_start_time" :end="rules.business_end_time" :step="step" :min-time="form.start_time" :clearable="false" /></el-form-item>
+      <el-form-item label="类别"><el-select v-model="form.block_type"><el-option label="维修（维修人员可见）" value="maintenance" /><el-option label="包场" value="private_booking" /></el-select></el-form-item>
       <el-form-item label="原因"><el-input v-model="form.reason" type="textarea" :rows="3" maxlength="255" placeholder="例如：地胶维护，预计完成后恢复预约" /></el-form-item>
       <el-button type="primary" native-type="submit" :loading="saving">保存维护安排</el-button>
     </el-form>

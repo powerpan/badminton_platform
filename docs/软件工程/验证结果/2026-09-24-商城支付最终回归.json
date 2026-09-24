@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "checks": [
+    "zero-balance mock checkout; no shop discount/points; idempotent creation and pending stock hold without a pickup code",
+    "stock cannot drop below holds; existing price and delisted pending order still payable; 20 confirmations collect once with rollback on pickup failure",
+    "owner-only credential; lookup is read-only; refund freeze/reject restores; retry does not re-freeze; staff/admin concurrent redemption preserves first actor and never re-deducts stock",
+    "balance available after other holds; exact debit, audit-fault rollback, refund once and unpaid cancel only releases holds",
+    "simulated refund never adds wallet money; expired pending collection releases stock without inventing refunds",
+    "last item claimed by two users: exactly one effective hold and one sale",
+    "expired last-item payment, new checkout and cleanup race: expired order cannot pay; replacement is the only sale and pickup",
+    "refund versus pickup race: only one legal terminal transition and corresponding stock outcome",
+    "legacy paid order needs original ledger proof, receives no fabricated payment; refund is once; unknown history cannot mint credit or pickup"
+  ],
+  "database_scope": "disposable only"
+}

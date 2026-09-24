@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "checks": [
+    "real SQL backup/restore preserves all phase7 rows and schema",
+    "migration interrupted after 10 committed DDL statements resumes remaining actions exactly once",
+    "legacy row fingerprints conserved; repeat applies zero DDL",
+    "all 25 tables: column definitions, indexes, FK definitions match fresh init",
+    "legacy channels, actors and payment/pickup evidence are not fabricated",
+    "admin creates frontdesk and maintenance accounts via service",
+    "repair-only queries, explicit reclassification and idempotent audit",
+    "real SQL backup/restore preserves phase8 schema, staff roles, recharge, payment/refund, pickup/holds and audit records"
+  ],
+  "migration_statements": 44,
+  "interrupted_after": 10,
+  "resumed_statements": 34,
+  "database_scope": "disposable only"
+}

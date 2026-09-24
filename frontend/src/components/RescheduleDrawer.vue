@@ -6,7 +6,7 @@ import type { Reservation } from '../api/reservation';
 import { getRescheduleQuote, rescheduleReservation, type BookingTarget, type RescheduleQuote } from '../api/operations';
 const visible = defineModel<boolean>({ default: false });
 const props = defineProps<{ reservation: Reservation | null }>();
-const emit = defineEmits<{ changed: [] }>();
+const emit = defineEmits<{ changed: []; paymentRequired: [paymentId: number] }>();
 const courts = ref<Court[]>([]), rules = ref<ReservationRules>();
 const target = ref<BookingTarget>({ court_id: 0, reserve_date: '', start_time: '', end_time: '' });
 const quote = ref<RescheduleQuote>(), error = ref(''), loading = ref(false), submitting = ref(false), requestKey = ref('');
@@ -36,8 +36,10 @@ async function submit() {
   if (!quote.value || !props.reservation || submitting.value) return;
   submitting.value = true; error.value = '';
   try {
-    await rescheduleReservation(props.reservation.id, { ...quote.value.target, expected_revision: quote.value.revision, expected_amount_cents: quote.value.payable_amount_cents, request_key: requestKey.value });
-    visible.value = false; emit('changed');
+    const response = await rescheduleReservation(props.reservation.id, { ...quote.value.target, expected_revision: quote.value.revision, expected_amount_cents: quote.value.payable_amount_cents, request_key: requestKey.value });
+    visible.value = false;
+    if (response.data.requires_payment && response.data.payment) emit('paymentRequired', response.data.payment.id);
+    else emit('changed');
   } catch (e) {
     error.value = e instanceof Error ? e.message : '改期失败，请重试';
     if (e instanceof ApiRequestError && e.status === 409) { quote.value = undefined; requestKey.value = ''; }
@@ -61,7 +63,8 @@ onUnmounted(() => { version++; });
     </el-form>
     <div v-if="quote" class="reschedule-quote" role="status">
       <p>新场次合计 <strong>¥{{ (quote.payable_amount_cents / 100).toFixed(2) }}</strong></p>
-      <p>{{ quote.difference_cents > 0 ? '需补差价' : quote.difference_cents < 0 ? '退回余额' : '无需补差价' }} <b v-if="quote.difference_cents">¥{{ (Math.abs(quote.difference_cents) / 100).toFixed(2) }}</b></p>
+      <p>{{ quote.difference_cents > 0 ? '需补差价' : quote.difference_cents < 0 ? '原渠道退款' : '无需补差价' }} <b v-if="quote.difference_cents">¥{{ (Math.abs(quote.difference_cents) / 100).toFixed(2) }}</b></p>
+      <p v-if="reservation?.order_pay_method === 'mock_alipay' && quote.difference_cents > 0">确认后生成模拟支付宝补差单，付款成功才会改期，目标场次不提前占用。</p>
       <p class="muted-text">按新日期的会员权益结算。确认成功后更新原预约，失败时保留原场次。</p>
       <el-button type="primary" :loading="submitting" @click="submit">确认改期</el-button>
     </div>

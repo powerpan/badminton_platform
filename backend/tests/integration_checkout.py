@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(ROOT/'backend/.env')
 from config.settings import load_settings
 from repositories.database import execute, fetch_one, fetch_all, get_pool, close_pool
-from services import shop_service
+from services import shop_service, payment_service
 from repositories import reservation_repository
 from utils.response import ApiError
 
@@ -24,7 +24,7 @@ async def run():
     settings=replace(load_settings(),mysql_database=name)
     actor={'id':2,'username':'demo_player','role':'user'}
     async def snapshot():
-        return [await fetch_all(settings,q) for q in ['SELECT * FROM member_account WHERE user_id=2','SELECT * FROM shop_product ORDER BY id','SELECT * FROM shop_order','SELECT * FROM shop_order_item','SELECT * FROM member_account_transaction WHERE user_id=2']]
+        return [await fetch_all(settings,q) for q in ['SELECT * FROM member_account WHERE user_id=2','SELECT * FROM shop_product ORDER BY id','SELECT * FROM shop_order','SELECT * FROM shop_order_item','SELECT * FROM member_account_transaction WHERE user_id=2','SELECT * FROM payment_order','SELECT * FROM shop_stock_hold','SELECT * FROM shop_pickup']]
     async def reject(awaitable, expected_status=409):
         try: await awaitable
         except ApiError as e: assert e.status_code==expected_status,(e.status_code,e.message)
@@ -61,7 +61,9 @@ async def run():
             before=await snapshot();await reject(shop_service.create_order(settings,current_user=actor,body=fresh),status);assert before==await snapshot()
         await execute(settings,'UPDATE member_account SET balance_cents=%s WHERE user_id=2',(saved,))
         order=await shop_service.create_order(settings,current_user=actor,body=fresh)
-        assert order['total_amount_cents']==1500
+        assert order['total_amount_cents']==1500 and order['status']=='pending'
+        assert (await fetch_one(settings,'SELECT balance_cents FROM member_account WHERE user_id=2'))['balance_cents']==saved
+        await payment_service.act(settings,actor,order['payment_id'],'balance_pay',{'request_key':'checkout-balance-confirm'})
         assert (await fetch_one(settings,'SELECT balance_cents FROM member_account WHERE user_id=2'))['balance_cents']==saved-1500
         print('PASS: current/available balance enforced; freshly confirmed price charged exactly')
         before=await snapshot();await reject(shop_service.create_order(settings,current_user=actor,body={'items':[{'product_id':1,'quantity':1}]}),400);assert before==await snapshot()

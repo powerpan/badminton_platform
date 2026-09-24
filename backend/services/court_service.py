@@ -125,7 +125,7 @@ async def list_admin_courts(
     return {"items": [_normalize_court(row) for row in rows], "total": total, "page": page, "page_size": page_size}
 
 
-async def get_slots(settings: Settings, *, court_id: int, date_arg: str, refresh: bool = True) -> dict[str, Any]:
+async def get_slots(settings: Settings, *, court_id: int, date_arg: str, refresh: bool = True, allow_current: bool = False) -> dict[str, Any]:
     reserve_date = _parse_date(date_arg)
     if refresh:
         await reservation_repository.expire_pending_reservation_orders(settings)
@@ -161,7 +161,7 @@ async def get_slots(settings: Settings, *, court_id: int, date_arg: str, refresh
         start_text = current_dt.strftime("%H:%M")
         end_text = next_dt.strftime("%H:%M")
         status = "available"
-        if normalized_court["status"] != 1 or date_out_of_range or current_dt <= now:
+        if normalized_court["status"] != 1 or date_out_of_range or (next_dt <= now if allow_current else current_dt <= now):
             status = "disabled"
         elif any(overlaps(start_text, end_text, start, end) for start, end in reserved_slots):
             status = "reserved"

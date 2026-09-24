@@ -4,6 +4,8 @@ import { useRoute } from "vue-router";
 import RescheduleDrawer from "../components/RescheduleDrawer.vue";
 import ReservationHistory from "../components/ReservationHistory.vue";
 import BookingAgenda from "../components/BookingAgenda.vue";
+import PaymentDialog from '../components/PaymentDialog.vue';
+import type { Payment } from '../api/payment';
 import { ElMessageBox } from "element-plus";
 
 import {
@@ -36,6 +38,19 @@ const reservations = ref<Reservation[]>([]);
 const selectedReservation = ref<Reservation | null>(null);
 const detailVisible = ref(false);
 const rescheduleVisible = ref(false);
+const paymentVisible = ref(false), paymentId = ref<number | null>(null);
+async function refreshRecords() {
+  await Promise.allSettled([loadReservations(), agenda.value?.refresh(), authStore.fetchProfile()]);
+}
+async function afterPayment(payment: Payment) {
+  await refreshRecords();
+  message.value = payment.purpose === 'reschedule' ? '补差付款成功，原预约已改期' : '支付成功，预约已确认';
+}
+function openSupplement(id: number) {
+  detailVisible.value = false; paymentId.value = id; paymentVisible.value = true;
+  message.value = '改期补差待付款，原预约保持不变';
+  void refreshRecords();
+}
 async function afterReschedule() {
   await loadReservations(); await agenda.value?.refresh(); await authStore.fetchProfile();
   message.value = '改期成功，原预约已更新';
@@ -108,7 +123,7 @@ function statusText(status: ReservationStatus) {
 }
 
 function payMethodText(value: string | null | undefined) {
-  return value === "balance" ? "会员余额" : value || "-";
+  return value === "balance" ? "会员余额" : value === 'mock_alipay' ? '模拟支付宝' : value || "-";
 }
 
 function openReservationDetail(reservation: Reservation) {
@@ -165,6 +180,9 @@ async function pay(reservation: Reservation) {
     if (latest.status !== 'pending' || latest.order_status !== 'pending' || !latest.order_id) {
       await loadReservations(); errorMessage.value = '预约状态已变化，请查看最新记录'; return;
     }
+    if (latest.payment_id) {
+      detailVisible.value = false; paymentId.value = latest.payment_id; paymentVisible.value = true; return;
+    }
     try {
       await ElMessageBox.confirm(
         `确认使用会员余额支付 ${formatMoney(latest.order_amount_cents ?? latest.payable_amount_cents)}？支付后预约将立即确认。`,
@@ -184,7 +202,7 @@ async function pay(reservation: Reservation) {
 async function cancel(reservation: Reservation) {
   const tip = reservation.status === "pending"
     ? "确认取消该待支付预约？取消后会释放场地占用，不涉及退款。"
-    : "确认取消该预约？取消后会退回余额并扣回对应积分。";
+    : "确认取消该预约？取消后按原支付渠道退款并扣回对应积分。";
   try {
     await ElMessageBox.confirm(tip, "取消预约", {
       confirmButtonText: "确认取消",
@@ -268,7 +286,7 @@ onUnmounted(() => {
     <el-alert v-if="message" class="page-alert" :title="message" type="success" show-icon :closable="false" />
     <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
 
-    <el-table class="reservation-desktop-table" v-loading="loading" :data="reservations" empty-text="暂无预约记录" stripe>
+    <el-table v-if="!errorMessage || reservations.length" class="reservation-desktop-table" v-loading="loading" :data="reservations" empty-text="暂无预约记录" stripe>
       <el-table-column prop="reservation_no" label="预约号" min-width="150" />
       <el-table-column prop="court_name" label="场地" min-width="120" />
       <el-table-column prop="reserve_date" label="日期" min-width="115" />
@@ -282,6 +300,7 @@ onUnmounted(() => {
         <template #default="{ row }">
           <el-tag :type="statusType(row.status)" effect="plain">{{ statusText(row.status) }}</el-tag>
           <small v-if="row.status === 'pending'" class="payment-countdown">{{ countdownText(row.order_expires_at, now) }}</small>
+          <el-button v-if="row.reschedule_payment_id" link type="primary" @click="openSupplement(row.reschedule_payment_id)">改期补差待付</el-button>
         </template>
       </el-table-column>
       <el-table-column label="操作" fixed="right" width="178">
@@ -310,12 +329,13 @@ onUnmounted(() => {
       </el-table-column>
     </el-table>
     <div class="reservation-mobile-list" v-loading="loading">
-      <div v-if="!reservations.length && !loading" class="quiet-state">{{ activeStatus ? '暂无此状态的预约' : '还没有预约记录' }}<RouterLink to="/courts" class="text-action">去预订场地</RouterLink></div>
+      <div v-if="!reservations.length && !loading && !errorMessage" class="quiet-state">{{ activeStatus ? '暂无此状态的预约' : '还没有预约记录' }}<RouterLink to="/courts" class="text-action">去预订场地</RouterLink></div>
       <article v-for="item in reservations" :key="item.id" class="reservation-line">
         <div class="reservation-line-heading"><strong>{{ item.court_name }}</strong><el-tag :type="statusType(item.status)" effect="plain">{{ statusText(item.status) }}</el-tag></div>
         <p>{{ item.reserve_date }} · {{ item.start_time }}–{{ item.end_time }}</p>
         <small>{{ item.reservation_no }}</small>
         <span v-if="item.status === 'pending'" class="payment-countdown">{{ countdownText(item.order_expires_at, now) }}</span>
+        <el-button v-if="item.reschedule_payment_id" link type="primary" @click="openSupplement(item.reschedule_payment_id)">改期补差待付款</el-button>
         <div class="reservation-line-actions"><b>{{ formatMoney(item.payable_amount_cents) }}</b>
           <el-button @click="openReservationDetail(item)">详情</el-button>
           <el-button v-if="canPay(item)" type="primary" :loading="actionId === item.id" @click="pay(item)">支付</el-button>
@@ -357,11 +377,13 @@ onUnmounted(() => {
       <ReservationHistory v-if="detailVisible" :reservation-id="selectedReservation.id" />
       <div class="dialog-actions">
         <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button v-if="selectedReservation.reschedule_payment_id" type="primary" @click="openSupplement(selectedReservation.reschedule_payment_id)">支付改期差额</el-button>
         <el-button v-if="canReschedule(selectedReservation)" type="primary" @click="detailVisible = false; rescheduleVisible = true">预约改期</el-button>
         <el-button v-if="canPay(selectedReservation)" type="primary" :loading="actionId === selectedReservation.id" @click="pay(selectedReservation)">支付</el-button>
         <el-button v-if="canCancel(selectedReservation)" type="danger" plain :loading="actionId === selectedReservation.id" @click="cancel(selectedReservation)">取消预约</el-button>
       </div>
     </div>
   </el-dialog>
-  <RescheduleDrawer v-model="rescheduleVisible" :reservation="selectedReservation" @changed="afterReschedule" />
+  <RescheduleDrawer v-model="rescheduleVisible" :reservation="selectedReservation" @changed="afterReschedule" @payment-required="openSupplement" />
+  <PaymentDialog v-model="paymentVisible" :payment-id="paymentId" @paid="afterPayment" @updated="refreshRecords" />
 </template>

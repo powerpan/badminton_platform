@@ -7,7 +7,7 @@ from utils.response import success
 
 class BookingBalanceHandler(BaseHandler):
     async def get(self) -> None:
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         data = await member_repository.get_booking_balance(self.application.settings["app_settings"], current_user["id"])
         self.write_json(success(data))
 
@@ -15,7 +15,7 @@ class BookingBalanceHandler(BaseHandler):
 class MemberTransactionsHandler(BaseHandler):
     async def get(self) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         page, page_size, offset = pagination(self)
         data = await member_service.list_my_transactions(
             settings,

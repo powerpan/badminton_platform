@@ -22,7 +22,7 @@ function authorName(post: CommunityPost) {
 }
 
 function canHide(post: CommunityPost) {
-  return authStore.user?.id === post.user_id;
+  return authStore.canConsume && authStore.user?.id === post.user_id;
 }
 
 async function loadPosts(reset = false) {
@@ -88,7 +88,7 @@ onMounted(() => loadPosts());
 
   <el-alert v-if="errorMessage" class="page-alert" :title="errorMessage" type="error" show-icon :closable="false" />
 
-  <el-card v-if="authStore.isLoggedIn" shadow="never" class="panel-card community-compose" v-loading="loading">
+  <el-card v-if="authStore.canConsume" shadow="never" class="panel-card community-compose" v-loading="loading">
     <el-form label-position="top" @submit.prevent="submitPost">
       <el-form-item label="发布动态">
         <el-input v-model="content" type="textarea" :rows="4" maxlength="1000" show-word-limit placeholder="写下今天想约的场次、训练心得或装备体验" />
@@ -96,7 +96,7 @@ onMounted(() => loadPosts());
       <el-button type="primary" native-type="submit" :loading="loading">发布动态</el-button>
     </el-form>
   </el-card>
-  <el-alert v-else class="page-alert" title="登录后可以发布球友圈动态。" type="info" show-icon :closable="false" />
+  <el-alert v-else-if="!authStore.isLoggedIn" class="page-alert" title="登录后可以发布球友圈动态。" type="info" show-icon :closable="false" />
 
   <el-card shadow="never" class="panel-card list-page-card" v-loading="loading">
     <el-empty v-if="posts.length === 0 && !loading" description="暂无动态" />

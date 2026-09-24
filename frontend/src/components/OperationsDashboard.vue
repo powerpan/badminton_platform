@@ -26,14 +26,15 @@ onUnmounted(() => {version++;});
       <div class="operations-metrics">
         <div><span>余额扣费</span><strong>{{ money(report.charges_cents) }}</strong></div><div><span>退回余额</span><strong>{{ money(report.refunds_cents) }}</strong></div><div><span>净扣费</span><strong>{{ money(report.net_cents) }}</strong></div>
       </div>
-      <p class="metric-caption">按流水发生日期汇总预约扣费、退款和改期差额，共 {{ report.ledger_count }} 笔；不包含充值和商城。退款可能对应其他日期的预约。</p>
-      <p class="reconciliation-note" :class="{ warning: report.reconciliation.mismatches > 0 }">场次订单核对：{{ report.reconciliation.orders }} 笔，{{ report.reconciliation.mismatches }} 笔不一致。按场次日期选订单，与其全部历史流水核对。</p>
+      <p class="metric-caption">按流水发生日期汇总预约扣费、退款和改期差额，共 {{ report.ledger_count }} 笔；不包含模拟渠道收退款、充值和商城。退款可能对应其他日期的预约。</p>
+      <RouterLink :to="{path:'/admin/transactions',query:{date_from:report.date_from,date_to:report.date_to}}">查看两种渠道与全部业务流水</RouterLink>
+      <p class="reconciliation-note" :class="{ warning: report.reconciliation.mismatches > 0 }">场次订单核对：{{ report.reconciliation.orders }} 笔，{{ report.reconciliation.mismatches }} 笔不一致，{{ report.reconciliation.unverified }} 笔缺少凭据待核对。按场次日期选订单，优先核对统一收退款，旧单查原账户记录。</p>
       <div class="operations-metrics">
         <div><span>取消率</span><strong>{{ percent(report.cancellation_rate) }}</strong><small>{{ report.canceled }} / {{ report.total }} 条预约</small></div>
         <div><span>已记录到场率</span><strong>{{ percent(report.attendance_rate) }}</strong><small>已到场 {{ report.checked_in }} · 未到场 {{ report.no_show }}</small></div>
-        <div><span>到场记录覆盖率</span><strong>{{ percent(report.attendance_coverage) }}</strong><small>已结束 {{ report.ended }} · 未记录 {{ report.unrecorded }}</small></div>
+        <div><span>到场记录覆盖率</span><strong>{{ percent(report.attendance_coverage) }}</strong><small>已结束首场/线上预约 {{ report.ended }} · 未记录 {{ report.unrecorded }}</small></div>
       </div>
-      <p class="metric-caption">预约指标按场次日期。取消率 = 已取消 / 全部预约；到场率只计算已结束且有明确结论的预约，未记录不会算作未到场。</p>
+      <p class="metric-caption">预约指标按场次日期。取消率 = 已取消 / 全部预约；到场率只计算已结束的线上预约和到店首场，续场不重复计新到店；未记录不会算作未到场。</p>
       <div class="operations-charts">
         <section><h3>每日预约</h3><p class="metric-caption">全部预约笔数；绿色条从零开始，取消数单独列示。</p>
           <p v-if="!report.total" class="quiet-state">此范围暂无预约。</p>

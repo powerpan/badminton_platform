@@ -2,16 +2,18 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import BookingRecommendations from "../components/BookingRecommendations.vue";
 import BookingReceipt from "../components/BookingReceipt.vue";
+import PaymentDialog from '../components/PaymentDialog.vue';
+import { ApiRequestError } from '../api/http';
 import { ArrowRight, Calendar, Check, EditPen, Refresh, Search } from "@element-plus/icons-vue";
 import type { Recommendation } from "../api/operations";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage } from "element-plus";
 
 import { getCourtSlots, getCourts, getReservationRules, getBookingBalance, type Court, type SlotItem, type ReservationRules, type BookingBalance } from "../api/court";
 import { getProfile } from "../api/auth";
-import { createReservation, payReservationOrder } from "../api/reservation";
+import { createReservation } from "../api/reservation";
 import { useAuthStore } from "../stores/auth";
 
-import { selectRange, rangePrice, timeToMinutes, formatDeadline, type TimeRange } from "../utils/booking";
+import { selectRange, rangePrice, timeToMinutes, type TimeRange } from "../utils/booking";
 
 const authStore = useAuthStore();
 
@@ -34,6 +36,15 @@ const message = ref("");
 const errorMessage = ref("");
 const receiptOpen = ref(false);
 const recommendationsOpen = ref(false);
+const payMethod = ref<'balance' | 'mock_alipay'>('balance');
+const paymentId = ref<number | null>(null), paymentVisible = ref(false);
+const pendingRequest = ref<Parameters<typeof createReservation>[0] | null>(null);
+const recoveryKey = () => `bf-booking-request:${authStore.user?.id}`;
+function clearPendingRequest() { pendingRequest.value = null; sessionStorage.removeItem(recoveryKey()); }
+async function afterPayment() {
+  message.value = '支付成功，预约已确认';
+  await Promise.allSettled([authStore.fetchProfile(), loadSlots()]);
+}
 
 const selectedCourt = computed(() => courts.value.find((court) => court.id === selectedCourtId.value) || null);
 const currentMember = computed(() => authStore.user?.member || null);
@@ -306,7 +317,7 @@ function chooseSlot(court: Court, slot: SlotItem) {
 
 async function submitReservation() {
   if (submitting.value) return;
-  if (!selectedCourtId.value || !selectedSlot.value) {
+  if (!pendingRequest.value && (!selectedCourtId.value || !selectedSlot.value)) {
     errorMessage.value = "请先选择可预约时间段";
     return;
   }
@@ -315,62 +326,45 @@ async function submitReservation() {
   errorMessage.value = "";
   message.value = "";
   try {
-    await loadSlots(true);
-    if (!selectedSlot.value || !selectedCourtId.value) {
-      if (errorMessage.value) ElMessage.error(errorMessage.value);
-      return;
-    }
-    if (displayedAmount !== payableFeeCents.value) {
-      errorMessage.value = '场地价格或会员权益已更新，请核对最新金额后再次确认预约';
-      ElMessage.warning(errorMessage.value);
-      return;
-    }
-    if (!balanceEnough.value) {
-      errorMessage.value = '可用余额不足，请先处理待支付预约，或联系前台充值';
-      ElMessage.error(errorMessage.value);
-      return;
-    }
-    const response = await createReservation({
-      court_id: selectedCourtId.value,
-      reserve_date: selectedDate.value,
-      start_time: selectedSlot.value.start_time,
-      end_time: selectedSlot.value.end_time,
-      remark: remark.value,
-      expected_amount_cents: payableFeeCents.value,
-    });
-    const reservation = response.data;
-    remark.value = "";
-    await loadSlots();
-    if (reservation.order_id && reservation.status === "pending") {
-      message.value = "待支付订单已创建，请在超时前完成余额支付";
-      try {
-        await ElMessageBox.confirm(
-          `待支付订单 ${reservation.order_no || ""} 已创建，需支付 ${formatMoney(reservation.order_amount_cents ?? reservation.payable_amount_cents)}。请在 ${formatDeadline(reservation.order_expires_at)} 前完成支付，否则场地占用会自动释放。`,
-          "余额支付确认",
-          {
-            confirmButtonText: "立即支付",
-            cancelButtonText: "稍后支付",
-            type: "warning",
-          },
-        );
-      } catch {
-        message.value = "待支付订单已创建，可在“我的预约”中继续支付或取消";
+    if (!pendingRequest.value) {
+      await loadSlots(true);
+      if (!selectedSlot.value || !selectedCourtId.value) {
+        if (errorMessage.value) ElMessage.error(errorMessage.value);
         return;
       }
-      const paid = await payReservationOrder(reservation.order_id);
-      await Promise.allSettled([authStore.fetchProfile(), loadSlots()]);
-      message.value = `支付成功，预约 ${paid.data.reservation_no} 已确认`;
+      if (displayedAmount !== payableFeeCents.value) {
+        errorMessage.value = '场地价格或会员权益已更新，请核对最新金额后再次确认预约';
+        ElMessage.warning(errorMessage.value); return;
+      }
+      if (payMethod.value === 'balance' && !balanceEnough.value) {
+        errorMessage.value = '可用余额不足，可以选择模拟支付宝，或联系前台充值';
+        ElMessage.error(errorMessage.value); return;
+      }
+      pendingRequest.value = { court_id: selectedCourtId.value, reserve_date: selectedDate.value,
+        start_time: selectedSlot.value.start_time, end_time: selectedSlot.value.end_time, remark: remark.value,
+        expected_amount_cents: payableFeeCents.value, pay_method: payMethod.value, request_key: crypto.randomUUID() };
+      sessionStorage.setItem(recoveryKey(), JSON.stringify(pendingRequest.value));
+    }
+    const response = await createReservation(pendingRequest.value);
+    const reservation = response.data;
+    clearPendingRequest();
+    remark.value = "";
+    await loadSlots();
+    if (reservation.payment_id) {
+      message.value = reservation.status === 'pending' ? '待支付订单已创建，可在“我的预约”中继续支付或取消' : '已恢复原预约，请查看订单状态';
+      paymentId.value = reservation.payment_id; paymentVisible.value = true;
       return;
     }
     await authStore.fetchProfile();
     message.value = "预约成功，已加入我的预约";
   } catch (error) {
+    if (error instanceof ApiRequestError && error.status && error.status >= 400 && error.status < 500) clearPendingRequest();
     const text = error instanceof Error ? error.message : "预约提交失败";
     const failure = text.includes("时间段") || text.includes("占用") || text.includes("已被预约")
       ? "该时间段已被其他用户抢先预约，请重新选择"
       : text;
     await loadSlots(true);
-    errorMessage.value = failure;
+    errorMessage.value = pendingRequest.value ? `${failure}。结果未确认，已保存原请求，请恢复查询。` : failure;
     ElMessage.error(failure);
   } finally {
     submitting.value = false;
@@ -384,6 +378,7 @@ watch(selectedDate, async () => {
 });
 
 onMounted(async () => {
+  try { pendingRequest.value = JSON.parse(sessionStorage.getItem(recoveryKey()) || 'null'); } catch { clearPendingRequest(); }
   await loadCourts();
   if (disposed) return;
   refreshTimer = setInterval(refreshSlots, 30_000);
@@ -431,6 +426,7 @@ onUnmounted(() => {
       </div>
 
       <el-alert v-if="errorMessage" class="planner-alert" :title="errorMessage" type="error" show-icon :closable="false" role="alert" />
+      <el-alert v-if="pendingRequest" title="有一笔预约提交尚未确认" type="warning" :closable="false"><p>恢复原请求会查询同一笔预约，不会重复创建。</p><el-button :loading="submitting" @click="submitReservation">恢复预约请求</el-button></el-alert>
       <el-alert v-if="message" class="planner-alert" :title="message" type="success" show-icon :closable="false" role="status" />
 
       <section class="planner-mobile-courts" aria-label="选择场地">
@@ -477,14 +473,15 @@ onUnmounted(() => {
       </div>
     </div>
     <aside class="planner-receipt-rail" aria-label="预订清单">
-      <BookingReceipt v-model="remark" v-bind="receipt" @clear="clearSelection" @confirm="confirmFromReceipt" />
+      <BookingReceipt v-model="remark" v-model:pay-method="payMethod" v-bind="receipt" @clear="clearSelection" @confirm="confirmFromReceipt" />
     </aside>
     <div class="planner-mobile-action">
       <div><strong>{{ receipt.total }}</strong><small>{{ selectedSlot ? `${selectedCourt?.court_no} · ${receipt.timeLabel} · ${selectedDurationLabel}` : '请选择连续时段' }}</small></div>
-      <el-button type="primary" :loading="submitting" :disabled="!receipt.canConfirm" @click="submitReservation">确认预约</el-button>
+      <el-button type="primary" :loading="submitting" :disabled="!receipt.canConfirm" @click="receiptOpen = true">确认预约</el-button>
     </div>
     <el-drawer v-model="receiptOpen" title="费用明细" direction="btt" size="min(86dvh, 760px)" class="planner-receipt-drawer" :close-on-click-modal="!submitting" :close-on-press-escape="!submitting" :show-close="!submitting" destroy-on-close>
-      <BookingReceipt v-model="remark" v-bind="receipt" @clear="clearSelection" @confirm="confirmFromReceipt" />
+      <BookingReceipt v-model="remark" v-model:pay-method="payMethod" v-bind="receipt" @clear="clearSelection" @confirm="confirmFromReceipt" />
     </el-drawer>
   </section>
+  <PaymentDialog v-model="paymentVisible" :payment-id="paymentId" @paid="afterPayment" @updated="loadSlots()" />
 </template>

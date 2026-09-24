@@ -1,3 +1,4 @@
+import { homeForRole, roleLabels } from "../utils/roles";
 import { defineStore } from "pinia";
 
 import {
@@ -54,6 +55,12 @@ export const useAuthStore = defineStore("auth", {
   }),
   getters: {
     isLoggedIn: (state) => Boolean(state.token && state.user),
+    canConsume: (state) => state.user?.role === "user" || state.user?.role === "admin",
+    isStaff: (state) => state.user?.role === "frontdesk" || state.user?.role === "maintenance",
+    canFrontdesk: (state) => state.user?.role === "frontdesk" || state.user?.role === "admin",
+    canMaintenance: (state) => state.user?.role === "maintenance" || state.user?.role === "admin",
+    homePath: (state) => homeForRole(state.user?.role),
+    roleLabel: (state) => state.user ? roleLabels[state.user.role] : "访客",
     isAdmin: (state) => state.user?.role === "admin",
   },
   actions: {

@@ -43,7 +43,7 @@ class EventDetailHandler(BaseHandler):
 class EventRegisterHandler(BaseHandler):
     async def post(self, event_id: str) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         event = await event_service.register_event(
             settings,
             current_user=current_user,
@@ -55,7 +55,7 @@ class EventRegisterHandler(BaseHandler):
 class EventCancelRegistrationHandler(BaseHandler):
     async def put(self, event_id: str) -> None:
         settings = self.application.settings["app_settings"]
-        current_user = await self.require_current_user()
+        current_user = await self.require_customer()
         event = await event_service.cancel_registration(
             settings,
             current_user=current_user,

@@ -15,6 +15,7 @@ defineProps<{
   submitting: boolean;
 }>();
 const remark = defineModel<string>({ default: '' });
+const payMethod = defineModel<'balance' | 'mock_alipay'>('payMethod', { default: 'balance' });
 defineEmits<{ clear: []; confirm: [] }>();
 </script>
 
@@ -41,17 +42,23 @@ defineEmits<{ clear: []; confirm: [] }>();
       <div><dt>待支付占用</dt><dd>{{ pendingBalance }}</dd></div>
     </dl>
     <div class="booking-receipt__total"><span>合计</span><strong>{{ total }}</strong></div>
+    <fieldset class="booking-payment-method" :disabled="submitting">
+      <legend>支付方式</legend>
+      <el-radio-group v-model="payMethod" aria-label="预约支付方式"><el-radio value="balance">储值余额</el-radio><el-radio value="mock_alipay">模拟支付宝</el-radio></el-radio-group>
+    </fieldset>
     <label class="booking-receipt__remark">
       <span>备注（选填）</span>
       <textarea v-model="remark" maxlength="255" rows="2" :disabled="submitting" aria-label="预约备注" />
     </label>
     <el-button type="primary" native-type="submit" :loading="submitting" :disabled="!canConfirm" class="booking-confirm">确认预约</el-button>
-    <p class="booking-receipt__policy">开始前可取消，已支付金额退回会员余额。待支付订单到期自动释放。</p>
+    <p class="booking-receipt__policy">开始前可取消，款项按原支付渠道退回。两种渠道均保留会员优惠；待支付订单到期自动释放。</p>
   </form>
 </template>
 
 <style scoped>
 .booking-receipt { color: #202822; font-size: 16px; }
+.booking-payment-method { border: 0; padding: 0; margin: 0 0 18px; }
+.booking-payment-method legend { font-size: 13px; color: #717973; margin-bottom: 8px; }
 .booking-receipt__heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .booking-receipt__heading h2 { font-size: 17px; font-weight: 650; margin: 0; }
 .booking-receipt__heading button { border: 0; background: transparent; color: #176447; cursor: pointer; font: inherit; padding: 8px 0 8px 12px; }

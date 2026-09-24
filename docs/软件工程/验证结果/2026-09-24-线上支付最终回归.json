@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "checks": [
+    "member snapshot, duplicate create/pay, owner/channel boundaries and complete audit-fault rollback",
+    "balance holds exclude simulated orders; both channels retain discounts and refund only their original channel",
+    "mock supplement preserves original booking; target conflict is rechecked before atomic payment and move",
+    "negative reschedule splits oldest-first refunds; final cancel conserves total cash and points",
+    "balance supplements/partial refunds/final cancellation settle once; refund failure rolls back",
+    "initial expiry releases occupancy; supplement expiry preserves original confirmed booking",
+    "cancel supplement preserves original; equal-price move invalidates old prepared supplements without collecting",
+    "zero-priced online booking closes without inventing refund money or points",
+    "both channels: repeated raises and decreases keep original booking id; final cancellation refunds each of three payments exactly and restores wallet/points"
+  ],
+  "database_scope": "disposable only"
+}

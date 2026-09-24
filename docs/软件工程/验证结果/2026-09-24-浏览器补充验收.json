@@ -1,0 +1,330 @@
+{
+  "wallets": [
+    {
+      "id": 2,
+      "role": "user",
+      "balance_cents": 757500,
+      "points": 2640
+    },
+    {
+      "id": 4,
+      "role": "frontdesk",
+      "balance_cents": 0,
+      "points": 0
+    }
+  ],
+  "recharges": [
+    {
+      "id": 1,
+      "user_id": 2,
+      "amount_cents": 10000,
+      "status": "paid",
+      "operator_id": 4
+    }
+  ],
+  "online_booking": [
+    {
+      "id": 61,
+      "user_id": 2,
+      "status": "confirmed",
+      "payable_amount_cents": 12000,
+      "start_time": "15:00:00",
+      "end_time": "16:00:00"
+    }
+  ],
+  "payments": [
+    {
+      "id": 5,
+      "amount_cents": 10000,
+      "status": "succeeded",
+      "pay_method": "mock_alipay",
+      "recharge_order_id": 1
+    },
+    {
+      "id": 6,
+      "amount_cents": 12000,
+      "status": "succeeded",
+      "pay_method": "mock_alipay",
+      "recharge_order_id": null
+    }
+  ],
+  "money_effects": [
+    {
+      "user_id": 2,
+      "transaction_type": "staff_recharge",
+      "balance_change_cents": 10000,
+      "points_change": 0,
+      "payment_order_id": 5,
+      "recharge_order_id": 1
+    },
+    {
+      "user_id": 2,
+      "transaction_type": "reservation_charge",
+      "balance_change_cents": 0,
+      "points_change": 120,
+      "payment_order_id": 6,
+      "recharge_order_id": null
+    }
+  ],
+  "announcements": [
+    {
+      "title": "隔离验收：球馆公告",
+      "content": "隔离验收：请提前十分钟到前台签到。",
+      "status": 0
+    }
+  ],
+  "events": [
+    {
+      "title": "隔离验收：双打练习",
+      "location": "二号场",
+      "status": 0
+    }
+  ],
+  "community": [
+    {
+      "user_id": 1,
+      "content": "隔离验收：管理员发布球馆交流提醒。",
+      "status": 0
+    }
+  ],
+  "scope": "owned disposable QA database; no business database mutation",
+  "date": "2026-09-24",
+  "base": "7b27268 plus uncommitted working tree",
+  "ui_checks": [
+    "admin announcement create/edit/hide",
+    "admin event create/edit/hide",
+    "admin community publish/moderate",
+    "recharge create response lost, reload, restore original, payment response lost and successful receipt",
+    "online booking create response lost, reload, restore original, payment response lost plus query 503, reload original confirmed booking",
+    "workarea loading/disabled feedback",
+    "reservation/frontdesk/recharge error does not imply empty data; recovery succeeds"
+  ],
+  "faults": [
+    {
+      "method": "POST",
+      "path": "/api/shop/orders",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 1,
+      "payment_id": 1,
+      "status": "pending",
+      "order_no": "S20c2eb97ed1641fda9f39ffaa51a4d6f"
+    },
+    {
+      "method": "POST",
+      "path": "/api/payments/1/balance-pay",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 1,
+      "payment_id": 1,
+      "status": "paid",
+      "order_no": "S20c2eb97ed1641fda9f39ffaa51a4d6f"
+    },
+    {
+      "method": "GET",
+      "path": "/api/payments/1",
+      "effect": "error",
+      "response_status": 200,
+      "id": 1,
+      "status": "succeeded"
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/profile",
+      "effect": "error",
+      "response_status": 200,
+      "id": 2,
+      "status": 1
+    },
+    {
+      "method": "GET",
+      "path": "/api/maintenance/court-blocks",
+      "effect": "error",
+      "response_status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/frontdesk/walk-ins",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 59,
+      "status": "pending",
+      "order_no": "WO66fb3d22eb75436280decd8d3d93de3d"
+    },
+    {
+      "method": "POST",
+      "path": "/api/payments/3/mock-confirm",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 59,
+      "status": "confirmed",
+      "order_no": "WO66fb3d22eb75436280decd8d3d93de3d"
+    },
+    {
+      "method": "GET",
+      "path": "/api/frontdesk/walk-ins/60",
+      "effect": "error",
+      "response_status": 200,
+      "id": 60,
+      "status": "pending",
+      "order_no": "WO57d1e6fa9892476495568446ca36ea1c"
+    },
+    {
+      "method": "GET",
+      "path": "/api/frontdesk/walk-ins/60",
+      "effect": "error",
+      "response_status": 200,
+      "id": 60,
+      "status": "pending",
+      "order_no": "WO57d1e6fa9892476495568446ca36ea1c"
+    },
+    {
+      "method": "POST",
+      "path": "/api/payments/4/mock-confirm",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 60,
+      "status": "confirmed",
+      "order_no": "WO57d1e6fa9892476495568446ca36ea1c"
+    },
+    {
+      "method": "POST",
+      "path": "/api/frontdesk/recharges",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 1,
+      "payment_id": 5,
+      "status": "pending"
+    },
+    {
+      "method": "POST",
+      "path": "/api/payments/5/mock-confirm",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 1,
+      "payment_id": 5,
+      "status": "paid"
+    },
+    {
+      "method": "POST",
+      "path": "/api/reservations",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 61,
+      "payment_id": 6,
+      "status": "pending",
+      "order_no": "RO6c54e119b4cc44ada14f76ac5e694ad9"
+    },
+    {
+      "method": "POST",
+      "path": "/api/payments/6/mock-confirm",
+      "effect": "drop",
+      "response_status": 200,
+      "id": 61,
+      "payment_id": 6,
+      "status": "confirmed",
+      "order_no": "RO6c54e119b4cc44ada14f76ac5e694ad9"
+    },
+    {
+      "method": "GET",
+      "path": "/api/payments/6",
+      "effect": "error",
+      "response_status": 200,
+      "id": 6,
+      "status": "succeeded"
+    },
+    {
+      "method": "GET",
+      "path": "/api/reservations/my",
+      "effect": "delay",
+      "seconds": 18
+    },
+    {
+      "method": "GET",
+      "path": "/api/reservations/my",
+      "effect": "error",
+      "response_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/reservations/my",
+      "effect": "error",
+      "response_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/frontdesk/court-slots",
+      "effect": "delay",
+      "seconds": 18
+    },
+    {
+      "method": "GET",
+      "path": "/api/frontdesk/court-slots",
+      "effect": "delay",
+      "seconds": 18
+    },
+    {
+      "method": "GET",
+      "path": "/api/frontdesk/walk-ins",
+      "effect": "error",
+      "response_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/frontdesk/recharges",
+      "effect": "error",
+      "response_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/reservations/my",
+      "effect": "error",
+      "response_status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/maintenance/court-blocks",
+      "effect": "delay",
+      "seconds": 8
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/transactions",
+      "effect": "delay",
+      "seconds": 8
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/transactions",
+      "effect": "delay",
+      "seconds": 5
+    }
+  ],
+  "screenshots": [
+    "2026-09-24-充值响应丢失恢复.png",
+    "2026-09-24-预约付款待确认.png",
+    "2026-09-24-预约加载态.png",
+    "2026-09-24-预约读取失败.png",
+    "2026-09-24-前台加载态.png",
+    "2026-09-24-维修加载态.png",
+    "2026-09-24-流水加载态.png"
+  ],
+  "limits": [
+    "QA session is not CAPTCHA login",
+    "no real scanner, WeChat device, HTTPS deployment or business database migration",
+    "four-width layouts and representative state coverage are not every page-state-size combination"
+  ],
+  "latest_build": {
+    "types": "passed",
+    "build": "passed",
+    "vite_seconds": 2.41,
+    "known_warning": "main bundle size"
+  },
+  "last_browser": {
+    "url": "http://127.0.0.1:5188/admin/transactions",
+    "title": "BF 羽毛球馆 · 在线预订",
+    "aria_busy": false,
+    "console_errors_warnings": [],
+    "viewport_reset": true
+  }
+}

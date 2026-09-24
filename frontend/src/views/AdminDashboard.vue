@@ -4,6 +4,8 @@ import { useRoute } from "vue-router";
 const route = useRoute();
 const pages = {
   statistics: defineAsyncComponent(() => import("./admin/StatisticsPage.vue")),
+  recharges: defineAsyncComponent(() => import("./admin/RechargesPage.vue")),
+  transactions: defineAsyncComponent(() => import("./admin/TransactionsPage.vue")),
   users: defineAsyncComponent(() => import("./admin/UsersPage.vue")),
   courts: defineAsyncComponent(() => import("./admin/CourtsPage.vue")),
   reservations: defineAsyncComponent(() => import("./admin/ReservationsPage.vue")),

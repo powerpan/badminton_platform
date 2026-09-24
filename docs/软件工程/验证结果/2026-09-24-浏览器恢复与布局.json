@@ -1,0 +1,456 @@
+{
+  "date": "2026-09-24",
+  "environment": "local disposable QA database; internal simulated payment only",
+  "base_commit": "7b27268",
+  "code_status": "uncommitted",
+  "browser": "Codex In-app Browser",
+  "money_verification": {
+    "orders": [
+      {
+        "id": 1,
+        "order_no": "S20c2eb97ed1641fda9f39ffaa51a4d6f",
+        "status": "paid",
+        "total_amount_cents": 500,
+        "pay_method": "balance"
+      },
+      {
+        "id": 2,
+        "order_no": "S94ec37a76894414ba7229bfc01fa021a",
+        "status": "paid",
+        "total_amount_cents": 1800,
+        "pay_method": "mock_alipay"
+      }
+    ],
+    "payments": [
+      {
+        "id": 1,
+        "shop_order_id": 1,
+        "status": "succeeded",
+        "amount_cents": 500
+      },
+      {
+        "id": 2,
+        "shop_order_id": 2,
+        "status": "succeeded",
+        "amount_cents": 1800
+      }
+    ],
+    "account": [
+      {
+        "balance_cents": 747500,
+        "points": 2520
+      }
+    ],
+    "stock": [
+      {
+        "id": 1,
+        "product_name": "训练羽毛球",
+        "stock": 30,
+        "sold_count": 0
+      },
+      {
+        "id": 2,
+        "product_name": "吸汗手胶",
+        "stock": 79,
+        "sold_count": 1
+      },
+      {
+        "id": 3,
+        "product_name": "场馆饮用水",
+        "stock": 119,
+        "sold_count": 1
+      }
+    ],
+    "effects": [
+      {
+        "shop_order_id": 1,
+        "balance_change_cents": -500,
+        "points_change": 0
+      }
+    ],
+    "pickup": [
+      {
+        "shop_order_id": 1,
+        "status": "ready"
+      },
+      {
+        "shop_order_id": 2,
+        "status": "ready"
+      }
+    ],
+    "fault_events": [
+      {
+        "method": "POST",
+        "path": "/api/shop/orders",
+        "effect": "drop",
+        "response_status": 200,
+        "id": 1,
+        "payment_id": 1,
+        "status": "pending",
+        "order_no": "S20c2eb97ed1641fda9f39ffaa51a4d6f"
+      },
+      {
+        "method": "POST",
+        "path": "/api/payments/1/balance-pay",
+        "effect": "drop",
+        "response_status": 200,
+        "id": 1,
+        "payment_id": 1,
+        "status": "paid",
+        "order_no": "S20c2eb97ed1641fda9f39ffaa51a4d6f"
+      },
+      {
+        "method": "GET",
+        "path": "/api/payments/1",
+        "effect": "error",
+        "response_status": 200,
+        "id": 1,
+        "status": "succeeded"
+      },
+      {
+        "method": "GET",
+        "path": "/api/auth/profile",
+        "effect": "error",
+        "response_status": 200,
+        "id": 2,
+        "status": 1
+      },
+      {
+        "method": "GET",
+        "path": "/api/maintenance/court-blocks",
+        "effect": "error",
+        "response_status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/frontdesk/walk-ins",
+        "effect": "drop",
+        "response_status": 200,
+        "id": 59,
+        "status": "pending",
+        "order_no": "WO66fb3d22eb75436280decd8d3d93de3d"
+      },
+      {
+        "method": "POST",
+        "path": "/api/payments/3/mock-confirm",
+        "effect": "drop",
+        "response_status": 200,
+        "id": 59,
+        "status": "confirmed",
+        "order_no": "WO66fb3d22eb75436280decd8d3d93de3d"
+      },
+      {
+        "method": "GET",
+        "path": "/api/frontdesk/walk-ins/60",
+        "effect": "error",
+        "response_status": 200,
+        "id": 60,
+        "status": "pending",
+        "order_no": "WO57d1e6fa9892476495568446ca36ea1c"
+      },
+      {
+        "method": "GET",
+        "path": "/api/frontdesk/walk-ins/60",
+        "effect": "error",
+        "response_status": 200,
+        "id": 60,
+        "status": "pending",
+        "order_no": "WO57d1e6fa9892476495568446ca36ea1c"
+      },
+      {
+        "method": "POST",
+        "path": "/api/payments/4/mock-confirm",
+        "effect": "drop",
+        "response_status": 200,
+        "id": 60,
+        "status": "confirmed",
+        "order_no": "WO57d1e6fa9892476495568446ca36ea1c"
+      }
+    ],
+    "walkin": [
+      {
+        "id": 59,
+        "reservation_no": "Wc880b3eb29ae482f9db721cabe35a19d",
+        "status": "confirmed",
+        "source": "walk_in",
+        "amount_cents": 12000
+      },
+      {
+        "id": 60,
+        "reservation_no": "W8ff955faad4d4390b6360023d4ffe03d",
+        "status": "confirmed",
+        "source": "walk_in",
+        "amount_cents": 12000
+      }
+    ],
+    "walkin_payments": [
+      {
+        "id": 3,
+        "reservation_order_id": 59,
+        "status": "succeeded",
+        "amount_cents": 12000
+      },
+      {
+        "id": 4,
+        "reservation_order_id": 60,
+        "status": "succeeded",
+        "amount_cents": 12000
+      }
+    ],
+    "staff_account": [
+      {
+        "user_id": 4,
+        "balance_cents": 0,
+        "points": 0
+      }
+    ]
+  },
+  "layouts": [
+    {
+      "documentWidth": 1425,
+      "main": 1329,
+      "overlays": 0,
+      "url": "/profile",
+      "width": 1440,
+      "role": "user",
+      "state": "profile",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 753,
+      "main": 709,
+      "overlays": 0,
+      "url": "/profile",
+      "width": 768,
+      "role": "user",
+      "state": "profile",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 375,
+      "main": 331,
+      "overlays": 0,
+      "url": "/profile",
+      "width": 390,
+      "role": "user",
+      "state": "profile",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 345,
+      "main": 301,
+      "overlays": 0,
+      "url": "/profile",
+      "width": 360,
+      "role": "user",
+      "state": "profile",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 1440,
+      "overlays": 0,
+      "url": "/maintenance",
+      "width": 1440,
+      "role": "maintenance",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 768,
+      "overlays": 0,
+      "url": "/maintenance",
+      "width": 768,
+      "role": "maintenance",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 390,
+      "overlays": 0,
+      "url": "/maintenance",
+      "width": 390,
+      "role": "maintenance",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 345,
+      "overlays": 0,
+      "url": "/maintenance",
+      "width": 360,
+      "role": "maintenance",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 1440,
+      "panelWidth": 322,
+      "sevenColumns": true,
+      "tableInsidePanel": true,
+      "tableWidth": 292,
+      "width": 1440,
+      "role": "maintenance",
+      "state": "date-picker-fixed",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 768,
+      "panelWidth": 322,
+      "sevenColumns": true,
+      "tableInsidePanel": true,
+      "tableWidth": 292,
+      "width": 768,
+      "role": "maintenance",
+      "state": "date-picker-fixed",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 390,
+      "panelWidth": 322,
+      "sevenColumns": true,
+      "tableInsidePanel": true,
+      "tableWidth": 292,
+      "width": 390,
+      "role": "maintenance",
+      "state": "date-picker-fixed",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 345,
+      "panelWidth": 322,
+      "sevenColumns": true,
+      "tableInsidePanel": true,
+      "tableWidth": 292,
+      "width": 360,
+      "role": "maintenance",
+      "state": "date-picker-fixed",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 1425,
+      "overlays": 0,
+      "url": "/frontdesk",
+      "width": 1440,
+      "role": "frontdesk",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 753,
+      "overlays": 0,
+      "url": "/frontdesk",
+      "width": 768,
+      "role": "frontdesk",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 375,
+      "overlays": 0,
+      "url": "/frontdesk",
+      "width": 390,
+      "role": "frontdesk",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 345,
+      "overlays": 0,
+      "url": "/frontdesk",
+      "width": 360,
+      "role": "frontdesk",
+      "state": "schedule",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 1440,
+      "overlays": 0,
+      "url": "/admin/users",
+      "width": 1440,
+      "role": "admin",
+      "state": "users",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 768,
+      "overlays": 0,
+      "url": "/admin/users",
+      "width": 768,
+      "role": "admin",
+      "state": "users",
+      "no_document_overflow": true
+    },
+    {
+      "documentWidth": 390,
+      "overlays": 0,
+      "url": "/admin/users",
+      "width": 390,
+      "role": "admin",
+      "state": "users",
+      "no_document_overflow": true,
+      "finding": "操作列遮挡身份信息；已在 fixed-action-column 状态修复并复验"
+    },
+    {
+      "documentWidth": 345,
+      "overlays": 0,
+      "url": "/admin/users",
+      "width": 360,
+      "role": "admin",
+      "state": "users",
+      "no_document_overflow": true,
+      "finding": "操作列遮挡身份信息；已在 fixed-action-column 状态修复并复验"
+    },
+    {
+      "actionPosition": "sticky",
+      "documentWidth": 1440,
+      "url": "/admin/users",
+      "width": 1440,
+      "role": "admin",
+      "state": "fixed-action-column",
+      "no_document_overflow": true
+    },
+    {
+      "actionPosition": "sticky",
+      "documentWidth": 768,
+      "url": "/admin/users",
+      "width": 768,
+      "role": "admin",
+      "state": "fixed-action-column",
+      "no_document_overflow": true
+    },
+    {
+      "actionPosition": "static",
+      "documentWidth": 390,
+      "url": "/admin/users",
+      "width": 390,
+      "role": "admin",
+      "state": "fixed-action-column",
+      "no_document_overflow": true
+    },
+    {
+      "actionPosition": "static",
+      "documentWidth": 345,
+      "url": "/admin/users",
+      "width": 360,
+      "role": "admin",
+      "state": "fixed-action-column",
+      "no_document_overflow": true
+    }
+  ],
+  "screenshots": [
+    "页面/2026-09-24-商城付款待确认.png",
+    "页面/2026-09-24-资料失败付款成功.png",
+    "页面/2026-09-24-赛事手机报名.png",
+    "页面/2026-09-24-日期选择器360.png",
+    "页面/2026-09-24-前台收款待确认.png",
+    "页面/2026-09-24-前台收款恢复成功.png",
+    "页面/2026-09-24-管理员表格360.png"
+  ],
+  "scope_limits": [
+    "新会话通过隔离 QA 入口生成；没有执行验证码登录表单",
+    "只覆盖所列代表页和状态，并非所有页面所有状态的笛卡尔积",
+    "浏览器按尺寸模拟，不是微信或手机实机",
+    "未进行真实摄像头或扫码器核销",
+    "业务库未迁移；源码未提交推送"
+  ]
+}

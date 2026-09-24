@@ -1,5 +1,7 @@
 import { http } from "./http";
 
+export type UserRole = "user" | "admin" | "frontdesk" | "maintenance";
+
 export interface MemberInfo {
   level: "normal" | "silver" | "gold" | "diamond";
   level_label: string;
@@ -15,7 +17,7 @@ export interface UserInfo {
   id: number;
   username: string;
   nickname: string;
-  role: "user" | "admin";
+  role: UserRole;
   contact: string;
   status: number;
   member: MemberInfo;

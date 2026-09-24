@@ -349,21 +349,21 @@ td select:not([class*="el-"]):focus,
   overflow-x: auto;
 }
 
-table {
+.table-wrap > table {
   width: 100%;
   min-width: 720px;
   border-collapse: collapse;
 }
 
-th,
-td {
+.table-wrap > table th,
+.table-wrap > table td {
   padding: 12px;
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--line);
 }
 
-th {
+.table-wrap > table th {
   color: #59655e;
   font-size: 13px;
   background: var(--surface-soft);
@@ -1284,7 +1284,7 @@ th {
     justify-content: flex-start;
   }
 
-  table {
+  .table-wrap > table {
     min-width: 620px;
   }
 }

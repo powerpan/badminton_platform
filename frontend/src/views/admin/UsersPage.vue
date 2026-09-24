@@ -2,7 +2,8 @@
 import { onMounted, ref } from "vue";
 
 import { adminCreateUser, adminGetUsers, adminResetUserPassword, adminUpdateUserMember, adminUpdateUserRole, adminUpdateUserStatus } from "../../api/admin";
-import { type UserInfo } from "../../api/auth";
+import { roleOptions, roleLabels } from "../../utils/roles";
+import { type UserInfo, type UserRole } from "../../api/auth";
 import { useAuthStore } from "../../stores/auth";
 import { type PageState, formatMoney, yuanDeltaToCents, discountText, memberValidity, confirmAction, setSuccess, setError, resetPage, changePage } from "./shared";
 
@@ -106,7 +107,7 @@ async function toggleUserStatus(user: UserInfo) {
 
 async function changeUserRoleValue(user: UserInfo, roleValue: string | number | boolean) {
   const role = String(roleValue);
-  if (role !== user.role && !(await confirmAction(`确认将用户 ${user.username} 的角色修改为 ${role}？`))) return;
+  if (role !== user.role && !(await confirmAction(`确认将用户 ${user.username} 的角色修改为 ${roleLabels[role as UserRole]}？`))) return;
   loading.value = true;
   try {
     await adminUpdateUserRole(user.id, role);
@@ -216,8 +217,7 @@ const createVisible = ref(false);
           <el-form-item label="联系方式"><el-input v-model="userForm.contact" /></el-form-item>
           <el-form-item label="角色">
             <el-select v-model="userForm.role" class="short-select">
-              <el-option label="普通用户" value="user" />
-              <el-option label="管理员" value="admin" />
+              <el-option v-for="role in roleOptions" :key="role.value" :label="role.label" :value="role.value" />
             </el-select>
           </el-form-item>
           <el-form-item label="状态">
@@ -233,8 +233,7 @@ const createVisible = ref(false);
       <el-form inline class="element-filter">
         <el-form-item label="角色">
           <el-select v-model="userFilters.role" clearable class="short-select" @change="refreshUsers(true)">
-            <el-option label="普通用户" value="user" />
-            <el-option label="管理员" value="admin" />
+            <el-option v-for="role in roleOptions" :key="role.value" :label="role.label" :value="role.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -252,8 +251,7 @@ const createVisible = ref(false);
         <el-table-column label="角色" min-width="120">
           <template #default="{ row }">
             <el-select :model-value="row.role" size="small" @change="changeUserRoleValue(row, $event)">
-              <el-option label="普通用户" value="user" />
-              <el-option label="管理员" value="admin" />
+              <el-option v-for="role in roleOptions" :key="role.value" :label="role.label" :value="role.value" />
             </el-select>
           </template>
         </el-table-column>

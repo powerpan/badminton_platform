@@ -60,3 +60,14 @@
 .admin-shell .el-table__header-wrapper {
   width: 100%;
 }
+
+@media (max-width: 600px) {
+  /* Keep record details readable; actions remain reachable by scrolling the table. */
+  .admin-shell .el-table .el-table__cell.el-table-fixed-column--right {
+    position: static !important;
+  }
+
+  .admin-shell .el-table .el-table__cell.el-table-fixed-column--right::before {
+    display: none;
+  }
+}

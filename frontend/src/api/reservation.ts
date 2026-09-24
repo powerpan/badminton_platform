@@ -1,6 +1,7 @@
 import { http } from "./http";
 import type { ApiResponse } from "./auth";
 import type { PageResult } from "./court";
+import type { Payment, PaymentMethod } from './payment';
 
 export type ReservationStatus = "pending" | "confirmed" | "canceled" | "expired" | "completed";
 
@@ -11,7 +12,14 @@ export interface Reservation {
   attendance_recorded_at?: string | null;
   attendance_recorded_by?: number | null;
   reservation_no: string;
-  user_id?: number;
+  user_id?: number | null;
+  source?: 'online' | 'walk_in' | 'walk_in_extension';
+  guest_name?: string | null;
+  guest_contact?: string | null;
+  operator_name_snapshot?: string | null;
+  opened_at?: string | null;
+  parent_reservation_id?: number | null;
+  root_reservation_id?: number | null;
   username?: string;
   nickname?: string;
   court_id: number;
@@ -32,6 +40,10 @@ export interface Reservation {
   discount_rate: number;
   points_awarded: number;
   order_id?: number | null;
+  payment_id?: number | null;
+  reschedule_payment_id?: number | null;
+  payment?: Pick<Payment, 'id' | 'payment_no' | 'amount_cents' | 'pay_method' | 'status' | 'expires_at' | 'paid_at'>;
+  requires_payment?: boolean;
   order_no?: string | null;
   order_status?: "pending" | "paid" | "canceled" | "expired" | null;
   order_amount_cents?: number | null;
@@ -51,6 +63,8 @@ export function createReservation(payload: {
   end_time: string;
   remark?: string;
   expected_amount_cents: number;
+  pay_method?: PaymentMethod;
+  request_key?: string;
 }) {
   return http.post<unknown, ApiResponse<Reservation>>("/reservations", payload);
 }

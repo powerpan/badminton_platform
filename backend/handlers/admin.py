@@ -255,7 +255,12 @@ class AdminReservationsHandler(BaseHandler):
             court_id_arg=self.get_argument("court_id", None),
             date_from_arg=self.get_argument("date_from", None),
             date_to_arg=self.get_argument("date_to", None),
+            source_arg=self.get_argument("source", None),
+            pay_method_arg=self.get_argument("pay_method", None),
+            operator_arg=self.get_argument("operator", None),
+            order_no_arg=self.get_argument("order_no", None),
         )
+        self.set_header('Cache-Control', 'no-store')
         self.write_json(success(data))
 
 
@@ -264,6 +269,7 @@ class AdminReservationDetailHandler(BaseHandler):
         await self.require_admin()
         settings = self.application.settings["app_settings"]
         reservation = await reservation_service.get_admin_reservation(settings, self.path_int(reservation_id, "预约ID"))
+        self.set_header('Cache-Control', 'no-store')
         self.write_json(success(reservation))
 
 
@@ -275,7 +281,11 @@ class AdminReservationCancelHandler(BaseHandler):
             settings,
             self.path_int(reservation_id, "预约ID"),
             current_user=current_user,
+            body=self.get_json_body(),
         )
+        if reservation.get('payment_id') or reservation.get('source') in ('walk_in','walk_in_extension'):
+            self.write_json(success(reservation))
+            return  # Guest payment and audit already committed together.
         await _record_admin_log(
             self,
             current_user,
@@ -615,15 +625,7 @@ class AdminShopOrderCompleteHandler(BaseHandler):
             settings,
             current_user=current_user,
             order_id=self.path_int(order_id, "订单ID"),
-        )
-        await _record_admin_log(
-            self,
-            current_user,
-            module="shop",
-            action="complete",
-            target_type="shop_order",
-            target_id=order["id"],
-            detail={"order_no": order["order_no"], "username": order.get("username")},
+            body=self.get_json_body(),
         )
         self.write_json(success(order, "订单已完成"))
 
@@ -636,17 +638,9 @@ class AdminShopOrderCancelHandler(BaseHandler):
             settings,
             current_user=current_user,
             order_id=self.path_int(order_id, "订单ID"),
+            body=self.get_json_body(),
         )
-        await _record_admin_log(
-            self,
-            current_user,
-            module="shop",
-            action="cancel",
-            target_type="shop_order",
-            target_id=order["id"],
-            detail={"order_no": order["order_no"], "username": order.get("username")},
-        )
-        self.write_json(success(order, "订单已取消并退款"))
+        self.write_json(success(order, "订单已取消，已付款项按原渠道退回"))
 
 
 class AdminShopOrderRefundRejectHandler(BaseHandler):
@@ -658,15 +652,6 @@ class AdminShopOrderRefundRejectHandler(BaseHandler):
             current_user=current_user,
             order_id=self.path_int(order_id, "订单ID"),
             body=self.get_json_body(),
-        )
-        await _record_admin_log(
-            self,
-            current_user,
-            module="shop",
-            action="refund_reject",
-            target_type="shop_order",
-            target_id=order["id"],
-            detail={"order_no": order["order_no"], "username": order.get("username"), "reason": order.get("refund_reject_reason")},
         )
         self.write_json(success(order, "退款申请已驳回"))
 
