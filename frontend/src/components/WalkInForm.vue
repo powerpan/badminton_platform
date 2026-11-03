@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { computed, ref, watch } from 'vue';
 import { ApiRequestError } from '../api/http';
 import { createWalkIn, quoteWalkIn, type WalkIn, type WalkInDraft, type WalkInQuote } from '../api/staff';
@@ -41,7 +42,7 @@ async function submit() {
   if (!attempt.value && quote.value) {
     attempt.value = { body: { court_id: props.court.court_id, reserve_date: props.court.date, start_time: props.start,
       end_time: end.value, guest_name: guestName.value, guest_contact: guestContact.value,
-      expected_amount_cents: quote.value.payable_amount_cents, request_key: crypto.randomUUID() }, parent: props.parent?.id };
+      expected_amount_cents: quote.value.payable_amount_cents, request_key: createRequestKey() }, parent: props.parent?.id };
     sessionStorage.setItem(storageKey, JSON.stringify(attempt.value));
   }
   busy.value = true; error.value = '';

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import ProductImage from '../components/ProductImage.vue';
@@ -72,7 +73,7 @@ async function changeOrder(order: ShopOrder, action: 'cancel' | 'refund') {
           reason = String(result.value || reason).trim();
         }
       } catch { return; }
-      command = { request_key: crypto.randomUUID(), reason }; sessionStorage.setItem(storageKey, JSON.stringify(command));
+      command = { request_key: createRequestKey(), reason }; sessionStorage.setItem(storageKey, JSON.stringify(command));
     }
     if (action === 'cancel') await cancelShopOrder(order.id, command.request_key);
     else await requestShopOrderRefund(order.id, command);

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import ProductImage from "../components/ProductImage.vue";
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -149,7 +150,7 @@ async function payOrder() {
     if (!pendingRequest.value) {
       const quote = await refreshCart();
       if (!quote.can_checkout) { checkoutError.value = quote.issues.join('；'); return; }
-      const payload = { items: quote.items.map(item => ({ product_id: item.product.id, quantity: item.quantity, expected_price_cents: item.product.price_cents })), remark: remark.value, pay_method: payMethod.value, request_key: crypto.randomUUID() };
+      const payload = { items: quote.items.map(item => ({ product_id: item.product.id, quantity: item.quantity, expected_price_cents: item.product.price_cents })), remark: remark.value, pay_method: payMethod.value, request_key: createRequestKey() };
       try {
         await ElMessageBox.confirm(
           `${cartNotice.value}订单合计 ${formatMoney(quote.total_amount_cents)}，使用${payMethod.value === 'balance' ? '储值余额' : '模拟支付宝'}。确认后暂留商品，请在付款期限内完成支付。`,

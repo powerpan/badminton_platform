@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { onUnmounted, ref, watch } from 'vue';
 import { lookupPickup, redeemPickup, type PickupLookup } from '../api/shop';
 import { formatDeadline } from '../utils/booking';
@@ -23,7 +24,7 @@ async function redeem() {
   const storageKey = `bf-pickup:${auth.user?.id}:${currentOrder.id}`;
   try {
     if (!await confirmAction(`确认已核对订单 ${currentOrder.order_no} 的全部商品，并交付给客户？同一订单只可领取一次。`)) return;
-    const key = sessionStorage.getItem(storageKey) || crypto.randomUUID(); sessionStorage.setItem(storageKey, key);
+    const key = sessionStorage.getItem(storageKey) || createRequestKey(); sessionStorage.setItem(storageKey, key);
     await redeemPickup(currentCode, key);
     const response = await lookupPickup(currentCode); order.value = response.data;
     sessionStorage.removeItem(storageKey);

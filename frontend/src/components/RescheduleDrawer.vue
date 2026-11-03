@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { ApiRequestError } from '../api/http';
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { getAllCourts, getReservationRules, type Court, type ReservationRules } from '../api/court';
@@ -28,7 +29,7 @@ async function preview() {
   const current = ++version; loading.value = true; error.value = ''; quote.value = undefined; requestKey.value = '';
   try {
     const response = await getRescheduleQuote(props.reservation.id, { ...target.value });
-    if (current === version) { quote.value = response.data; requestKey.value = crypto.randomUUID(); }
+    if (current === version) { quote.value = response.data; requestKey.value = createRequestKey(); }
   } catch (e) { if (current === version) error.value = e instanceof Error ? e.message : '报价失败'; }
   finally { if (current === version) loading.value = false; }
 }

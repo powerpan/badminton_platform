@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { findRechargeCustomers, createRecharge, getRecharge, getRecharges, cancelRecharge, type RechargeCustomer, type RechargeOrder, type RechargeDraft } from '../api/recharge';
@@ -55,7 +56,7 @@ async function submit() {
   try {
     if(!recovery.value){
       if(!customer.value || cents.value===null){searchError.value='请确认客户并输入正数金额，最多两位小数';return;}
-      const draft={payload:{user_id:customer.value.id,amount_cents:cents.value,request_key:crypto.randomUUID()},customer:{...customer.value}};
+      const draft={payload:{user_id:customer.value.id,amount_cents:cents.value,request_key:createRequestKey()},customer:{...customer.value}};
       if(!await confirmAction(`确认向 ${draft.customer.nickname || draft.customer.username}（账号 ${draft.customer.username}）储值 ${formatMoney(draft.payload.amount_cents)}？本设备模拟收款成功后，款项才会存入该客户账户。`))return;
       recovery.value=draft;sessionStorage.setItem(recoveryKey,JSON.stringify(draft));
     }
@@ -80,7 +81,7 @@ async function cancel(order: RechargeOrder){
   const keyName=`bf-recharge-cancel:${auth.user?.id}:${order.id}`;
   try{
     if(!await confirmAction(`撤销 ${order.customer.username} 的 ${formatMoney(order.amount_cents)} 未收款充值单？本单尚未入账。`))return;
-    const key=sessionStorage.getItem(keyName)||crypto.randomUUID();sessionStorage.setItem(keyName,key);
+    const key=sessionStorage.getItem(keyName)||createRequestKey();sessionStorage.setItem(keyName,key);
     const response=await cancelRecharge(order.id,key);sessionStorage.removeItem(keyName);selected.value=response.data;
     ElMessage.success('未收款充值单已撤销');await load();
   }catch(e){

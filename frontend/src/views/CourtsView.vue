@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import BookingRecommendations from "../components/BookingRecommendations.vue";
 import BookingReceipt from "../components/BookingReceipt.vue";
@@ -342,7 +343,7 @@ async function submitReservation() {
       }
       pendingRequest.value = { court_id: selectedCourtId.value, reserve_date: selectedDate.value,
         start_time: selectedSlot.value.start_time, end_time: selectedSlot.value.end_time, remark: remark.value,
-        expected_amount_cents: payableFeeCents.value, pay_method: payMethod.value, request_key: crypto.randomUUID() };
+        expected_amount_cents: payableFeeCents.value, pay_method: payMethod.value, request_key: createRequestKey() };
       sessionStorage.setItem(recoveryKey(), JSON.stringify(pendingRequest.value));
     }
     const response = await createReservation(pendingRequest.value);

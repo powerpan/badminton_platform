@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { getPayment, paymentAction, type Payment, type PaymentAction } from '../api/payment';
 import { useAuthStore } from '../stores/auth';
@@ -43,7 +44,7 @@ async function submit(action: PaymentAction) {
   const storageKey = `bf-payment:${auth.user?.id}:${props.paymentId}:${action}`;
   let key = keys.get(storageKey);
   try {
-    key ||= sessionStorage.getItem(storageKey) || crypto.randomUUID();
+    key ||= sessionStorage.getItem(storageKey) || createRequestKey();
     keys.set(storageKey, key); sessionStorage.setItem(storageKey, key);
     await paymentAction(props.paymentId, action, key);
     await refresh();

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../../utils/requestKey";
 import { onMounted, ref } from "vue";
 import ProductImage from "../../components/ProductImage.vue";
 
@@ -14,7 +15,7 @@ const auth = useAuthStore();
 async function submitCommand(order: ShopOrder, action: 'complete' | 'cancel' | 'reject', reason = '') {
   const storageKey = `bf-admin-shop:${auth.user?.id}:${order.id}:${action}`;
   const saved = sessionStorage.getItem(storageKey);
-  const payload = saved ? JSON.parse(saved) : { request_key: crypto.randomUUID(), reason };
+  const payload = saved ? JSON.parse(saved) : { request_key: createRequestKey(), reason };
   sessionStorage.setItem(storageKey, JSON.stringify(payload));
   try {
     const response = action === 'complete' ? await adminCompleteShopOrder(order.id, payload)

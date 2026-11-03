@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createRequestKey } from "../utils/requestKey";
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import WalkInForm from '../components/WalkInForm.vue';
@@ -75,7 +76,7 @@ async function collect(action: 'confirm' | 'fail' | 'cancel') {
     selected.value = current;
     if (current.payment.status !== 'pending') { ElMessage.info('订单状态已更新，请查看收款结果'); return; }
     if (current.payment.amount_cents !== order.payment.amount_cents) { ElMessage.warning('金额已变化，请重新确认'); return; }
-    const key = crypto.randomUUID();
+    const key = createRequestKey();
     selected.value = action==='cancel' ? (await cancelWalkIn(order.id,key)).data : (await mockCollect(order.payment.id,action,key)).data;
     ElMessage.success(action==='confirm' ? '模拟收款完成，场地已确认' : action==='cancel' ? '已撤销并释放场地' : '已记录模拟失败，仍可在截止前重试');
   } catch (e) {
