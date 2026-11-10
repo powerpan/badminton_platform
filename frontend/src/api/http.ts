@@ -85,7 +85,7 @@ http.interceptors.response.use(
     const sessionUnchanged = () => sentAuthorization === `Bearer ${localStorage.getItem('bf_token')}`;
     // A delayed failure from the previous account cannot erase a newly accepted phone login.
     if (sentAuthorization && !sessionUnchanged()) return Promise.reject(new ApiRequestError(message, status));
-    if (status === 401 && originalConfig && !originalConfig._retry && !requestUrl.includes("/auth/")) {
+    if (status === 401 && originalConfig && !originalConfig._retry && !isPublicAuthRequest(requestUrl)) {
       originalConfig._retry = true;
       try {
         const token = await refreshAccessToken();

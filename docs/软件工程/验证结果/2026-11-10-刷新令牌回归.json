@@ -1,0 +1,138 @@
+{
+  "date": "2026-11-10",
+  "base_commit": "38e0d322cc951d445f2612994aa75b1d6481a4ea",
+  "historical_reproduction": {
+    "historical_commit": "2e45945",
+    "historical_result": {
+      "http_status": 401,
+      "message": "登录状态无效，请重新登录"
+    },
+    "fixed_commit": "38e0d32",
+    "current_result": {
+      "token_type": "refresh"
+    }
+  },
+  "new_fix": "Protected /auth/profile and /auth/password 401 responses can refresh; public authentication endpoints remain excluded.",
+  "frontend_before": {
+    "tests": 9,
+    "passed": 8,
+    "failed": 1,
+    "failure": "/auth/profile did not trigger refresh"
+  },
+  "backend_refresh_tests": 13,
+  "backend_all_tests": 83,
+  "frontend_session_tests": 9,
+  "frontend_all_tests": 24,
+  "build": "passed",
+  "browser": {
+    "tool": "CUA in-app browser",
+    "url": "http://localhost:5199",
+    "viewport": [
+      617,
+      734
+    ],
+    "page_identity": "passed",
+    "nonblank": "passed",
+    "framework_overlay": "none",
+    "console_errors_warnings": [],
+    "fixtures": "Owned temporary Redis; fixture user reads, notification count and empty ledger; no MySQL",
+    "cases": [
+      {
+        "name": "valid",
+        "final_path": "/profile",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 401
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 401
+          },
+          {
+            "method": "POST",
+            "path": "/api/auth/refresh",
+            "status": 200
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 200
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 304
+          }
+        ]
+      },
+      {
+        "name": "expired",
+        "final_path": "/login",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 401
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 401
+          },
+          {
+            "method": "POST",
+            "path": "/api/auth/refresh",
+            "status": 401
+          }
+        ]
+      },
+      {
+        "name": "wrong-type",
+        "final_path": "/login",
+        "requests": [
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 401
+          },
+          {
+            "method": "GET",
+            "path": "/api/auth/profile",
+            "status": 401
+          },
+          {
+            "method": "POST",
+            "path": "/api/auth/refresh",
+            "status": 401
+          }
+        ]
+      }
+    ]
+  },
+  "coverage": [
+    "successful refresh and rotated tokens",
+    "expired access plus valid refresh",
+    "access/refresh type separation",
+    "missing claims and invalid signature",
+    "JWT exp boundary",
+    "expired or revoked Redis session",
+    "old-token replay and logout",
+    "disabled or missing user",
+    "public endpoints excluded",
+    "retry loop prevention",
+    "concurrent refresh sharing",
+    "account switch isolation"
+  ],
+  "limits": [
+    "No production deployment",
+    "No physical phone or WeChat test in this round",
+    "No multi-tab refresh race or dropped-response retry validation"
+  ],
+  "artifacts": [
+    "页面/2026-11-10-刷新成功资料页.jpg",
+    "页面/2026-11-10-刷新过期登录页.jpg"
+  ]
+}
