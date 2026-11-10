@@ -4,11 +4,14 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { getPayment, paymentAction, type Payment, type PaymentAction } from '../api/payment';
 import { useAuthStore } from '../stores/auth';
 import { countdownText } from '../utils/booking';
+import { useRouter } from 'vue-router';
+import { pickupPath } from '../utils/mobileHandoff';
 
 const visible = defineModel<boolean>({ default: false });
 const props = defineProps<{ paymentId: number | null }>();
 const emit = defineEmits<{ paid: [payment: Payment]; updated: [] }>();
 const auth = useAuthStore();
+const router = useRouter();
 const payment = ref<Payment>(), loading = ref(false), busy = ref(false), error = ref(''), notice = ref('');
 const now = ref(Date.now());
 let version = 0, offset = 0, reported = false;
@@ -26,7 +29,13 @@ async function refresh() {
     if (current !== version || !visible.value) return;
     payment.value = response.data;
     offset = new Date(response.data.server_now).getTime() - Date.now(); now.value = Date.now() + offset;
-    if (payment.value.status === 'succeeded' && !reported) { reported = true; emit('paid', payment.value); }
+    if (payment.value.status === 'succeeded' && !reported) {
+      reported = true; emit('paid', payment.value);
+      if (payment.value.business_type === 'shop' && payment.value.shop_order_id) {
+        visible.value = false;
+        await router.push({ path: pickupPath(payment.value.shop_order_id), query: { handoff: '1' } });
+      }
+    }
   } finally { if (current === version) loading.value = false; }
 }
 async function query() {

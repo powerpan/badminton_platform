@@ -4,7 +4,8 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import ProductImage from '../components/ProductImage.vue';
 import PaymentDialog from '../components/PaymentDialog.vue';
-import PickupCodeDialog from '../components/PickupCodeDialog.vue';
+import { useRouter } from 'vue-router';
+import { pickupPath } from '../utils/mobileHandoff';
 import { getMyShopOrders, getShopOrder, cancelShopOrder, requestShopOrderRefund, type ShopOrder } from '../api/shop';
 import { ApiRequestError } from '../api/http';
 import { useAuthStore } from '../stores/auth';
@@ -12,9 +13,10 @@ import { countdownText, formatDeadline } from '../utils/booking';
 import { formatMoney, payMethodText } from './admin/shared';
 
 const auth = useAuthStore();
+const router = useRouter();
 const orders = ref<ShopOrder[]>([]), selectedOrder = ref<ShopOrder | null>(null);
-const detailVisible = ref(false), paymentVisible = ref(false), pickupVisible = ref(false);
-const paymentId = ref<number | null>(null), pickupOrderId = ref<number | null>(null);
+const detailVisible = ref(false), paymentVisible = ref(false);
+const paymentId = ref<number | null>(null);
 const filter = ref(''), page = ref({ page: 1, page_size: 10, total: 0 });
 const loading = ref(false), busy = ref(false), errorMessage = ref(''), now = ref(Date.now());
 const statuses: Record<string, string> = { pending: '待付款', paid: '待取货', refund_requested: '退款待审核', completed: '已取货', canceled: '已取消', expired: '已过期' };
@@ -56,7 +58,7 @@ async function pay(order: ShopOrder) {
   } catch (e) { ElMessage.error(e instanceof Error ? e.message : '付款状态查询失败'); }
   finally { busy.value = false; }
 }
-function pickup(order: ShopOrder) { pickupOrderId.value = order.id; detailVisible.value = false; pickupVisible.value = true; }
+function pickup(order: ShopOrder) { void router.push(pickupPath(order.id)); }
 async function paymentUpdated() { await Promise.allSettled([refreshDetails(), auth.fetchProfile()]); }
 async function changeOrder(order: ShopOrder, action: 'cancel' | 'refund') {
   if (busy.value) return; busy.value = true;
@@ -149,7 +151,6 @@ onUnmounted(() => { version++; detailVersion++; clearInterval(timer); document.r
     </div>
   </el-dialog>
   <PaymentDialog v-model="paymentVisible" :payment-id="paymentId" @paid="paymentUpdated" @updated="refreshDetails()" />
-  <PickupCodeDialog v-model="pickupVisible" :order-id="pickupOrderId" @update:model-value="value => { if (!value) void refreshDetails(); }" />
 </template>
 <style scoped>
 .shop-order-toolbar { flex-wrap: wrap; gap: 12px; }

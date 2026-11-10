@@ -1,6 +1,8 @@
 from handlers.recharges import RechargeCustomersHandler, RechargesHandler, RechargeDetailHandler, RechargeCancelHandler, AdminRechargesHandler, AdminRechargeDetailHandler
 from handlers.finance import AdminTransactionsHandler, AdminTransactionDetailHandler
 from handlers.pickup import ShopPickupCodeHandler, PickupLookupHandler, PickupRedeemHandler
+from handlers.mobile_handoff import (MobileHandoffCreateHandler, MobileHandoffStatusHandler,
+    MobileHandoffDecisionHandler, MobileHandoffClaimHandler, MobileHandoffExchangeHandler)
 from handlers.staff_booking import (WalkInQuoteHandler, WalkInsHandler, WalkInDetailHandler, WalkInCancelHandler,
     WalkInExtensionQuoteHandler, WalkInExtensionsHandler, StaffPaymentHandler, MockPaymentActionHandler, BalancePaymentHandler, CancelSupplementHandler)
 from handlers.booking_operations import (FrontdeskCourtSlotsHandler, ClassifyCourtBlockHandler, MaintenanceCourtBlocksHandler, RecommendationsHandler, RescheduleQuoteHandler, RescheduleHandler,
@@ -96,6 +98,11 @@ def build_routes() -> list[tuple[str, object]]:
         (r'/api/admin/transactions', AdminTransactionsHandler),
         (r'/api/admin/transactions/([^/]+)/([0-9]+)', AdminTransactionDetailHandler),
         (r"/api/health", HealthHandler),
+        (r"/api/auth/mobile-handoffs", MobileHandoffCreateHandler),
+        (r"/api/auth/mobile-handoffs/([a-f0-9]{32})", MobileHandoffStatusHandler),
+        (r"/api/auth/mobile-handoffs/([a-f0-9]{32})/decision", MobileHandoffDecisionHandler),
+        (r"/api/auth/mobile-handoffs/([a-f0-9]{32})/claim", MobileHandoffClaimHandler),
+        (r"/api/auth/mobile-handoffs/([a-f0-9]{32})/exchange", MobileHandoffExchangeHandler),
         (r"/api/admin/health", HealthHandler),
         (r"/api/auth/captcha", CaptchaHandler),
         (r"/api/auth/register", RegisterHandler),

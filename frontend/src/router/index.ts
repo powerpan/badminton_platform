@@ -24,6 +24,8 @@ import { useAuthStore } from "../stores/auth";
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: "/mobile-handoff/:id", name: "mobile-handoff", component: () => import('../views/MobileHandoffView.vue') },
+    { path: "/shop/orders/:id/pickup", name: "shop-pickup", component: () => import('../views/ShopPickupView.vue'), meta: { requiresAuth: true, roles: ["user", "admin"] } },
     { path: "/frontdesk", name: "frontdesk", component: FrontdeskView, meta: { requiresAuth: true, roles: ["frontdesk", "admin"] } },
     { path: "/maintenance", name: "maintenance", component: MaintenanceView, meta: { requiresAuth: true, roles: ["maintenance", "admin"] } },
     { path: "/", name: "home", component: HomeView },

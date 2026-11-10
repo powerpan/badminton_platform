@@ -15,6 +15,7 @@ const refreshHttp = axios.create({
 });
 
 let refreshPromise: Promise<string> | null = null;
+let refreshSession: string | null = null;
 
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -41,10 +42,14 @@ async function refreshAccessToken() {
   if (!refreshToken) {
     throw new Error("请重新登录");
   }
-  if (!refreshPromise) {
-    refreshPromise = refreshHttp
+  if (!refreshPromise || refreshSession !== refreshToken) {
+    refreshSession = refreshToken;
+    const pending = refreshHttp
       .post("/auth/refresh", { refresh_token: refreshToken })
       .then((response) => {
+        if (localStorage.getItem('bf_refresh_token') !== refreshToken) {
+          throw new ApiRequestError('账号已切换，请重试', 409);
+        }
         const data = response.data.data;
         const token = data.access_token || data.token;
         localStorage.setItem("bf_token", token);
@@ -53,8 +58,9 @@ async function refreshAccessToken() {
         return token;
       })
       .finally(() => {
-        refreshPromise = null;
+        if (refreshPromise === pending) { refreshPromise = null; refreshSession = null; }
       });
+    refreshPromise = pending;
   }
   return refreshPromise;
 }
@@ -75,6 +81,10 @@ http.interceptors.response.use(
     const message = responseData?.message || "请求失败";
     const originalConfig = error.config as RetryConfig | undefined;
     const requestUrl = originalConfig?.url || "";
+    const sentAuthorization = originalConfig?.headers?.Authorization;
+    const sessionUnchanged = () => sentAuthorization === `Bearer ${localStorage.getItem('bf_token')}`;
+    // A delayed failure from the previous account cannot erase a newly accepted phone login.
+    if (sentAuthorization && !sessionUnchanged()) return Promise.reject(new ApiRequestError(message, status));
     if (status === 401 && originalConfig && !originalConfig._retry && !requestUrl.includes("/auth/")) {
       originalConfig._retry = true;
       try {
@@ -82,6 +92,7 @@ http.interceptors.response.use(
         originalConfig.headers.Authorization = `Bearer ${token}`;
         return http(originalConfig);
       } catch {
+        if (sentAuthorization && !sessionUnchanged()) return Promise.reject(new ApiRequestError('账号已切换，请重试', 409));
         clearLocalSession();
         if (window.location.pathname !== "/login") {
           window.location.assign("/login");

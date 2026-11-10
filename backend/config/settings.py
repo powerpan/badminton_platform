@@ -34,6 +34,7 @@ class Settings:
     redis_host: str
     redis_port: int
     redis_db: int
+    mobile_web_origin: str = ""
 
 
 def load_settings() -> Settings:
@@ -56,4 +57,5 @@ def load_settings() -> Settings:
         redis_host=os.getenv("REDIS_HOST", "127.0.0.1"),
         redis_port=_int_env("REDIS_PORT", 6379),
         redis_db=_int_env("REDIS_DB", 0),
+        mobile_web_origin=os.getenv("MOBILE_WEB_ORIGIN", ""),
     )

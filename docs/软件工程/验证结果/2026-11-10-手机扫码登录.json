@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-10",
+  "status": "local_checks_passed",
+  "deployment": "not_deployed",
+  "user_trial": {
+    "date": "2026-11-10",
+    "feedback": "没啥问题，推送到仓库吧",
+    "environment": "existing isolated local demo",
+    "device_details": "not specified",
+    "push_authorized": true
+  },
+  "backend_tests": 70,
+  "new_backend_tests": 14,
+  "frontend_tests": 18,
+  "new_frontend_tests": 6,
+  "shop_integration_groups": 9,
+  "build": "passed",
+  "browser": {
+    "tool": "CUA in-app browser",
+    "desktop": [
+      1280,
+      900
+    ],
+    "mobile": [
+      390,
+      844
+    ],
+    "console_errors_warnings": [],
+    "flows": [
+      "desktop balance payment to QR",
+      "matching pairing code and desktop approval",
+      "phone login and exact order pickup",
+      "different existing account requires confirmation; cancel retains account",
+      "deny terminates waiting",
+      "mobile mock payment skips desktop authorization",
+      "frontdesk redemption updates phone credential"
+    ],
+    "qr_decoding": "rendered screenshot and SVG decoded; no real phone camera"
+  },
+  "sql": {
+    "passed": true,
+    "database": "isolated temporary MySQL 5.7",
+    "orders": [
+      {
+        "status": "completed",
+        "count": 1
+      },
+      {
+        "status": "paid",
+        "count": 2
+      }
+    ],
+    "product": {
+      "stock": 27,
+      "sold_count": 3
+    },
+    "account": {
+      "balance_cents": 36400
+    },
+    "ledger": {
+      "count": 2
+    },
+    "pickups": [
+      {
+        "status": "ready",
+        "count": 2
+      },
+      {
+        "status": "redeemed",
+        "count": 1
+      }
+    ],
+    "payments": [
+      {
+        "status": "succeeded",
+        "count": 3
+      }
+    ]
+  },
+  "remaining": [
+    "physical phone camera and WeChat webview",
+    "production HTTPS and routing",
+    "physical barcode scanner",
+    "physical network-disconnection test"
+  ],
+  "artifacts": [
+    "电脑授权手机",
+    "手机取货凭证",
+    "手机账号切换",
+    "手机拒绝授权",
+    "手机已领取"
+  ]
+}

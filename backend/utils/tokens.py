@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import jwt
+import secrets
 
 from utils.response import ApiError
 
@@ -20,6 +21,7 @@ def create_access_token(
         "username": username,
         "role": role,
         "token_type": "access",
+        "jti": secrets.token_hex(16),
         "iat": now,
         "exp": now + timedelta(seconds=expire_seconds),
     }
@@ -48,7 +50,7 @@ def create_refresh_token(
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
-def decode_access_token(token: str, secret: str) -> dict[str, Any]:
+def _decode_token(token: str, secret: str) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
     except jwt.ExpiredSignatureError as exc:
@@ -59,14 +61,18 @@ def decode_access_token(token: str, secret: str) -> dict[str, Any]:
     user_id = payload.get("user_id")
     if not isinstance(user_id, int):
         raise ApiError(401, "登录状态无效，请重新登录", 401)
-    token_type = payload.get("token_type")
-    if token_type not in (None, "access"):
+    return payload
+
+
+def decode_access_token(token: str, secret: str) -> dict[str, Any]:
+    payload = _decode_token(token, secret)
+    if payload.get("token_type") not in (None, "access"):
         raise ApiError(401, "登录状态无效，请重新登录", 401)
     return payload
 
 
 def decode_refresh_token(token: str, secret: str) -> dict[str, Any]:
-    payload = decode_access_token(token, secret)
+    payload = _decode_token(token, secret)
     if payload.get("token_type") != "refresh":
         raise ApiError(401, "刷新登录状态无效，请重新登录", 401)
     token_id = payload.get("token_id")

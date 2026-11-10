@@ -99,7 +99,12 @@ export const useAuthStore = defineStore("auth", {
       if (!this.token) {
         return null;
       }
+      const session = this.refreshToken;
       const response = await getProfile();
+      // A late response from the old account must not overwrite a phone handoff.
+      if (this.refreshToken !== session) return this.user;
+      this.token = localStorage.getItem('bf_token') || this.token;
+      this.refreshToken = localStorage.getItem('bf_refresh_token') || this.refreshToken;
       this.setProfile(response.data);
       return this.user;
     },
